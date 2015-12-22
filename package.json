@@ -1,0 +1,10 @@
+{
+  "name": "gonimo-front",
+  "version": "1.0.0",
+  "description": "Frontend code for gonimo.org",
+  "dependencies": {
+    "virtual-dom": "^2.1.1"
+  },
+  "author": "Robert Klotzner <robert.klotzner AT gmx.at>",
+  "license": "AGPLv3"
+}
