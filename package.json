@@ -1,6 +1,6 @@
 {
   "name": "gonimo-front",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Frontend code for gonimo.org",
   "dependencies": {
     "virtual-dom": "^2.1.1"
