@@ -5,6 +5,22 @@
   "dependencies": {
     "virtual-dom": "^2.1.1"
   },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/gonimo/gonimo-front.git"
+  },
   "author": "Robert Klotzner <robert.klotzner AT gmx.at>",
-  "license": "AGPLv3"
+  "license": "AGPL-3.0",
+  "bugs": {
+    "url": "https://github.com/gonimo/gonimo-front/issues"
+  },
+  "homepage": "https://gonimo.com",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
 }
