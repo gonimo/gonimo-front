@@ -9,7 +9,7 @@ import Control.Monad.Eff (Eff())
 import Control.Monad.Eff.Exception (throwException)
 import Data.Generic
 import Network.HTTP.Affjax
-import Data.Foreign.Generic
+import Data.Argonaut.Encode
 
 type FamilyId = Int
 type EmailAddress = String
@@ -22,5 +22,4 @@ derive instance genericInvitation :: Generic Invitation
 --  read = readGeneric defaultOptions
 
 sendInvitation :: forall e . FamilyId -> Invitation -> Affjax e Unit
-sendInvitation fid inv = post "http://localhost:8081/1/" (toForeignGeneric inv)
-
+sendInvitation fid inv = post "http://localhost:8081/1/" (gEncodeJson inv)
