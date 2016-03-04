@@ -15,6 +15,8 @@
     "purescript-halogen": "^0.5.9",
     "purescript-affjax": "~0.10.1",
     "purescript-foreign-generic": "~0.3.0",
-    "purescript-argonaut-codecs": "~0.6.1"
+    "purescript-argonaut-codecs": "~0.6.1",
+    "purescript-exceptions": "~0.3.4",
+    "purescript-transformers": "~0.8.4"
   }
 }
