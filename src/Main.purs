@@ -39,7 +39,8 @@ helloC = component render eval
   res <- Ajax.get "/users"
   log $ "Google result: " <> res.response
 --}
-
+{--
 mymain = runAff throwException (const (pure unit)) do
   r <- sendInvitation 8 (EmailInvitation "robert@google.com")
   log $ show r.status <> show r.response <> show r.headers
+--}
