@@ -1,5 +1,6 @@
 module Gonimo.Server.Types where
 
+import Prelude
 import Network.HTTP.Affjax
 import Network.HTTP.Affjax.Request
 import Network.HTTP.RequestHeader
@@ -7,8 +8,8 @@ import Control.Monad.Aff
 import Control.Monad.Reader.Class
 import Control.Monad.Reader.Trans
 import Data.Argonaut.Core
+import Data.Maybe
 import Data.Generic
-
 
 -- Used in the ServerT Reader monad for accessing common parameters
 type Config = {
@@ -23,13 +24,15 @@ type ServerRequest = AffjaxRequest Json
 type EmailAddress = String
 type FamilyName = String
 
+
 data UserName = UserNameEmail EmailAddress
   | UserNamePhone String
 derive instance genericUserName :: Generic UserName
 
-
 data AuthToken = GonimoSecret Secret
 derive instance genericAuthToken :: Generic AuthToken
+instance showAuthToken :: Show AuthToken where
+  show = gShow
 
 type Secret = String -- Good enough on the client side - no need to decode
 
@@ -66,6 +69,10 @@ type AccountId = DbId
 type InvitationId = DbId
 type DateString = String
 
-newtype MyUnit = MyUnit {}
+data MyUnit = MyUnit
 
-derive instance genericMyUnit :: Generic MyUnit
+instance genericMyUnit :: Generic MyUnit where
+  toSpine _ = SArray []
+  toSignature _ = SigArray (\_ -> SigInt)
+  fromSpine (SArray []) = Just MyUnit
+  fromSpine _ = Nothing

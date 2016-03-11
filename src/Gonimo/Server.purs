@@ -23,13 +23,13 @@ import Network.HTTP.Method
 import Network.HTTP.StatusCode
 import Data.Argonaut.Encode
 import Data.Argonaut.Decode
-
+import Data.Argonaut.Aeson
 
 import Gonimo.Server.Types
 
 ----------------------- Endpoints --------------------------------------
-createAccountReq :: forall e. Maybe Credentials -> ServerT e (Tuple AccountId AuthToken)
-createAccountReq = doRequest expect201 <=< basicArgRequest POST "accounts"
+createAccount :: forall e. Maybe Credentials -> ServerT e (Tuple AccountId AuthToken)
+createAccount = doRequest expect201 <=< basicArgRequest POST "accounts"
 
 createInvitation :: forall e. FamilyId -> ServerT e (Tuple InvitationId Invitation)
 createInvitation = doRequest expect201 <=< basicArgRequest POST "invitations"
