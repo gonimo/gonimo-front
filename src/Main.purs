@@ -8,9 +8,11 @@ import Control.Monad.Aff.Console (log)
 import qualified Control.Monad.Aff as Aff
 import Control.Monad.Eff (Eff())
 import Control.Monad.Eff.Class
+import Control.Monad.Eff.Console (CONSOLE)
 import Control.Monad.Eff.Exception (throwException, error)
 import Control.Monad.Error.Class
 import Control.Monad.Reader.Trans
+import Data.Generic
 import Data.Maybe
 import Data.Tuple
 import Data.Argonaut.Core
@@ -28,6 +30,8 @@ import qualified Network.HTTP.Affjax as Ajax
 
 import Gonimo.Server
 import Gonimo.Server.Types
+import Gonimo.LocalStorage
+import Browser.LocalStorage
 
 type Model = Unit
 
@@ -58,13 +62,21 @@ testConfig =  {
   , headers : []
 }
 
-affMain :: forall e. ServerT e Unit
+affMain :: forall eff. ServerT (storage :: STORAGE, console :: CONSOLE | eff ) Unit
 affMain = do
-  treq <- basicArgRequest POST "accounts" (Nothing :: Maybe Credentials)
-  (resp :: AffjaxResponse String) <- liftAff $ affjax treq
-  throwError $ error $ show resp.status <> ":" <> show resp.response
+  -- treq <- basicArgRequest POST "accounts" (Nothing :: Maybe Credentials)
+  -- (resp :: AffjaxResponse String) <- liftAff $ affjax treq
+  -- throwError $ error $ show resp.status <> ":" <> show resp.response
+  account <- createAccount Nothing
+  lift $ liftEff $ localStorage.setItem accountData account
+  readAccount <- lift $ liftEff $ localStorage.getItem accountData
+  throwError $ error $ gShow readAccount
+  return unit
+  {--
+  lift $ log $ gShow readAccount
+  --}
   -- Tuple aid token <- createAccount Nothing
   -- liftAff $ log $ show aid <> ":" <> show token
 
-mymain = runAff throwException (const (pure unit))
+main = runAff throwException (const (pure unit))
   $ runReaderT affMain testConfig
