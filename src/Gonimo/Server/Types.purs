@@ -8,6 +8,7 @@ import Control.Monad.Aff
 import Control.Monad.Reader.Class
 import Control.Monad.Reader.Trans
 import Data.Argonaut.Core
+import Data.Tuple
 import Data.Maybe
 import Data.Generic
 
@@ -24,6 +25,7 @@ type ServerRequest = AffjaxRequest Json
 type EmailAddress = String
 type FamilyName = String
 
+type MachineCredentials = Tuple AccountId AuthToken
 
 data UserName = UserNameEmail EmailAddress
   | UserNamePhone String

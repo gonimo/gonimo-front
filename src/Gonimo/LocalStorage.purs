@@ -5,10 +5,9 @@ import Data.Generic
 import Data.Tuple
 import Gonimo.Server.Types
 
-data StorageData a =
-  AccountData
+data Key a = MachineCredentials
 
-derive instance genericStorageData :: Generic (StorageData a)
+derive instance genericStorageData :: Generic (Key a)
 
-accountData :: StorageData (Tuple AccountId AuthToken)
-accountData = AccountData
+machineCredentials :: Key MachineCredentials
+machineCredentials = MachineCredentials

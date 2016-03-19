@@ -6,7 +6,6 @@ import Control.Monad.Aff (runAff)
 import Control.Monad.Aff.Class
 import Control.Monad.Aff.Console (log)
 import qualified Control.Monad.Aff as Aff
-import Control.Monad.Eff (Eff())
 import Control.Monad.Eff.Class
 import Control.Monad.Eff.Console (CONSOLE)
 import Control.Monad.Eff.Exception (throwException, error)
@@ -30,7 +29,7 @@ import qualified Network.HTTP.Affjax as Ajax
 
 import Gonimo.Server
 import Gonimo.Server.Types
-import Gonimo.LocalStorage
+import Gonimo.LocalStorage as Key
 import Browser.LocalStorage
 
 type Model = Unit
@@ -62,15 +61,32 @@ testConfig =  {
   , headers : []
 }
 
+
+getMachineCredentials :: forall e. ServerT (storage :: STORAGE | e) (Tuple AccountId AuthToken)
+getMachineCredentials = do
+    macc <- liftEff $ localStorage.getItem Key.machineCredentials
+    case macc of
+      Nothing -> createAndSave
+      Just acc -> return acc
+  where
+    createAndSave = do
+      acc <- createAccount Nothing
+      liftEff $ localStorage.setItem Key.machineCredentials acc
+      return acc
+
+
 affMain :: forall eff. ServerT (storage :: STORAGE, console :: CONSOLE | eff ) Unit
 affMain = do
   -- treq <- basicArgRequest POST "accounts" (Nothing :: Maybe Credentials)
   -- (resp :: AffjaxResponse String) <- liftAff $ affjax treq
   -- throwError $ error $ show resp.status <> ":" <> show resp.response
-  account <- createAccount Nothing
-  lift $ liftEff $ localStorage.setItem accountData account
-  readAccount <- lift $ liftEff $ localStorage.getItem accountData
-  throwError $ error $ gShow readAccount
+
+  liftAff $ log "Creating/getting an account ... "
+  account <- getMachineCredentials
+  liftAff $ log "Got account - juhu!"
+  liftEff $ localStorage.setItem Key.machineCredentials account
+  readAccount <- lift $ liftEff $ localStorage.getItem Key.machineCredentials
+  liftAff $ log $ gShow readAccount
   return unit
   {--
   lift $ log $ gShow readAccount

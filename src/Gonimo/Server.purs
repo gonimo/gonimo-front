@@ -28,7 +28,7 @@ import Data.Argonaut.Aeson
 import Gonimo.Server.Types
 
 ----------------------- Endpoints --------------------------------------
-createAccount :: forall e. Maybe Credentials -> ServerT e (Tuple AccountId AuthToken)
+createAccount :: forall e. Maybe Credentials -> ServerT e MachineCredentials
 createAccount = doRequest expect201 <=< basicArgRequest POST "accounts"
 
 createInvitation :: forall e. FamilyId -> ServerT e (Tuple InvitationId Invitation)
