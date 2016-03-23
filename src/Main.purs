@@ -21,31 +21,12 @@ import Network.HTTP.Affjax.Request
 import Network.HTTP.Method
 import Network.HTTP.StatusCode
 
-import Halogen
-import Halogen.Util (appendToBody, onLoad)
-import qualified Halogen.HTML.Indexed as H
-import qualified Halogen.HTML.Events.Indexed as E
 import qualified Network.HTTP.Affjax as Ajax
 
 import Gonimo.Server
 import Gonimo.Server.Types
 import Gonimo.LocalStorage as Key
 import Browser.LocalStorage
-
-type Model = Unit
-
-
-data Query a = Query a
-
-helloC :: forall g . (Functor g) => Component Model Query g
-helloC = component render eval
-  where
-    render ::  Model -> ComponentHTML Query
-    render _ = H.span
-                []
-                [ H.text "Hello sailor!" ]
-    eval :: Natural Query (ComponentDSL Model Query g)
-    eval (Query next) = pure next
 
 
 -- main :: forall eff . Eff (HalogenEffects eff) Unit

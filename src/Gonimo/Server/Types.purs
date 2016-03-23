@@ -11,6 +11,8 @@ import Data.Argonaut.Core
 import Data.Tuple
 import Data.Maybe
 import Data.Generic
+import Control.Monad.Eff.Console (CONSOLE)
+
 
 -- Used in the ServerT Reader monad for accessing common parameters
 type Config = {
