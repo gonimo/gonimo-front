@@ -31,7 +31,7 @@ import Gonimo.Server.Types
 createAccount :: forall e. Maybe Credentials -> ServerT e MachineCredentials
 createAccount = doRequest expect201 <=< basicArgRequest POST "accounts"
 
-createInvitation :: forall e. FamilyId -> ServerT e (Tuple InvitationId Invitation)
+createInvitation :: forall e. FamilyId -> ServerT e (Tuple (Key Invitation) Invitation)
 createInvitation = doRequest expect201 <=< basicArgRequest POST "invitations"
 
 acceptInvitation :: forall e. Secret -> ServerT e Invitation
@@ -43,7 +43,7 @@ acceptInvitation = doRequest expect200 <=< basicArgRequest DELETE "invitations"
 sendInvitation :: forall e. SendInvitation -> ServerT e MyUnit
 sendInvitation = doRequest expect201 <=< basicArgRequest POST "invitationOutbox"
 
-createFamily :: forall e. FamilyName -> ServerT e FamilyId
+createFamily :: forall e. FamilyName -> ServerT e (Key Family)
 createFamily = doRequest expect201 <=< basicArgRequest POST "families"
 
 ----------------------- Helper functions --------------------------------
