@@ -14,6 +14,7 @@ import Control.Monad.State.Trans
 import Control.Monad.Eff.Exception
 
 
+{--
 type GonimoT e = StateT Int (Aff (err :: EXCEPTION | e))
 
 -- testGonimo :: forall m. ( MonadState Int m, Monad m) => m Int
@@ -30,7 +31,6 @@ runGonimo = runAff handleError handleResult $ runStateT testGonimo 0
      handleError e = log $ "Caught error: " <> show e
      handleResult r = log $ "Got result: " <> show r
 
-{--
 import Gonimo.AppState
 runGonimo
 --}

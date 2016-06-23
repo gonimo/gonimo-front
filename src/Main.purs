@@ -5,7 +5,7 @@ import Prelude
 import Control.Monad.Aff (runAff)
 import Control.Monad.Aff.Class
 import Control.Monad.Aff.Console (log)
-import qualified Control.Monad.Aff as Aff
+import Control.Monad.Aff as Aff
 import Control.Monad.Eff.Class
 import Control.Monad.Eff.Console (CONSOLE)
 import Control.Monad.Eff.Exception (throwException, error)
@@ -18,15 +18,16 @@ import Data.Argonaut.Core
 
 import Network.HTTP.Affjax
 import Network.HTTP.Affjax.Request
-import Network.HTTP.Method
+import Data.HTTP.Method
 import Network.HTTP.StatusCode
 
-import qualified Network.HTTP.Affjax as Ajax
+import Network.HTTP.Affjax as Ajax
 
-import Gonimo.Server
 import Gonimo.Server.Types
+import Gonimo.Types
 import Gonimo.LocalStorage as Key
 import Browser.LocalStorage
+import Gonimo.WebAPI
 
 
 -- main :: forall eff . Eff (HalogenEffects eff) Unit
@@ -37,43 +38,42 @@ import Browser.LocalStorage
   log $ "Google result: " <> res.response
 --}
 
-testConfig =  {
-  baseUrl : "http://localhost:8081/"
-  , headers : []
-}
+-- testConfig =  {
+--   baseUrl : "http://localhost:8081/"
+--   , headers : []
+-- }
 
+-- getMachineCredentials :: forall e. ServerT (storage :: STORAGE | e) (Tuple (Key Account) AuthToken)
+-- getMachineCredentials = do
+--     macc <- liftEff $ localStorage.getItem Key.machineCredentials
+--     case macc of
+--       Nothing -> createAndSave
+--       Just acc -> return acc
+--   where
+--     createAndSave = do
+--       acc <- createAccount Nothing
+--       liftEff $ localStorage.setItem Key.machineCredentials acc
+--       return acc
 
-getMachineCredentials :: forall e. ServerT (storage :: STORAGE | e) (Tuple AccountId AuthToken)
-getMachineCredentials = do
-    macc <- liftEff $ localStorage.getItem Key.machineCredentials
-    case macc of
-      Nothing -> createAndSave
-      Just acc -> return acc
-  where
-    createAndSave = do
-      acc <- createAccount Nothing
-      liftEff $ localStorage.setItem Key.machineCredentials acc
-      return acc
+-- affMain :: forall eff. ServerT (storage :: STORAGE, console :: CONSOLE | eff ) Unit
+-- affMain = do
+--   -- treq <- basicArgRequest POST "accounts" (Nothing :: Maybe Credentials)
+--   -- (resp :: AffjaxResponse String) <- liftAff $ affjax treq
+--   -- throwError $ error $ show resp.status <> ":" <> show resp.response
 
+--   liftAff $ log "Creating/getting an account ... "
+--   account <- getMachineCredentials
+--   liftAff $ log "Got account - juhu!"
+--   liftEff $ localStorage.setItem Key.machineCredentials account
+--   readAccount <- lift $ liftEff $ localStorage.getItem Key.machineCredentials
+--   liftAff $ log $ gShow readAccount
+--   return unit
+--   {--
+--   lift $ log $ gShow readAccount
+--   --}
+--   -- Tuple aid token <- createAccount Nothing
+--   -- liftAff $ log $ show aid <> ":" <> show token
 
-affMain :: forall eff. ServerT (storage :: STORAGE, console :: CONSOLE | eff ) Unit
-affMain = do
-  -- treq <- basicArgRequest POST "accounts" (Nothing :: Maybe Credentials)
-  -- (resp :: AffjaxResponse String) <- liftAff $ affjax treq
-  -- throwError $ error $ show resp.status <> ":" <> show resp.response
+-- main = runAff throwException (const (pure unit))
+--   $ runReaderT affMain testConfig
 
-  liftAff $ log "Creating/getting an account ... "
-  account <- getMachineCredentials
-  liftAff $ log "Got account - juhu!"
-  liftEff $ localStorage.setItem Key.machineCredentials account
-  readAccount <- lift $ liftEff $ localStorage.getItem Key.machineCredentials
-  liftAff $ log $ gShow readAccount
-  return unit
-  {--
-  lift $ log $ gShow readAccount
-  --}
-  -- Tuple aid token <- createAccount Nothing
-  -- liftAff $ log $ show aid <> ":" <> show token
-
-main = runAff throwException (const (pure unit))
-  $ runReaderT affMain testConfig
