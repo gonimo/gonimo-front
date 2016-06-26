@@ -5,3 +5,4 @@
 /.psci*
 /src/.webpack.js
 /dist/gonimo-front.js
+/dist/app.js

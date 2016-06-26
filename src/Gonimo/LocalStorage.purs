@@ -1,6 +1,16 @@
 module Gonimo.LocalStorage where
 
-import Browser.LocalStorage
-import Data.Generic
-import Data.Tuple
-import Gonimo.Server.Types
+
+import Data.Generic (class Generic)
+
+import Gonimo.WebAPI.Types as API
+
+
+
+data Key a = AuthData
+
+
+authData :: Key API.AuthData
+authData = AuthData
+
+derive instance genericKey :: Generic (Key a)

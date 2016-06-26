@@ -9,30 +9,49 @@ import Control.Monad.Reader.Class (ask, class MonadReader)
 import Data.Argonaut.Generic.Aeson (decodeJson, encodeJson)
 import Data.Argonaut.Printer (printJson)
 import Data.Maybe (Maybe(..))
-import Data.Nullable (toNullable)
+import Data.Nullable (Nullable(), toNullable)
 import Data.Tuple (Tuple)
 import Global (encodeURIComponent)
-import Gonimo.Server.DbEntities (Invitation, SendInvitation)
-import Gonimo.Server.Types (Family, Key, Secret)
-import Gonimo.Types (AuthToken, Coffee)
+import Gonimo.Server.DbEntities (Invitation)
+import Gonimo.Server.Types (AuthToken, Coffee)
+import Gonimo.Types (Family, Key, Secret)
+import Gonimo.WebAPI.Types (AuthData, SendInvitation)
 import Network.HTTP.Affjax (AJAX)
 import Prelude (Unit)
 import Prim (String)
 import Servant.PureScript.Affjax (AjaxError(..), affjax, defaultRequest)
 import Servant.PureScript.Settings (SPSettings_(..), gDefaultToURLPiece)
-import Servant.PureScript.Util (getResult)
+import Servant.PureScript.Util (encodeListQuery, encodeQueryItem, getResult)
 
-
-newtype SPParams_ = SPParams_ { baseURL :: String
+newtype SPParams_ = SPParams_ { authorization :: AuthToken
+                              , baseURL :: String
                               }
 
-postInvitations :: forall eff m.
-                (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-                => AuthToken -> Key Family
-                -> m (Tuple (Key Invitation) Invitation)
-postInvitations authorization reqBody = do
+postAccounts :: forall eff m.
+             (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
+             => m AuthData
+postAccounts = do
   SPSettings_ spOpts_ <- ask
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
+  let baseURL = spParams_.baseURL
+  let httpMethod = "POST"
+  let reqUrl = baseURL <> "accounts"
+  let reqHeaders =
+        []
+  affResp <- liftAff $ affjax defaultRequest
+                                { method = httpMethod
+                                , url = reqUrl
+                                , headers = defaultRequest.headers <> reqHeaders
+                                }
+  getResult decodeJson affResp
+  
+postInvitations :: forall eff m.
+                (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
+                => Key Family -> m (Tuple (Key Invitation) Invitation)
+postInvitations reqBody = do
+  SPSettings_ spOpts_ <- ask
+  let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
+  let authorization = spParams_.authorization
   let baseURL = spParams_.baseURL
   let httpMethod = "POST"
   let reqUrl = baseURL <> "invitations"
@@ -50,10 +69,11 @@ postInvitations authorization reqBody = do
   
 deleteInvitations :: forall eff m.
                   (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-                  => AuthToken -> Secret -> m Invitation
-deleteInvitations authorization reqBody = do
+                  => Secret -> m Invitation
+deleteInvitations reqBody = do
   SPSettings_ spOpts_ <- ask
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
+  let authorization = spParams_.authorization
   let baseURL = spParams_.baseURL
   let httpMethod = "DELETE"
   let reqUrl = baseURL <> "invitations"
@@ -71,10 +91,11 @@ deleteInvitations authorization reqBody = do
   
 postInvitationOutbox :: forall eff m.
                      (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-                     => AuthToken -> SendInvitation -> m Unit
-postInvitationOutbox authorization reqBody = do
+                     => SendInvitation -> m Unit
+postInvitationOutbox reqBody = do
   SPSettings_ spOpts_ <- ask
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
+  let authorization = spParams_.authorization
   let baseURL = spParams_.baseURL
   let httpMethod = "POST"
   let reqUrl = baseURL <> "invitationOutbox"
@@ -92,10 +113,11 @@ postInvitationOutbox authorization reqBody = do
   
 postFamilies :: forall eff m.
              (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-             => AuthToken -> String -> m (Key Family)
-postFamilies authorization reqBody = do
+             => String -> m (Key Family)
+postFamilies reqBody = do
   SPSettings_ spOpts_ <- ask
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
+  let authorization = spParams_.authorization
   let baseURL = spParams_.baseURL
   let httpMethod = "POST"
   let reqUrl = baseURL <> "families"
