@@ -19,18 +19,18 @@ data State = Loading
              , settings :: Settings
              }
 
-data Action = NOP
+data Action = LoadState
 
 update :: Action -> State -> State
-update _ = id
+update LoadState = id
 
 view :: State -> Html Action
 view state =
   div [ A.id_ "site" ]
     [ div [ A.id_ "main"]
-              [ img [ A.id_ "logo", A.src "pix/gonimo-21.jpg", A.alt "Gonimo Logo"] []
-              , span [] [ text "Loading your gonimo, stay tight ..."]
-              ]
+        [ img [ A.id_ "logo", A.src "pix/gonimo-21.jpg", A.alt "Gonimo Logo"] []
+        , span [] [ text "Loading your gonimo, stay tight ..."]
+        ]
     ]
 
 getAuthData :: forall eff. Client.Effects(storage :: STORAGE | eff) AuthData
