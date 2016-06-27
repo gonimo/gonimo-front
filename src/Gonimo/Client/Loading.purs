@@ -17,23 +17,29 @@ import Servant.PureScript.Settings (defaultSettings, SPSettings_(SPSettings_))
 import Signal (constant, Signal)
 
 
+import Gonimo.Client.Init as Init
+import Gonimo.Client.LocalStorage as Key
+import Gonimo.Client.Types as Client
+import Gonimo.Client.Html (viewLogo)
 import Gonimo.Client.Types (runEffectsT, Settings)
 import Gonimo.Server.Types (AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (Secret(Secret))
 import Gonimo.WebAPI (SPParams_(SPParams_), postAccounts)
 import Gonimo.WebAPI.Types (AuthData(AuthData))
-import Gonimo.Client.Types as Client
-import Gonimo.LocalStorage as Key
-import Gonimo.Client.Init as Init
+import Gonimo.Client.Effects as Gonimo
 
 data State = Loading
 
 
-data Action = Init.Action
+type Action = Init.Action
 
 
-update :: forall eff. Action -> EffModel State Action (Client.EffEffects eff)
-update Start = onlyEffects Loading [ init ]
+update :: forall eff. Action -> State -> EffModel State Action (Client.EffEffects eff)
+update Init.Start _ = onlyEffects Loading [ Init.init ]
+update _ _ = onlyEffects Loading $ [ do Gonimo.log "Loading can only handle Init.Start!"
+                                        unsafeCrashWith "Shit happens!"
+                                   ]
+
 
 view :: State -> Html Action
 view _ = viewLogo $ span [] [ text "Loading your gonimo, stay tight ..."]

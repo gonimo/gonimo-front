@@ -3,21 +3,19 @@ module Gonimo.Client.Types where
 import Prelude
 import Servant.PureScript.Affjax as Affjax
 import Browser.LocalStorage (STORAGE)
-
-
 import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.Class (liftAff, class MonadAff)
 import Control.Monad.Eff.Class (liftEff, class MonadEff)
+import Control.Monad.Eff.Console (CONSOLE)
 import Control.Monad.Error.Class (catchError, throwError)
-
 import Control.Monad.Except.Trans (class MonadError, ExceptT)
 import Control.Monad.Reader.Class (local, ask, class MonadReader)
 import Control.Monad.Reader.Trans (ReaderT)
-
-import Gonimo.WebAPI (SPParams_())
+import Data.Generic (class Generic)
+import Gonimo.WebAPI (SPParams_)
 import Network.HTTP.Affjax (AJAX)
 import Servant.PureScript.Affjax (AjaxError)
-import Servant.PureScript.Settings (SPSettings_())
+import Servant.PureScript.Settings (SPSettings_)
 import Signal.Channel (CHANNEL)
 
 
@@ -29,6 +27,7 @@ derive instance genericError :: Generic Error
 
 type EffEffects eff = ( ajax :: AJAX
                       , channel :: CHANNEL
+                      , console :: CONSOLE
                       , storage :: STORAGE | eff
                       )
 
@@ -38,6 +37,11 @@ type Effects eff = EffectsT (EffEffects eff)
 
 runEffectsT :: forall eff a. EffectsT eff a -> (ReaderT Settings (ExceptT Error (Aff eff)) a)
 runEffectsT (EffectsT m) = m
+
+type EffModel state action eff =
+  { state :: state
+  , effects :: Array (Aff (EffEffects eff) action)
+  }
 
 instance functorEffectsT :: Functor (EffectsT eff) where
   map f (EffectsT m) = EffectsT $ map f m
