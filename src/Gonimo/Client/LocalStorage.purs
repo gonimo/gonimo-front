@@ -1,4 +1,4 @@
-module Gonimo.LocalStorage where
+module Gonimo.Client.LocalStorage where
 
 
 import Data.Generic (class Generic)

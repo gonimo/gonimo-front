@@ -1,3 +1,4 @@
+-- | Replacement types for translated server types.
 module Gonimo.Types where
 
 import Data.Generic (class Generic)
