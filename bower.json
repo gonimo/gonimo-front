@@ -12,7 +12,7 @@
   ],
   "dependencies": {
     "purescript-pux": "git@github.com:Thimoteus/purescript-pux.git#master",
-    "purescript-affjax": "git@github.com:eskimor/purescript-affjax#added-generics",
+    "purescript-affjax": "^1.1.0",
     "purescript-argonaut-generic-codecs": "^1.0.0",
     "purescript-generics": "^1.0.0",
     "purescript-partial": "^1.1.2",
