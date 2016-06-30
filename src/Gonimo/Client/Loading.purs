@@ -2,7 +2,6 @@ module Gonimo.Client.Loading where
 
 import Prelude
 import Gonimo.Client.Effects as Gonimo
-import Gonimo.Client.Init as Init
 import Gonimo.Client.LocalStorage as Key
 import Gonimo.Client.Types as Client
 import Pux.Html.Attributes as A
@@ -48,7 +47,7 @@ update (ReportError error) Loading = onlyEffects Loading $ [ do Gonimo.error err
                                                                 pure Nop
                                                           ]
 update Nop Loading                 = noEffects Loading
-update _ _                         = onlyEffects Loading $ [ do Gonimo.log "Loading can only handle Init.Start!"
+update _ _                         = onlyEffects Loading $ [ do Gonimo.log "Loading can only handle Start, ReportError and Nop!"
                                                                 unsafeCrashWith "Shit happens!"
                                    ]
 

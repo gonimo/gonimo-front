@@ -2,7 +2,6 @@ module Main where
 
 import Prelude
 import Gonimo.Client.Effects as Gonimo
-import Gonimo.Client.Init as Init
 import Gonimo.Client.Loaded as LoadedC
 import Gonimo.Client.Loading as LoadingC
 import Gonimo.Client.LocalStorage as Key

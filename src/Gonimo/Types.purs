@@ -11,7 +11,7 @@ newtype Secret = Secret String
 
 derive instance genericSecret :: Generic Secret
 
-data Key a = Int
+newtype Key a = Key Int
 
 derive instance genericKey :: Generic (Key a)
 
