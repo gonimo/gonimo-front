@@ -1,4 +1,4 @@
-module Gonimo.Client.Loading where
+module Gonimo.UI.Loading where
 
 import Prelude
 import Gonimo.Client.Effects as Gonimo
@@ -16,7 +16,7 @@ import Data.Either (Either(Right, Left))
 import Data.Generic (gShow)
 import Data.Maybe (Maybe(..))
 import Gonimo.Client.Effects (handleError)
-import Gonimo.Client.Html (viewLogo)
+import Gonimo.UI.Html (viewLogo)
 import Gonimo.Client.Types (runEffectsT, Settings)
 import Gonimo.Pux (justEffect, noEffects, onlyEffects, EffModel(EffModel))
 import Gonimo.Server.Types (AuthToken, AuthToken(GonimoSecret))
@@ -29,6 +29,7 @@ import Pux.Html (text, span, Html, img, div, button)
 import Servant.PureScript.Affjax (AjaxError)
 import Servant.PureScript.Settings (defaultSettings, SPSettings_(SPSettings_))
 import Signal (constant, Signal)
+import Gonimo.UI.Invite as InviteC
 
 data State = Loading
 
@@ -36,6 +37,7 @@ data State = Loading
 type LoadedState = {
                authData :: AuthData
              , settings :: Settings
+             , inviteS  :: InviteC.State
              }
 
 data Action = Start
@@ -67,6 +69,7 @@ init = do
     Left err -> pure $ ReportError err
     Right (authData@(AuthData auth)) -> pure $ Init { authData : authData
                                                     , settings : mkSettings auth.authToken
+                                                    , inviteS : InviteC.init
                                                     }
 
 handleInvalidAction :: forall m eff. MonadEff (console :: CONSOLE | eff) m => m Action

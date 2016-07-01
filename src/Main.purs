@@ -2,8 +2,8 @@ module Main where
 
 import Prelude
 import Gonimo.Client.Effects as Gonimo
-import Gonimo.Client.Loaded as LoadedC
-import Gonimo.Client.Loading as LoadingC
+import Gonimo.UI.Loaded as LoadedC
+import Gonimo.UI.Loading as LoadingC
 import Gonimo.Client.LocalStorage as Key
 import Gonimo.Client.Types as Client
 import Pux.Html.Attributes as A

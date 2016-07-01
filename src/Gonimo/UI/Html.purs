@@ -1,5 +1,5 @@
 -- | Html view elements which are generically usefull:
-module Gonimo.Client.Html where
+module Gonimo.UI.Html where
 
 import Pux.Html (Html, img, div)
 import Pux.Html.Attributes as A
