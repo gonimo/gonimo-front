@@ -38,10 +38,6 @@ type Effects eff = EffectsT (EffEffects eff)
 runEffectsT :: forall eff a. EffectsT eff a -> (ReaderT Settings (ExceptT Error (Aff eff)) a)
 runEffectsT (EffectsT m) = m
 
-type EffModel state action eff =
-  { state :: state
-  , effects :: Array (Aff (EffEffects eff) action)
-  }
 
 instance functorEffectsT :: Functor (EffectsT eff) where
   map f (EffectsT m) = EffectsT $ map f m

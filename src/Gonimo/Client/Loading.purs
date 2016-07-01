@@ -8,20 +8,23 @@ import Pux.Html.Attributes as A
 import Pux.Html.Events as E
 import Browser.LocalStorage (STORAGE, localStorage)
 import Control.Monad.Aff (Aff)
-import Control.Monad.Eff.Class (liftEff)
+import Control.Monad.Eff.Class (class MonadEff, liftEff)
+import Control.Monad.Eff.Console (CONSOLE)
 import Control.Monad.Except.Trans (runExceptT)
 import Control.Monad.Reader.Trans (runReaderT)
 import Data.Either (Either(Right, Left))
 import Data.Generic (gShow)
 import Data.Maybe (Maybe(..))
+import Gonimo.Client.Effects (handleError)
 import Gonimo.Client.Html (viewLogo)
 import Gonimo.Client.Types (runEffectsT, Settings)
+import Gonimo.Pux (justEffect, noEffects, onlyEffects, EffModel(EffModel))
 import Gonimo.Server.Types (AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (Secret(Secret))
 import Gonimo.WebAPI (SPParams_(SPParams_), postAccounts)
 import Gonimo.WebAPI.Types (AuthData(AuthData))
 import Partial.Unsafe (unsafeCrashWith)
-import Pux (noEffects, onlyEffects, EffModel, renderToDOM, fromSimple, start)
+import Pux (renderToDOM, fromSimple, start)
 import Pux.Html (text, span, Html, img, div, button)
 import Servant.PureScript.Affjax (AjaxError)
 import Servant.PureScript.Settings (defaultSettings, SPSettings_(SPSettings_))
@@ -41,22 +44,13 @@ data Action = Start
             | Nop
 
 
-update :: forall eff. Action -> State -> EffModel State Action (Client.EffEffects eff)
-update Start s                     = onlyEffects s [ init ]
-update (ReportError error) Loading = onlyEffects Loading $ [ do Gonimo.error error
-                                                                pure Nop
-                                                          ]
-update Nop Loading                 = noEffects Loading
-update _ _                         = onlyEffects Loading $ [ do Gonimo.log "Loading can only handle Start, ReportError and Nop!"
-                                                                unsafeCrashWith "Shit happens!"
-                                   ]
+--------------------------------------------------------------------------------
 
-
-view :: State -> Html Action
-view _ = viewLogo $ div []
-                      [ span [] [ text "Loading your gonimo, stay tight ..."]
-                      , button [E.onClick (const Start)] [ text "Start it!"]
-                      ]
+update :: forall eff. Action -> State -> EffModel eff State Action 
+update Start               = justEffect init
+update (ReportError error) = justEffect $ handleError Nop error
+update Nop                 = noEffects
+update _                   = justEffect handleInvalidAction
 
 
 init :: forall eff. Aff (Client.EffEffects eff) Action
@@ -75,6 +69,11 @@ init = do
                                                     , settings : mkSettings auth.authToken
                                                     }
 
+handleInvalidAction :: forall m eff. MonadEff (console :: CONSOLE | eff) m => m Action
+handleInvalidAction = do
+  Gonimo.log "Loading can only handle Start, ReportError and Nop!"
+  unsafeCrashWith "Shit happens!"
+
 getAuthData :: forall eff. Client.Effects eff AuthData
 getAuthData = do
   md <- liftEff $ localStorage.getItem Key.authData
@@ -87,3 +86,10 @@ getAuthData = do
       liftEff $ localStorage.setItem Key.authData auth
       pure auth
     Just d  -> pure d
+
+--------------------------------------------------------------------------------
+
+view :: State -> Html Action
+view _ = viewLogo $ div []
+                      [ span [] [ text "Loading your gonimo, stay tight ..."]
+                      ]

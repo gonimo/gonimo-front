@@ -15,3 +15,10 @@ log = liftEff <<< Console.log
 
 error :: forall m eff. MonadEff (console :: CONSOLE | eff) m => Error -> m Unit
 error = liftEff <<< Console.error <<< gShow
+
+
+-- | Little UI helper for printing an error and returning some action.
+handleError :: forall action m eff. MonadEff (console :: CONSOLE | eff) m => action -> Error -> m action
+handleError action err = do
+  error err
+  pure action
