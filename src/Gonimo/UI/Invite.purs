@@ -13,8 +13,10 @@ import Browser.LocalStorage (STORAGE, localStorage)
 import Control.Monad.Aff (Aff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Except.Trans (runExceptT)
+import Control.Monad.Reader.Class (ask)
 import Control.Monad.Reader.Trans (runReaderT)
 import Data.Either (Either(Right, Left))
+import Data.Generic (gShow)
 import Data.Maybe (isJust, isNothing, Maybe(..))
 import Data.Tuple (Tuple(Tuple))
 import Gonimo.Client.Effects (handleError)
@@ -69,6 +71,9 @@ update settings action = case action of
 
 handleSendInvitation :: forall eff. State -> Effects eff Action
 handleSendInvitation state = do
+  (SPSettings_ settings) <- ask
+  let params = case settings.params of (SPParams_ params) -> params
+  Gonimo.log $ "Using AuthToken: " <> gShow params.authorization
   fid <- case state.familyId of
     Nothing   -> postFamilies state.familyName
     Just fid' -> pure fid'
