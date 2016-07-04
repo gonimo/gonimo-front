@@ -74,8 +74,8 @@ init = do
 
 handleInvalidAction :: forall m eff. MonadEff (console :: CONSOLE | eff) m => m Action
 handleInvalidAction = do
-  Gonimo.log "Loading can only handle Start, ReportError and Nop!"
-  unsafeCrashWith "Shit happens!"
+  Gonimo.log "ERROR: Unexpected Action in Loading!"
+  pure Nop
 
 getAuthData :: forall eff. Client.Effects eff AuthData
 getAuthData = do
