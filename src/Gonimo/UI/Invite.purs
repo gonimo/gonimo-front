@@ -7,6 +7,7 @@ import Gonimo.UI.Html
 import Gonimo.Client.Effects as Gonimo
 import Gonimo.Client.LocalStorage as Key
 import Gonimo.Client.Types as Client
+import Gonimo.WebAPI.Types as WebAPI
 import Pux.Html.Attributes as A
 import Pux.Html.Events as E
 import Browser.LocalStorage (STORAGE, localStorage)
@@ -22,9 +23,9 @@ import Data.Tuple (Tuple(Tuple))
 import Gonimo.Client.Effects (handleError)
 import Gonimo.Client.Types (Effects, Settings, runEffectsT)
 import Gonimo.Pux (noEffects, justEffect, onlyEffects, EffModel(EffModel))
-import Gonimo.Server.Types (AuthToken, AuthToken(GonimoSecret))
+import Gonimo.Server.Types (InvitationDelivery(EmailInvitation), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (Key(Key), Family(Family), Secret(Secret))
-import Gonimo.WebAPI (postInvitations, postFamilies, SPParams_(SPParams_), postAccounts)
+import Gonimo.WebAPI (postInvitationOutbox, postInvitations, postFamilies, SPParams_(SPParams_), postAccounts)
 import Gonimo.WebAPI.Types (AuthData(AuthData))
 import Partial.Unsafe (unsafeCrashWith)
 import Pux (renderToDOM, fromSimple, start)
@@ -78,6 +79,7 @@ handleSendInvitation state = do
     Nothing   -> postFamilies state.familyName
     Just fid' -> pure fid'
   (Tuple invId invitation) <- postInvitations fid
+  postInvitationOutbox $ WebAPI.SendInvitation invId (EmailInvitation state.email)
   pure InvitationSent
 
 runEffect :: forall eff. Settings -> Effects eff Action
@@ -100,7 +102,7 @@ viewSend state =
   div []
       [ h1 [] [ text "Welcome To Gonimo!"]
       , p []  [ text $ "In order to get you started, invite a second device via email to your family " <> state.familyName <> ":"]
-      , div []
+      , div [ E.onKeyUp handleEnter ]
             [ p []
                 if isNothing state.familyId -- We can only set the family name here, if we are creating one!
                 then
@@ -127,6 +129,9 @@ viewSend state =
                 else []
             ]
       ]
+  where
+    handleEnter :: E.KeyboardEvent -> Action
+    handleEnter ev = if ev.keyCode == 13 then SendInvitation else Nop
 
 viewSent :: State -> Html Action
 viewSent state = viewLogo $ text "Invitation sucessfully sent!"
