@@ -7,7 +7,7 @@ import Control.Monad.Eff.Console (CONSOLE)
 import Data.Generic (gShow)
 import Gonimo.Client.Types (Error)
 
--- run :: forall eff a. Settings -> Effects eff -> Aff (Effects eff) a
+-- run :: forall eff a. Settings -> Gonimo eff -> Aff (Effects eff) a
 -- run = 
 
 log :: forall m eff. MonadEff (console :: CONSOLE | eff) m => String -> m Unit

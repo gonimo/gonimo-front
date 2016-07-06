@@ -6,7 +6,7 @@ import Prelude
 import Gonimo.UI.Html
 import Gonimo.Client.Effects as Gonimo
 import Gonimo.Client.LocalStorage as Key
-import Gonimo.Client.Types as Client
+import Gonimo.Client.Types as Gonimo
 import Gonimo.WebAPI.Types as WebAPI
 import Pux.Html.Attributes as A
 import Pux.Html.Events as E
@@ -21,8 +21,8 @@ import Data.Generic (gShow)
 import Data.Maybe (isJust, isNothing, Maybe(..))
 import Data.Tuple (Tuple(Tuple))
 import Gonimo.Client.Effects (handleError)
-import Gonimo.Client.Types (Effects, Settings, runEffectsT)
-import Gonimo.Pux (noEffects, justEffect, onlyEffects, EffModel(EffModel))
+import Gonimo.Client.Types (Gonimo, Settings, runGonimoT, class ReportErrorAction)
+import Gonimo.Pux (noEffects, justEffect, onlyEffects, EffModel(EffModel), justGonimo)
 import Gonimo.Server.Types (InvitationDelivery(EmailInvitation), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (Key(Key), Family(Family), Secret(Secret))
 import Gonimo.WebAPI (postInvitationOutbox, postInvitations, postFamilies, SPParams_(SPParams_), postAccounts)
@@ -40,7 +40,7 @@ type State =
   , email      :: String
   , familyId   :: Maybe (Key Family)
   , invitationSent :: Boolean
-  , errorOccurred :: Maybe Client.Error
+  , errorOccurred :: Maybe Gonimo.Error
   }
 
 init :: State
@@ -56,21 +56,24 @@ data Action = SetFamilyName String
             | SetEmail String
             | SendInvitation
             | InvitationSent
-            | ReportError Client.Error
+            | ReportError Gonimo.Error
             | Nop
 
+instance reportErrorActionAction :: ReportErrorAction Action where
+  reportError = ReportError
 
 update :: forall eff. Settings -> Action -> State -> EffModel eff State Action
 update settings action = case action of
   (SetFamilyName name ) -> \state -> noEffects state { familyName = name }
   (SetEmail email )     -> \state -> noEffects state { email = email }
   InvitationSent        -> \state -> noEffects state { invitationSent = true }
-  SendInvitation        -> \state -> justEffect (runEffect settings (handleSendInvitation state)) state
+  SendInvitation        -> \state -> justGonimo settings (handleSendInvitation state) state
   Nop                   -> noEffects
-  ReportError err       -> \state -> justEffect (Gonimo.handleError Nop err) state { errorOccurred = Just err }
+  ReportError err       -> \state -> justEffect (Gonimo.handleError Nop err)
+                                                state { errorOccurred = Just err }
 
 
-handleSendInvitation :: forall eff. State -> Effects eff Action
+handleSendInvitation :: forall eff. State -> Gonimo eff Action
 handleSendInvitation state = do
   (SPSettings_ settings) <- ask
   let params = case settings.params of (SPParams_ params) -> params
@@ -81,14 +84,6 @@ handleSendInvitation state = do
   (Tuple invId invitation) <- postInvitations fid
   postInvitationOutbox $ WebAPI.SendInvitation invId (EmailInvitation state.email)
   pure InvitationSent
-
-runEffect :: forall eff. Settings -> Effects eff Action
-             -> Aff (Client.EffEffects eff) Action
-runEffect settings m = do
-    er <- runExceptT <<< flip runReaderT settings <<< runEffectsT $ m
-    case er of
-      Left err -> pure $ ReportError err
-      Right v -> pure v
 
 --------------------------------------------------------------------------------
 

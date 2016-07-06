@@ -5,7 +5,8 @@ import Gonimo.Client.Router
 import Gonimo.Client.Effects as Gonimo
 import Gonimo.Client.Effects as Gonimo
 import Gonimo.Client.LocalStorage as Key
-import Gonimo.Client.Types as Client
+import Gonimo.Client.Types as Gonimo
+import Gonimo.Client.Types (GonimoEff, Gonimo)
 import Gonimo.UI.Invite as InviteC
 import Gonimo.UI.Loaded as LoadedC
 import Pux.Html.Attributes as A
@@ -21,7 +22,7 @@ import Data.List (toUnfoldable, reverse, List(Nil, Cons))
 import Data.Maybe (Maybe(..))
 import Debug.Trace (trace)
 import Gonimo.Client.Effects (handleError)
-import Gonimo.Client.Types (Error(URLRouteError), runEffectsT, Settings)
+import Gonimo.Client.Types (Error(URLRouteError), runGonimoT, Settings)
 import Gonimo.Pux (onlyEffect, justEffect, onlyEffects, noEffects, EffModel(EffModel), toPux)
 import Gonimo.Server.Types (AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (Secret(Secret))
@@ -53,7 +54,7 @@ init = LoadingS { actionQueue : Nil }
 
 data Action = Start
             | Init LoadedC.State
-            | ReportError Client.Error
+            | ReportError Gonimo.Error
             | Nop
             | LoadedA LoadedC.Action
 
@@ -102,7 +103,7 @@ viewLoading = viewLogo $ div []
 --------------------------------------------------------------------------------
 
 
-load :: forall eff. Aff (Client.EffEffects eff) Action
+load :: forall eff. Aff (GonimoEff eff) Action
 load = do
   let
     mkSettings :: AuthToken -> Settings
@@ -111,7 +112,7 @@ load = do
         , baseURL : "http://localhost:8081/"
         }
     initSettings = mkSettings $ GonimoSecret (Secret "blabala")
-  r <- runExceptT <<< flip runReaderT initSettings <<< runEffectsT $ getAuthData 
+  r <- runExceptT <<< flip runReaderT initSettings <<< runGonimoT $ getAuthData 
   case r of
     Left err -> pure $ ReportError err
     Right (authData@(AuthData auth)) -> pure $ Init { authData : authData
@@ -120,7 +121,7 @@ load = do
                                                     }
 
 
-getAuthData :: forall eff. Client.Effects eff AuthData
+getAuthData :: forall eff. Gonimo eff AuthData
 getAuthData = do
   md <- liftEff $ localStorage.getItem Key.authData
   Gonimo.log $ "Got authdata from local storage: " <> gShow md

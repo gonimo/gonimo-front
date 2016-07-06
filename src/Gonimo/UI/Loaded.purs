@@ -5,7 +5,7 @@ import Prelude
 import Gonimo.UI.Html
 import Gonimo.Client.Effects as Gonimo
 import Gonimo.Client.LocalStorage as Key
-import Gonimo.Client.Types as Client
+import Gonimo.Client.Types as Gonimo
 import Gonimo.UI.Invite as InviteC
 import Pux.Html.Attributes as A
 import Pux.Html.Events as E
@@ -19,7 +19,7 @@ import Data.Either (Either(Right, Left))
 import Data.Maybe (Maybe(..))
 import Debug.Trace (trace)
 import Gonimo.Client.Effects (handleError)
-import Gonimo.Client.Types (runEffectsT, Settings)
+import Gonimo.Client.Types (runGonimoT, Settings)
 import Gonimo.Pux (justEffect, noEffects, onlyEffects, EffModel(EffModel))
 import Gonimo.Server.Types (AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (Secret(Secret))
@@ -39,10 +39,10 @@ type State = {
              , inviteS  :: InviteC.State
              }
 
-data Action = ReportError Client.Error
+data Action = ReportError Gonimo.Error
             | SetState State
             | InviteA InviteC.Action
-            | HandleInvite Secret 
+            | HandleInvite Secret
             | Nop
 
 
