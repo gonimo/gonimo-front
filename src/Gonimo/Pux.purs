@@ -32,6 +32,12 @@ onlyEffects state effects = EffModel { state : state
                                      , effects : effects
                                      }
 
+-- | Like `onlyEffects` but for a single effect
+onlyEffect :: forall state action eff
+               . state -> Aff (EffEffects eff) action
+               -> EffModel eff state action
+onlyEffect state eff = onlyEffects state [eff]
+
 -- | Like onlyEffects but with arguments flipped
 justEffects :: forall state action eff
                .  Array (Aff (EffEffects eff) action)
@@ -43,6 +49,8 @@ justEffect :: forall state action eff
                .  Aff (EffEffects eff) action
                -> state -> EffModel eff state action
 justEffect eff = justEffects [eff]
+
+                 
 
 noEffects :: forall state action eff. state -> EffModel eff state action
 noEffects state = EffModel { state : state, effects : [] }

@@ -22,6 +22,7 @@ import Signal.Channel (CHANNEL)
 type Settings = SPSettings_ SPParams_
 
 data Error = AjaxError Affjax.AjaxError
+           | URLRouteError String
 
 derive instance genericError :: Generic Error
 
@@ -67,7 +68,7 @@ instance monadErrorAjaxErrorEffectsT :: MonadError AjaxError (EffectsT eff) wher
   catchError (EffectsT ma) ef = EffectsT $ catchError ma (runEffectsT <<< handleAjax)
     where
       handleAjax (AjaxError err) = ef err
-      --handleAjax err = throwError err
+      handleAjax err = throwError err
 
 instance monadEffeffEffectsT :: MonadEff eff (EffectsT eff) where
   liftEff = EffectsT <<< liftEff
