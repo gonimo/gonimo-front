@@ -6,7 +6,7 @@ import Gonimo.Client.Effects as Gonimo
 import Gonimo.Client.Effects as Gonimo
 import Gonimo.Client.LocalStorage as Key
 import Gonimo.Client.Types as Gonimo
-import Gonimo.Client.Types (GonimoEff, Gonimo)
+import Gonimo.Client.Types (GonimoEff, Gonimo, class ReportErrorAction)
 import Gonimo.UI.Invite as InviteC
 import Gonimo.UI.Loaded as LoadedC
 import Pux.Html.Attributes as A
@@ -58,6 +58,9 @@ data Action = Start
             | Nop
             | LoadedA LoadedC.Action
 
+instance reportErrorActionAction :: ReportErrorAction Action where
+  reportError = ReportError
+
 --------------------------------------------------------------------------------
 update :: forall eff. Action -> State -> EffModel eff State Action
 update action (LoadingS state)          = updateLoading action state
@@ -104,21 +107,22 @@ viewLoading = viewLogo $ div []
 
 
 load :: forall eff. Aff (GonimoEff eff) Action
-load = do
-  let
+load = Gonimo.toAff initSettings <<< map authToAction $ getAuthData
+  where
+    initSettings = mkSettings $ GonimoSecret (Secret "blabala")
+
     mkSettings :: AuthToken -> Settings
     mkSettings secret = defaultSettings $ SPParams_ {
           authorization : secret
         , baseURL : "http://localhost:8081/"
         }
-    initSettings = mkSettings $ GonimoSecret (Secret "blabala")
-  r <- runExceptT <<< flip runReaderT initSettings <<< runGonimoT $ getAuthData 
-  case r of
-    Left err -> pure $ ReportError err
-    Right (authData@(AuthData auth)) -> pure $ Init { authData : authData
-                                                    , settings : mkSettings auth.authToken
-                                                    , inviteS : InviteC.init
-                                                    }
+
+    authToAction (authData@(AuthData auth))
+      = Init { authData : authData
+            , settings : mkSettings auth.authToken
+            , inviteS : InviteC.init
+            }
+
 
 
 getAuthData :: forall eff. Gonimo eff AuthData

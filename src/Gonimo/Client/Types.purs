@@ -47,11 +47,7 @@ runGonimoT (GonimoT m) = m
 toAff :: forall eff action. ReportErrorAction action
          => Settings -> Gonimo eff action -> Aff (GonimoEff eff) action
 toAff settings m = do
-  er <- runExceptT <<< flip runReaderT settings <<< runGonimoT $ m
-  pure $ case er of
-    Left err -> reportError err
-    Right action -> action
-  -- pure $ either reportError id
+  map (either reportError id) <<< runExceptT <<< flip runReaderT settings <<< runGonimoT $ m
 
 instance functorGonimoT :: Functor (GonimoT eff) where
   map f (GonimoT m) = GonimoT $ map f m
