@@ -7,6 +7,7 @@ import Gonimo.Client.Effects as Gonimo
 import Gonimo.Client.LocalStorage as Key
 import Gonimo.Client.Types as Gonimo
 import Gonimo.UI.Invite as InviteC
+import Gonimo.UI.AcceptInvitation as AcceptC
 import Pux.Html.Attributes as A
 import Pux.Html.Events as E
 import Browser.LocalStorage (STORAGE, localStorage)
@@ -37,11 +38,13 @@ type State = {
                authData :: AuthData
              , settings :: Settings
              , inviteS  :: InviteC.State
+             , acceptS  :: AcceptC.State
              }
 
 data Action = ReportError Gonimo.Error
             | SetState State
             | InviteA InviteC.Action
+            | AcceptA AcceptC.Action
             | HandleInvite Secret
             | Nop
 
@@ -52,15 +55,20 @@ update :: forall eff. Action -> State -> EffModel eff State Action
 update (SetState state)      = const $ noEffects state
 update (ReportError err)     = justEffect $ handleError Nop err
 update (InviteA action)      = updateInvite action
-update (HandleInvite secret) = justEffect $ do Gonimo.log "Got invitation secret!"
-                                               pure Nop
+update (HandleInvite secret) = justEffect $ pure (AcceptA $ AcceptC.LoadInvitation secret)
+update (AcceptA action)      = updateAccept action
 update Nop                   = noEffects
 
 
 updateInvite :: forall eff. InviteC.Action -> State -> EffModel eff State Action
 updateInvite action state = bimap (state {inviteS = _}) InviteA
                             $ InviteC.update state.settings action state.inviteS
+
+updateAccept :: forall eff. AcceptC.Action -> State -> EffModel eff State Action
+updateAccept action state = bimap (state {acceptS = _}) AcceptA
+                            $ AcceptC.update state.settings action state.acceptS
 --------------------------------------------------------------------------------
 
 view :: State -> Html Action
-view state = map InviteA $ InviteC.view state.inviteS
+-- view state = map InviteA $ InviteC.view state.inviteS
+view state = map AcceptA $ AcceptC.view state.acceptS

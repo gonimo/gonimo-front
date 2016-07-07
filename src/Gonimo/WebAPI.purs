@@ -69,9 +69,32 @@ postInvitations reqBody = do
                                 }
   getResult decodeJson affResp
   
+getInvitations :: forall eff m.
+               (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
+               => Secret -> m Invitation
+getInvitations reqBody = do
+  spOpts_' <- ask
+  let spOpts_ = case spOpts_' of SPSettings_ o -> o
+  let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
+  let authorization = spParams_.authorization
+  let baseURL = spParams_.baseURL
+  let httpMethod = "GET"
+  let reqUrl = baseURL <> "invitations"
+  let reqHeaders =
+        [{ field : "Authorization"
+         , value : encodeURLPiece spOpts_' authorization
+         }]
+  affResp <- liftAff $ affjax defaultRequest
+                                { method = httpMethod
+                                , url = reqUrl
+                                , headers = defaultRequest.headers <> reqHeaders
+                                , content = toNullable <<< Just <<< printJson <<< encodeJson $ reqBody
+                                }
+  getResult decodeJson affResp
+  
 deleteInvitations :: forall eff m.
                   (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-                  => Secret -> m Invitation
+                  => Secret -> m Unit
 deleteInvitations reqBody = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o

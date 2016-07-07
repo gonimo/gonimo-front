@@ -1,8 +1,9 @@
 -- | Html view elements which are generically usefull:
 module Gonimo.UI.Html where
 
-import Pux.Html (Html, img, div)
+import Prelude
 import Pux.Html.Attributes as A
+import Pux.Html (text, span, Html, img, div)
 
 viewLogo :: forall action. Html action -> Html action
 viewLogo inner =
@@ -12,3 +13,6 @@ viewLogo inner =
         , inner
         ]
     ]
+
+viewLoading :: forall action. String -> Html action
+viewLoading inner = viewLogo $ span [] [text inner]

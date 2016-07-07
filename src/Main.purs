@@ -8,6 +8,7 @@ import Gonimo.Client.LocalStorage as Key
 import Gonimo.Client.Types as Gonimo
 import Gonimo.Client.Types (GonimoEff, Gonimo, class ReportErrorAction)
 import Gonimo.UI.Invite as InviteC
+import Gonimo.UI.AcceptInvitation as AcceptC
 import Gonimo.UI.Loaded as LoadedC
 import Pux.Html.Attributes as A
 import Browser.LocalStorage (STORAGE, localStorage)
@@ -37,6 +38,7 @@ import Servant.PureScript.Affjax (AjaxError)
 import Servant.PureScript.Settings (defaultSettings, SPSettings_(SPSettings_))
 import Signal (constant, Signal)
 import Signal.Channel (send, subscribe, channel)
+import Gonimo.UI.AcceptInvitation
 
 data State = LoadingS LoadingS'
            | LoadedS LoadedC.State
@@ -47,7 +49,6 @@ type LoadedState = {
                authData :: AuthData
              , settings :: Settings
              }
-
 
 init :: State
 init = LoadingS { actionQueue : Nil }
@@ -121,6 +122,7 @@ load = Gonimo.toAff initSettings <<< map authToAction $ getAuthData
       = Init { authData : authData
             , settings : mkSettings auth.authToken
             , inviteS : InviteC.init
+            , acceptS : AcceptC.init
             }
 
 
