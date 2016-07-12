@@ -123,6 +123,7 @@ load = Gonimo.toAff initSettings <<< map authToAction $ getAuthData
             , settings : mkSettings auth.authToken
             , inviteS : InviteC.init
             , acceptS : AcceptC.init
+            , central : LoadedC.CentralInvite
             }
 
 

@@ -25,8 +25,8 @@ import Gonimo.Pux (noEffects, justEffect, onlyEffects, EffModel(EffModel), justG
 import Gonimo.Server.DbEntities (Invitation(Invitation))
 import Gonimo.Server.Types (InvitationDelivery(EmailInvitation), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (Key(Key), Family(Family), Secret(Secret))
-import Gonimo.WebAPI (getInvitations, postInvitations, postFamilies, SPParams_(SPParams_), postAccounts)
-import Gonimo.WebAPI.Types (AuthData(AuthData))
+import Gonimo.WebAPI (putInvitationInfoByInvitationSecret, postInvitations, postFamilies, SPParams_(SPParams_), postAccounts)
+import Gonimo.WebAPI.Types (InvitationInfo(InvitationInfo), AuthData(AuthData))
 import Partial.Unsafe (unsafeCrashWith)
 import Pux (renderToDOM, fromSimple, start)
 import Pux.Html (button, input, p, h1, text, span, Html, img, div)
@@ -37,7 +37,7 @@ import Prelude hiding (div)
 
 
 
-type State = Maybe { invitationData :: Invitation
+type State = Maybe { invitationInfo :: InvitationInfo
                    , accepted :: Maybe Boolean
                    }
 
@@ -46,7 +46,7 @@ init :: State
 init = Nothing
 
 data Action = LoadInvitation Secret
-            | Init Invitation
+            | Init InvitationInfo
             | Accept
             | Decline
             | ReportError Gonimo.Error
@@ -59,36 +59,36 @@ update :: forall eff. Settings -> Action -> State -> EffModel eff State Action
 update settings action = case action of
   LoadInvitation secret -> justGonimo settings $ loadInvitation secret
   Init inv              -> \state -> noEffects $ case state of
-    Nothing -> Just { invitationData : inv, accepted : Nothing }
-    Just state -> Just state { invitationData = inv }
+    Nothing -> Just { invitationInfo : inv, accepted : Nothing }
+    Just state -> Just state { invitationInfo = inv }
   Accept                -> noEffects <<< const init
   Decline               -> noEffects <<< const init
   Nop                   -> noEffects
   ReportError err       -> justEffect $ Gonimo.handleError Nop err
 
 loadInvitation :: forall eff. Secret -> Gonimo eff Action
-loadInvitation = map Init <<< getInvitations
+loadInvitation = map Init <<< putInvitationInfoByInvitationSecret
 
 --------------------------------------------------------------------------------
 
 view :: State -> Html Action
 view Nothing = viewLoading "Loading your invitation - stay tight ..."
 view (Just state) = case state.accepted of
-  Nothing    ->  viewAskUser state.invitationData
-  Just true  ->  viewAccepted state.invitationData
-  Just false ->  viewDeclined state.invitationData
+  Nothing    ->  viewAskUser state.invitationInfo
+  Just true  ->  viewAccepted state.invitationInfo
+  Just false ->  viewDeclined state.invitationInfo
 
-viewAskUser :: Invitation -> Html Action
-viewAskUser (Invitation invitation) =
+viewAskUser :: InvitationInfo -> Html Action
+viewAskUser (InvitationInfo invitation) =
     div []
         [ h1 [] [ text "Gonimo Family Invitation!"]
-        , p []  [ text $ "You received an invitation to join family " <> invitation.invitationSendingFamily <> "!"
-                , text $ "You got invited by a device answering to the name: " <> invitation.invitationSendingClient
+        , p []  [ text $ "You received an invitation to join family " <> invitation.invitationInfoFamily <> "!"
+                , text $ "You got invited by a device answering to the name: " <> invitation.invitationInfoSendingClient
                 ]
 
         , div [ E.onKeyUp handleEnter ]
               [ p []
-                  [ text $ "Do you really want to join the almighty family \"" <> invitation.invitationSendingFamily <>"\"?"
+                  [ text $ "Do you really want to join the almighty family \"" <> invitation.invitationInfoFamily <>"\"?"
                     , text $ "Pick wisely, gonimo is the most awesome baby monitor on the planet, but only with the right family!"
                   ]
               , p []
@@ -109,16 +109,16 @@ viewAskUser (Invitation invitation) =
     handleEnter :: E.KeyboardEvent -> Action
     handleEnter ev = if ev.keyCode == 13 then Accept else Nop
 
-viewAccepted :: Invitation -> Html Action
-viewAccepted (Invitation invitation) = viewLogo
+viewAccepted :: InvitationInfo -> Html Action
+viewAccepted (InvitationInfo invitation) = viewLogo
                           $ span [ A.title "You chose wisely!" ]
                                  [ text $ "Your device <deviceName> is now a member of family: "
-                                   <> invitation.invitationSendingFamily <> "!"
+                                   <> invitation.invitationInfoFamily <> "!"
                                  ]
 
-viewDeclined :: Invitation -> Html Action
-viewDeclined (Invitation invitation) = viewLogo
+viewDeclined :: InvitationInfo -> Html Action
+viewDeclined (InvitationInfo invitation) = viewLogo
                           $ span [ A.title "You chose wisely!" ]
                                  [ text $ "You did not join the stalker family: "
-                                   <> invitation.invitationSendingFamily <> "!"
+                                   <> invitation.invitationInfoFamily <> "!"
                                  ]

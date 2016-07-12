@@ -39,6 +39,7 @@ type State = {
              , settings :: Settings
              , inviteS  :: InviteC.State
              , acceptS  :: AcceptC.State
+             , central  :: Central
              }
 
 data Action = ReportError Gonimo.Error
@@ -48,14 +49,19 @@ data Action = ReportError Gonimo.Error
             | HandleInvite Secret
             | Nop
 
+data Central = CentralInvite
+             | CentralAccept
 
+setCentral :: Central -> State -> State
+setCentral central = _ { central = central }
 --------------------------------------------------------------------------------
 
 update :: forall eff. Action -> State -> EffModel eff State Action
 update (SetState state)      = const $ noEffects state
 update (ReportError err)     = justEffect $ handleError Nop err
 update (InviteA action)      = updateInvite action
-update (HandleInvite secret) = justEffect $ pure (AcceptA $ AcceptC.LoadInvitation secret)
+update (HandleInvite secret) = setCentral CentralAccept
+                               >>> justEffect (inviteEffect secret)
 update (AcceptA action)      = updateAccept action
 update Nop                   = noEffects
 
@@ -67,8 +73,16 @@ updateInvite action state = bimap (state {inviteS = _}) InviteA
 updateAccept :: forall eff. AcceptC.Action -> State -> EffModel eff State Action
 updateAccept action state = bimap (state {acceptS = _}) AcceptA
                             $ AcceptC.update state.settings action state.acceptS
+
+inviteEffect :: forall m. Monad m => Secret -> m Action
+inviteEffect = pure <<< AcceptA <<< AcceptC.LoadInvitation
 --------------------------------------------------------------------------------
 
 view :: State -> Html Action
--- view state = map InviteA $ InviteC.view state.inviteS
-view state = map AcceptA $ AcceptC.view state.acceptS
+view = viewCentral
+
+
+viewCentral :: State -> Html Action
+viewCentral state = case state.central of
+  CentralInvite -> map InviteA $ InviteC.view state.inviteS
+  CentralAccept -> map AcceptA $ AcceptC.view state.acceptS
