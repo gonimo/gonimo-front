@@ -32,9 +32,8 @@ data Invitation =
     , invitationFamilyId :: Key Family
     , invitationCreated :: Date
     , invitationDelivery :: InvitationDelivery
-    , invitationSendingFamily :: String
-    , invitationSendingClient :: String
-    , invitationSendingUser :: Maybe String
+    , invitationSenderId :: Key Client
+    , invitationReceiverId :: Maybe (Key Account)
     }
 
 derive instance genericInvitation :: Generic Invitation
