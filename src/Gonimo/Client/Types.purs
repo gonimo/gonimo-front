@@ -23,6 +23,7 @@ import Signal.Channel (CHANNEL)
 type Settings = SPSettings_ SPParams_
 
 data Error = AjaxError Affjax.AjaxError
+           | UnexpectedAction String
            | URLRouteError String
 
 derive instance genericError :: Generic Error

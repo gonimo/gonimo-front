@@ -15,18 +15,19 @@ import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Except.Trans (runExceptT)
 import Control.Monad.Reader.Class (ask)
 import Control.Monad.Reader.Trans (runReaderT)
+import Data.Bifunctor (lmap)
 import Data.Either (Either(Right, Left))
 import Data.Generic (gShow)
 import Data.Maybe (isJust, isNothing, Maybe(..))
 import Data.Tuple (Tuple(Tuple))
 import Gonimo.Client.Effects (handleError)
-import Gonimo.Client.Types (Gonimo, Settings, runGonimoT, class ReportErrorAction)
-import Gonimo.Pux (noEffects, justEffect, onlyEffects, EffModel(EffModel), justGonimo)
+import Gonimo.Client.Types (Error(UnexpectedAction), Gonimo, Settings, runGonimoT, class ReportErrorAction)
+import Gonimo.Pux (noEffects, onlyEffect, onlyGonimo, justEffect, onlyEffects, EffModel(EffModel), justGonimo)
 import Gonimo.Server.DbEntities (Invitation(Invitation))
 import Gonimo.Server.Types (InvitationDelivery(EmailInvitation), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (Key(Key), Family(Family), Secret(Secret))
-import Gonimo.WebAPI (putInvitationInfoByInvitationSecret, postInvitations, postFamilies, SPParams_(SPParams_), postAccounts)
-import Gonimo.WebAPI.Types (InvitationInfo(InvitationInfo), AuthData(AuthData))
+import Gonimo.WebAPI (deleteInvitationsByInvitationSecret, putInvitationInfoByInvitationSecret, postInvitations, postFamilies, SPParams_(SPParams_), postAccounts)
+import Gonimo.WebAPI.Types (InvitationReply(InvitationReject, InvitationAccept), InvitationReply(InvitationReject, InvitationAccept), InvitationInfo(InvitationInfo), AuthData(AuthData))
 import Partial.Unsafe (unsafeCrashWith)
 import Pux (renderToDOM, fromSimple, start)
 import Pux.Html (button, input, p, h1, text, span, Html, img, div)
@@ -37,18 +38,21 @@ import Prelude hiding (div)
 
 
 
-type State = Maybe { invitationInfo :: InvitationInfo
-                   , accepted :: Maybe Boolean
-                   }
+type State = Maybe StateImpl
 
+type StateImpl = { invitationInfo :: InvitationInfo
+                 , invitationSecret :: Secret
+                 , accepted :: Maybe Boolean
+                 }
 
 init :: State
 init = Nothing
 
 data Action = LoadInvitation Secret
-            | Init InvitationInfo
+            | Init (Tuple Secret InvitationInfo)
             | Accept
             | Decline
+            | SetAccepted Boolean
             | ReportError Gonimo.Error
             | Nop
 
@@ -56,20 +60,38 @@ instance reportErrorActionAction :: ReportErrorAction Action where
   reportError = ReportError
 
 update :: forall eff. Settings -> Action -> State -> EffModel eff State Action
-update settings action = case action of
-  LoadInvitation secret -> justGonimo settings $ loadInvitation secret
-  Init inv              -> \state -> noEffects $ case state of
-    Nothing -> Just { invitationInfo : inv, accepted : Nothing }
-    Just state -> Just state { invitationInfo = inv }
-  Accept                -> noEffects <<< const init
-  Decline               -> noEffects <<< const init
-  Nop                   -> noEffects
-  ReportError err       -> justEffect $ Gonimo.handleError Nop err
+update settings action Nothing = case action of
+  LoadInvitation secret -> onlyGonimo settings Nothing $ loadInvitation secret
+  Init (Tuple secret inv) -> noEffects $ Just { invitationInfo : inv, invitationSecret : secret, accepted : Nothing }
+  Nop                   -> noEffects Nothing
+  ReportError err       -> onlyEffect Nothing $ Gonimo.handleError Nop err
+  _                     -> onlyEffect Nothing <<< pure <<< ReportError
+                            $ UnexpectedAction "Received some Action but State is Nothing!"
+update settings action (Just state) = lmap Just $ updateJust settings action state
+
+
+updateJust :: forall eff. Settings -> Action -> StateImpl -> EffModel eff StateImpl Action
+updateJust settings action = case action of
+  LoadInvitation secret   -> justGonimo settings $ loadInvitation secret
+  Init (Tuple secret inv) -> noEffects <<< _ { invitationInfo = inv, invitationSecret = secret }
+  Accept                  -> answerInvitation settings InvitationAccept
+  Decline                 -> answerInvitation settings InvitationReject
+  SetAccepted accepted'   -> noEffects <<<  _ { accepted = Just accepted' }
+  Nop                     -> noEffects
+  ReportError err         -> justEffect $ Gonimo.handleError Nop err
+
 
 loadInvitation :: forall eff. Secret -> Gonimo eff Action
-loadInvitation = map Init <<< putInvitationInfoByInvitationSecret
+loadInvitation secret = Init <<< Tuple secret <$> putInvitationInfoByInvitationSecret secret
 
---------------------------------------------------------------------------------
+answerInvitation :: forall eff. Settings -> InvitationReply -> StateImpl -> EffModel eff StateImpl Action
+answerInvitation settings reply state = onlyGonimo settings state $ do
+    deleteInvitationsByInvitationSecret reply state.invitationSecret
+    pure $ SetAccepted $ case reply of
+      InvitationAccept  -> true
+      InvitationReject  -> false
+
+    --------------------------------------------------------------------------------
 
 view :: State -> Html Action
 view Nothing = viewLoading "Loading your invitation - stay tight ..."
