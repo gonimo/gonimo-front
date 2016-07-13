@@ -8,6 +8,7 @@ import Data.Generic (class Generic)
 data ServerError =
     InvalidAuthToken 
   | InvitationAlreadyClaimed 
+  | AlreadyFamilyMember 
 
 derive instance genericServerError :: Generic ServerError
 
