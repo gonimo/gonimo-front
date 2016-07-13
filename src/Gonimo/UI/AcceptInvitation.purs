@@ -30,7 +30,7 @@ import Gonimo.WebAPI (deleteInvitationsByInvitationSecret, putInvitationInfoByIn
 import Gonimo.WebAPI.Types (InvitationReply(InvitationReject, InvitationAccept), InvitationReply(InvitationReject, InvitationAccept), InvitationInfo(InvitationInfo), AuthData(AuthData))
 import Partial.Unsafe (unsafeCrashWith)
 import Pux (renderToDOM, fromSimple, start)
-import Pux.Html (button, input, p, h1, text, span, Html, img, div)
+import Pux.Html (em, button, input, p, h1, text, span, Html, img, div)
 import Servant.PureScript.Affjax (AjaxError)
 import Servant.PureScript.Settings (defaultSettings, SPSettings_(SPSettings_))
 import Signal (constant, Signal)
@@ -73,7 +73,7 @@ update settings action (Just state) = lmap Just $ updateJust settings action sta
 updateJust :: forall eff. Settings -> Action -> StateImpl -> EffModel eff StateImpl Action
 updateJust settings action = case action of
   LoadInvitation secret   -> justGonimo settings $ loadInvitation secret
-  Init (Tuple secret inv) -> noEffects <<< _ { invitationInfo = inv, invitationSecret = secret }
+  Init (Tuple secret inv) -> noEffects <<< _ { invitationInfo = inv, invitationSecret = secret, accepted = Nothing }
   Accept                  -> answerInvitation settings InvitationAccept
   Decline                 -> answerInvitation settings InvitationReject
   SetAccepted accepted'   -> noEffects <<<  _ { accepted = Just accepted' }
@@ -103,15 +103,26 @@ view (Just state) = case state.accepted of
 viewAskUser :: InvitationInfo -> Html Action
 viewAskUser (InvitationInfo invitation) =
     div []
-        [ h1 [] [ text "Gonimo Family Invitation!"]
-        , p []  [ text $ "You received an invitation to join family " <> invitation.invitationInfoFamily <> "!"
-                , text $ "You got invited by a device answering to the name: " <> invitation.invitationInfoSendingClient
-                ]
+        [ h1 []
+             [ text "Gonimo Family Invitation!"]
+        , p []
+            [ text $ "You received an invitation to join family: "
+            , em [] [ text invitation.invitationInfoFamily ]
+            , text "!"
+            ]
+        , p []
+            [ text $ "You got invited by a device answering to the name: "
+            , em [] [ text invitation.invitationInfoSendingClient ]
+            , text "."
+            ]
 
         , div [ E.onKeyUp handleEnter ]
               [ p []
-                  [ text $ "Do you really want to join the almighty family \"" <> invitation.invitationInfoFamily <>"\"?"
-                    , text $ "Pick wisely, gonimo is the most awesome baby monitor on the planet, but only with the right family!"
+                  [ text $ "Do you really want to join the almighty family \""
+                    <> invitation.invitationInfoFamily <> "\"?"
+                  ]
+              , p []
+                  [ text $ "Pick wisely! Gonimo is the most awesome baby monitor on the planet, but only with the right family!"
                   ]
               , p []
                 [ button [ A.title "Hello my dear family!"
@@ -142,5 +153,6 @@ viewDeclined :: InvitationInfo -> Html Action
 viewDeclined (InvitationInfo invitation) = viewLogo
                           $ span [ A.title "You chose wisely!" ]
                                  [ text $ "You did not join the stalker family: "
-                                   <> invitation.invitationInfoFamily <> "!"
+                                 , em [] [ text invitation.invitationInfoFamily ]
+                                 , text "!"
                                  ]
