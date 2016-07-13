@@ -22,6 +22,7 @@ data Client =
     , clientAuthToken :: AuthToken
     , clientAccountId :: Key Account
     , clientLastAccessed :: Date
+    , clientUserAgent :: String
     }
 
 derive instance genericClient :: Generic Client
