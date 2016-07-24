@@ -16,7 +16,7 @@
     "purescript-generics": "^1.0.0",
     "purescript-partial": "^1.1.2",
     "purescript-localstorage": "^1.0.0",
-    "purescript-servant-support": "git@github.com:eskimor/purescript-servant-support#master"
+    "purescript-servant-support": "^1.0.1"
   },
   "devDependencies": {
     "purescript-debug": "^1.0.0"
