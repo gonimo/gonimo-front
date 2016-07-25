@@ -115,7 +115,7 @@ load = Gonimo.toAff initSettings <<< map authToAction $ getAuthData
     mkSettings :: AuthToken -> Settings
     mkSettings secret = defaultSettings $ SPParams_ {
           authorization : secret
-        , baseURL : "http://localhost:8081/"
+        , baseURL : "https://b00.gonimo.com/"
         }
 
     authToAction (authData@(AuthData auth))
