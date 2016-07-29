@@ -2,13 +2,13 @@ module Main where
 
 import Prelude
 import Gonimo.Client.Router
+import Gonimo.UI.AcceptInvitation
 import Gonimo.Client.Effects as Gonimo
 import Gonimo.Client.Effects as Gonimo
 import Gonimo.Client.LocalStorage as Key
 import Gonimo.Client.Types as Gonimo
-import Gonimo.Client.Types (GonimoEff, Gonimo, class ReportErrorAction)
-import Gonimo.UI.Invite as InviteC
 import Gonimo.UI.AcceptInvitation as AcceptC
+import Gonimo.UI.Invite as InviteC
 import Gonimo.UI.Loaded as LoadedC
 import Pux.Html.Attributes as A
 import Browser.LocalStorage (STORAGE, localStorage)
@@ -23,12 +23,13 @@ import Data.List (toUnfoldable, reverse, List(Nil, Cons))
 import Data.Maybe (Maybe(..))
 import Debug.Trace (trace)
 import Gonimo.Client.Effects (handleError)
+import Gonimo.Client.Types (GonimoEff, Gonimo, class ReportErrorAction)
 import Gonimo.Client.Types (Error(URLRouteError), runGonimoT, Settings)
 import Gonimo.Pux (onlyEffect, justEffect, onlyEffects, noEffects, EffModel(EffModel), toPux)
 import Gonimo.Server.Types (AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (Secret(Secret))
 import Gonimo.UI.Html (viewLogo)
-import Gonimo.WebAPI (SPParams_(SPParams_), postAccounts)
+import Gonimo.WebAPI (postFunnyName, SPParams_(SPParams_), postAccounts)
 import Gonimo.WebAPI.Types (AuthData(AuthData))
 import Partial.Unsafe (unsafeCrashWith)
 import Pux (renderToDOM, fromSimple, start)
@@ -38,7 +39,6 @@ import Servant.PureScript.Affjax (AjaxError)
 import Servant.PureScript.Settings (defaultSettings, SPSettings_(SPSettings_))
 import Signal (constant, Signal)
 import Signal.Channel (send, subscribe, channel)
-import Gonimo.UI.AcceptInvitation
 
 data State = LoadingS LoadingS'
            | LoadedS LoadedC.State
@@ -108,23 +108,25 @@ viewLoading = viewLogo $ div []
 
 
 load :: forall eff. Aff (GonimoEff eff) Action
-load = Gonimo.toAff initSettings <<< map authToAction $ getAuthData
+load = Gonimo.toAff initSettings $ authToAction =<< getAuthData
   where
     initSettings = mkSettings $ GonimoSecret (Secret "blabala")
 
     mkSettings :: AuthToken -> Settings
     mkSettings secret = defaultSettings $ SPParams_ {
           authorization : secret
-        , baseURL : "https://b00.gonimo.com/"
+        , baseURL : "http://localhost:8081/"
         }
 
+    authToAction :: AuthData -> Gonimo eff Action
     authToAction (authData@(AuthData auth))
-      = Init { authData : authData
+      = let doInit inviteState =  Init { authData : authData
             , settings : mkSettings auth.authToken
-            , inviteS : InviteC.init
+            , inviteS : inviteState
             , acceptS : AcceptC.init
             , central : LoadedC.CentralInvite
             }
+        in doInit <$> InviteC.init
 
 
 

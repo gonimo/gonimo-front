@@ -269,6 +269,25 @@ receiveSocketByFamilyIdByFromClientByToClientByChannelId familyId fromClient
                                 }
   getResult decodeJson affResp
   
+postFunnyName :: forall eff m.
+              (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
+              => m String
+postFunnyName = do
+  spOpts_' <- ask
+  let spOpts_ = case spOpts_' of SPSettings_ o -> o
+  let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
+  let baseURL = spParams_.baseURL
+  let httpMethod = "POST"
+  let reqUrl = baseURL <> "funnyName"
+  let reqHeaders =
+        []
+  affResp <- liftAff $ affjax defaultRequest
+                                { method = httpMethod
+                                , url = reqUrl
+                                , headers = defaultRequest.headers <> reqHeaders
+                                }
+  getResult decodeJson affResp
+  
 getCoffee :: forall eff m.
           (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
           => m Coffee

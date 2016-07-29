@@ -25,7 +25,7 @@ import Gonimo.Client.Types (Gonimo, Settings, runGonimoT, class ReportErrorActio
 import Gonimo.Pux (noEffects, justEffect, onlyEffects, EffModel(EffModel), justGonimo)
 import Gonimo.Server.Types (InvitationDelivery(EmailInvitation), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (Key(Key), Family(Family), Secret(Secret))
-import Gonimo.WebAPI (postInvitationOutbox, postInvitations, postFamilies, SPParams_(SPParams_), postAccounts)
+import Gonimo.WebAPI (postInvitationOutbox, postInvitations, postFamilies, SPParams_(SPParams_), postAccounts, postFunnyName)
 import Gonimo.WebAPI.Types (AuthData(AuthData))
 import Partial.Unsafe (unsafeCrashWith)
 import Pux (renderToDOM, fromSimple, start)
@@ -43,14 +43,16 @@ type State =
   , errorOccurred :: Maybe Gonimo.Error
   }
 
-init :: State
-init = { familyName : "Family"
-       , email : ""
-       , familyId : Nothing
-       , invitationSent : false
-       , errorOccurred : Nothing
-       }
-
+init :: forall eff. Gonimo eff State
+init = let
+    initWithFamily family = { familyName : family
+                            , email : ""
+                            , familyId : Nothing
+                            , invitationSent : false
+                            , errorOccurred : Nothing
+                            }
+  in
+     initWithFamily <$> postFunnyName
 
 data Action = SetFamilyName String
             | SetEmail String
@@ -103,6 +105,7 @@ viewSend state =
                 then
                   [ text "FamilyName: "
                   , input [ A.type_ "text"
+                          , A.className "funnyName"
                           , E.onInput $ \ev -> SetFamilyName ev.target.value
                           , A.value state.familyName
                           ] []

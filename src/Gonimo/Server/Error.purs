@@ -9,6 +9,7 @@ data ServerError =
     InvalidAuthToken 
   | InvitationAlreadyClaimed 
   | AlreadyFamilyMember 
+  | TransactionTimeout 
 
 derive instance genericServerError :: Generic ServerError
 

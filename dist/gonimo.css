@@ -22,3 +22,7 @@ body {
     justify-content: center;
     flex-direction: row;
 }
+
+input.funnyName {
+    width: 20em;
+}
