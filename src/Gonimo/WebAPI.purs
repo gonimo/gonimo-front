@@ -13,12 +13,12 @@ import Data.Nullable (Nullable(), toNullable)
 import Data.Tuple (Tuple)
 import Global (encodeURIComponent)
 import Gonimo.Server.DbEntities (Client, Invitation)
-import Gonimo.Server.Types (AuthToken, Coffee)
+import Gonimo.Server.Types (AuthToken, ClientType, Coffee)
 import Gonimo.Types (Family, Key, Secret)
 import Gonimo.WebAPI.Types (AuthData, InvitationInfo, InvitationReply, SendInvitation)
 import Network.HTTP.Affjax (AJAX)
 import Prelude (Unit)
-import Prim (String)
+import Prim (Array, String)
 import Servant.PureScript.Affjax (AjaxError(..), affjax, defaultRequest)
 import Servant.PureScript.Settings (SPSettings_(..), gDefaultToURLPiece)
 import Servant.PureScript.Util (encodeListQuery, encodeQueryItem, encodeURLPiece, getResult)
@@ -28,8 +28,8 @@ newtype SPParams_ = SPParams_ { authorization :: AuthToken
                               }
 
 postAccounts :: forall eff m.
-             (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-             => m AuthData
+                (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
+                => m AuthData
 postAccounts = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
@@ -47,8 +47,8 @@ postAccounts = do
   getResult decodeJson affResp
   
 postInvitations :: forall eff m.
-                (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-                => Key Family -> m (Tuple (Key Invitation) Invitation)
+                   (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
+                   => Key Family -> m (Tuple (Key Invitation) Invitation)
 postInvitations reqBody = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
@@ -70,8 +70,8 @@ postInvitations reqBody = do
   getResult decodeJson affResp
   
 deleteInvitationsByInvitationSecret :: forall eff m.
-                                    (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-                                    => InvitationReply -> Secret -> m Unit
+                                       (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
+                                       => InvitationReply -> Secret -> m Unit
 deleteInvitationsByInvitationSecret reqBody invitationSecret = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
@@ -94,8 +94,8 @@ deleteInvitationsByInvitationSecret reqBody invitationSecret = do
   getResult decodeJson affResp
   
 postInvitationOutbox :: forall eff m.
-                     (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-                     => SendInvitation -> m Unit
+                        (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
+                        => SendInvitation -> m Unit
 postInvitationOutbox reqBody = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
@@ -117,8 +117,8 @@ postInvitationOutbox reqBody = do
   getResult decodeJson affResp
   
 putInvitationInfoByInvitationSecret :: forall eff m.
-                                    (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-                                    => Secret -> m InvitationInfo
+                                       (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
+                                       => Secret -> m InvitationInfo
 putInvitationInfoByInvitationSecret invitationSecret = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
@@ -140,8 +140,8 @@ putInvitationInfoByInvitationSecret invitationSecret = do
   getResult decodeJson affResp
   
 postFamilies :: forall eff m.
-             (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-             => String -> m (Key Family)
+                (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
+                => String -> m (Key Family)
 postFamilies reqBody = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
@@ -163,9 +163,9 @@ postFamilies reqBody = do
   getResult decodeJson affResp
   
 postSocketByFamilyIdByToClient :: forall eff m.
-                               (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-                               => Key Client -> Key Family -> Key Client
-                               -> m Secret
+                                  (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
+                                  => Key Client -> Key Family -> Key Client
+                                  -> m Secret
 postSocketByFamilyIdByToClient reqBody familyId toClient = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
@@ -188,9 +188,9 @@ postSocketByFamilyIdByToClient reqBody familyId toClient = do
   getResult decodeJson affResp
   
 receiveSocketByFamilyIdByToClient :: forall eff m.
-                                  (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-                                  => Key Family -> Key Client
-                                  -> m (Tuple (Key Client) Secret)
+                                     (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
+                                     => Key Family -> Key Client
+                                     -> m (Tuple (Key Client) Secret)
 receiveSocketByFamilyIdByToClient familyId toClient = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
@@ -212,10 +212,11 @@ receiveSocketByFamilyIdByToClient familyId toClient = do
   getResult decodeJson affResp
   
 putSocketByFamilyIdByFromClientByToClientByChannelId :: forall eff m.
-                                                     (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-                                                     => String -> Key Family
-                                                     -> Key Client -> Key Client
-                                                     -> Secret -> m Unit
+                                                        (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
+                                                        => String -> Key Family
+                                                        -> Key Client
+                                                        -> Key Client -> Secret
+                                                        -> m Unit
 putSocketByFamilyIdByFromClientByToClientByChannelId reqBody familyId fromClient
                                                      toClient channelId = do
   spOpts_' <- ask
@@ -241,11 +242,12 @@ putSocketByFamilyIdByFromClientByToClientByChannelId reqBody familyId fromClient
   getResult decodeJson affResp
   
 receiveSocketByFamilyIdByFromClientByToClientByChannelId :: forall eff m.
-                                                         (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-                                                         => Key Family
-                                                         -> Key Client
-                                                         -> Key Client -> Secret
-                                                         -> m String
+                                                            (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
+                                                            => Key Family
+                                                            -> Key Client
+                                                            -> Key Client
+                                                            -> Secret
+                                                            -> m String
 receiveSocketByFamilyIdByFromClientByToClientByChannelId familyId fromClient
                                                          toClient channelId = do
   spOpts_' <- ask
@@ -269,9 +271,108 @@ receiveSocketByFamilyIdByFromClientByToClientByChannelId familyId fromClient
                                 }
   getResult decodeJson affResp
   
+postOnlineStatusByFamilyId :: forall eff m.
+                              (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
+                              => Tuple (Key Client) ClientType -> Key Family
+                              -> m Unit
+postOnlineStatusByFamilyId reqBody familyId = do
+  spOpts_' <- ask
+  let spOpts_ = case spOpts_' of SPSettings_ o -> o
+  let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
+  let authorization = spParams_.authorization
+  let baseURL = spParams_.baseURL
+  let httpMethod = "POST"
+  let reqUrl = baseURL <> "onlineStatus"
+        <> "/" <> encodeURLPiece spOpts_' familyId
+  let reqHeaders =
+        [{ field : "Authorization"
+         , value : encodeURLPiece spOpts_' authorization
+         }]
+  affResp <- liftAff $ affjax defaultRequest
+                                { method = httpMethod
+                                , url = reqUrl
+                                , headers = defaultRequest.headers <> reqHeaders
+                                , content = toNullable <<< Just <<< printJson <<< encodeJson $ reqBody
+                                }
+  getResult decodeJson affResp
+  
+putOnlineStatusByFamilyIdByClientId :: forall eff m.
+                                       (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
+                                       => ClientType -> Key Family -> Key Client
+                                       -> m Unit
+putOnlineStatusByFamilyIdByClientId reqBody familyId clientId = do
+  spOpts_' <- ask
+  let spOpts_ = case spOpts_' of SPSettings_ o -> o
+  let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
+  let authorization = spParams_.authorization
+  let baseURL = spParams_.baseURL
+  let httpMethod = "PUT"
+  let reqUrl = baseURL <> "onlineStatus"
+        <> "/" <> encodeURLPiece spOpts_' familyId
+        <> "/" <> encodeURLPiece spOpts_' clientId
+  let reqHeaders =
+        [{ field : "Authorization"
+         , value : encodeURLPiece spOpts_' authorization
+         }]
+  affResp <- liftAff $ affjax defaultRequest
+                                { method = httpMethod
+                                , url = reqUrl
+                                , headers = defaultRequest.headers <> reqHeaders
+                                , content = toNullable <<< Just <<< printJson <<< encodeJson $ reqBody
+                                }
+  getResult decodeJson affResp
+  
+deleteOnlineStatusByFamilyIdByClientId :: forall eff m.
+                                          (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
+                                          => Key Family -> Key Client -> m Unit
+deleteOnlineStatusByFamilyIdByClientId familyId clientId = do
+  spOpts_' <- ask
+  let spOpts_ = case spOpts_' of SPSettings_ o -> o
+  let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
+  let authorization = spParams_.authorization
+  let baseURL = spParams_.baseURL
+  let httpMethod = "DELETE"
+  let reqUrl = baseURL <> "onlineStatus"
+        <> "/" <> encodeURLPiece spOpts_' familyId
+        <> "/" <> encodeURLPiece spOpts_' clientId
+  let reqHeaders =
+        [{ field : "Authorization"
+         , value : encodeURLPiece spOpts_' authorization
+         }]
+  affResp <- liftAff $ affjax defaultRequest
+                                { method = httpMethod
+                                , url = reqUrl
+                                , headers = defaultRequest.headers <> reqHeaders
+                                }
+  getResult decodeJson affResp
+  
+getOnlineStatusByFamilyId :: forall eff m.
+                             (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
+                             => Key Family
+                             -> m (Array (Tuple (Key Client) ClientType))
+getOnlineStatusByFamilyId familyId = do
+  spOpts_' <- ask
+  let spOpts_ = case spOpts_' of SPSettings_ o -> o
+  let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
+  let authorization = spParams_.authorization
+  let baseURL = spParams_.baseURL
+  let httpMethod = "GET"
+  let reqUrl = baseURL <> "onlineStatus"
+        <> "/" <> encodeURLPiece spOpts_' familyId
+  let reqHeaders =
+        [{ field : "Authorization"
+         , value : encodeURLPiece spOpts_' authorization
+         }]
+  affResp <- liftAff $ affjax defaultRequest
+                                { method = httpMethod
+                                , url = reqUrl
+                                , headers = defaultRequest.headers <> reqHeaders
+                                }
+  getResult decodeJson affResp
+  
 postFunnyName :: forall eff m.
-              (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-              => m String
+                 (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
+                 => m String
 postFunnyName = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
@@ -289,8 +390,8 @@ postFunnyName = do
   getResult decodeJson affResp
   
 getCoffee :: forall eff m.
-          (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-          => m Coffee
+             (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
+             => m Coffee
 getCoffee = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
