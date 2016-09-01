@@ -12,9 +12,9 @@ import Data.Maybe (Maybe(..))
 import Data.Nullable (Nullable(), toNullable)
 import Data.Tuple (Tuple, Tuple(..))
 import Global (encodeURIComponent)
-import Gonimo.Server.DbEntities (Client)
+import Gonimo.Server.DbEntities (Account, Client, Family)
 import Gonimo.Server.Types (AuthToken, ClientType)
-import Gonimo.Types (Family, Key, Secret)
+import Gonimo.Types (Key, Secret)
 import Gonimo.WebAPI (SPParams_(..))
 import Network.HTTP.Affjax (AJAX)
 import Prim (Array, String)
@@ -28,6 +28,13 @@ import Servant.Subscriber.Types (Path(..))
 import Servant.Subscriber.Util (TypedToUser, subGenFlagQuery, subGenListQuery, subGenNormalQuery, toUserType)
 
 import Gonimo.WebAPI.MakeRequests as MakeRequests
+
+getFamiliesByAccountId :: forall m a. MonadReader (SPSettings_ SPParams_) m =>
+                          TypedToUser (Array (Tuple (Key Family) Family)) a
+                          -> Key Account -> m (Subscriptions a)
+getFamiliesByAccountId spToUser_ accountId = do
+  spReq <- MakeRequests.getFamiliesByAccountId accountId
+  pure $ makeSubscriptions spReq (toUserType spToUser_)
 
 receiveSocketByFamilyIdByToClient :: forall m a.
                                      MonadReader (SPSettings_ SPParams_) m =>

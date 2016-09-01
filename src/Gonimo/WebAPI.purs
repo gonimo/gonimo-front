@@ -12,9 +12,9 @@ import Data.Maybe (Maybe(..))
 import Data.Nullable (Nullable(), toNullable)
 import Data.Tuple (Tuple)
 import Global (encodeURIComponent)
-import Gonimo.Server.DbEntities (Client, Invitation)
+import Gonimo.Server.DbEntities (Account, Client, Family, Invitation)
 import Gonimo.Server.Types (AuthToken, ClientType, Coffee)
-import Gonimo.Types (Family, Key, Secret)
+import Gonimo.Types (Key, Secret)
 import Gonimo.WebAPI.Types (AuthData, InvitationInfo, InvitationReply, SendInvitation)
 import Network.HTTP.Affjax (AJAX)
 import Prelude (Unit)
@@ -159,6 +159,29 @@ postFamilies reqBody = do
                                 , url = reqUrl
                                 , headers = defaultRequest.headers <> reqHeaders
                                 , content = toNullable <<< Just <<< printJson <<< encodeJson $ reqBody
+                                }
+  getResult decodeJson affResp
+  
+getFamiliesByAccountId :: forall eff m.
+                          (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
+                          => Key Account
+                          -> m (Array (Tuple (Key Family) Family))
+getFamiliesByAccountId accountId = do
+  spOpts_' <- ask
+  let spOpts_ = case spOpts_' of SPSettings_ o -> o
+  let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
+  let authorization = spParams_.authorization
+  let baseURL = spParams_.baseURL
+  let httpMethod = "GET"
+  let reqUrl = baseURL <> "families" <> "/" <> encodeURLPiece spOpts_' accountId
+  let reqHeaders =
+        [{ field : "Authorization"
+         , value : encodeURLPiece spOpts_' authorization
+         }]
+  affResp <- liftAff $ affjax defaultRequest
+                                { method = httpMethod
+                                , url = reqUrl
+                                , headers = defaultRequest.headers <> reqHeaders
                                 }
   getResult decodeJson affResp
   

@@ -24,7 +24,8 @@ import Gonimo.Client.Effects (handleError)
 import Gonimo.Client.Types (Gonimo, Settings, runGonimoT, class ReportErrorAction)
 import Gonimo.Pux (noEffects, justEffect, onlyEffects, EffModel(EffModel), justGonimo)
 import Gonimo.Server.Types (InvitationDelivery(EmailInvitation), AuthToken, AuthToken(GonimoSecret))
-import Gonimo.Types (Key(Key), Family(Family), Secret(Secret))
+import Gonimo.Server.DbEntities (Family(Family))
+import Gonimo.Types (Key(Key), Secret(Secret))
 import Gonimo.WebAPI (postInvitationOutbox, postInvitations, postFamilies, SPParams_(SPParams_), postAccounts, postFunnyName)
 import Gonimo.WebAPI.Types (AuthData(AuthData))
 import Partial.Unsafe (unsafeCrashWith)
@@ -36,20 +37,20 @@ import Signal (constant, Signal)
 
 
 type State =
-  { familyName :: String
-  , email      :: String
-  , familyId   :: Maybe (Key Family)
+  { familyName     :: String
+  , email          :: String
+  , familyId       :: Maybe (Key Family)
   , invitationSent :: Boolean
-  , errorOccurred :: Maybe Gonimo.Error
+  , errorOccurred  :: Maybe Gonimo.Error
   }
 
 init :: forall eff. Gonimo eff State
 init = let
-    initWithFamily family = { familyName : family
-                            , email : ""
-                            , familyId : Nothing
+    initWithFamily family = { familyName :     family
+                            , email :          ""
+                            , familyId :       Nothing
                             , invitationSent : false
-                            , errorOccurred : Nothing
+                            , errorOccurred :  Nothing
                             }
   in
      initWithFamily <$> postFunnyName

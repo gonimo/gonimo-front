@@ -10,7 +10,8 @@ data ServerError =
   | InvitationAlreadyClaimed 
   | AlreadyFamilyMember 
   | NoSuchFamily 
-  | Unauthorized 
+  | Forbidden 
+  | NotFound 
   | TransactionTimeout 
 
 derive instance genericServerError :: Generic ServerError

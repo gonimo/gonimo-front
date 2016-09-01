@@ -11,8 +11,11 @@ import Gonimo.UI.AcceptInvitation as AcceptC
 import Gonimo.UI.Invite as InviteC
 import Gonimo.UI.Loaded as LoadedC
 import Pux.Html.Attributes as A
+import Servant.Subscriber as Sub
+import Servant.Subscriber.Connection as Sub
 import Browser.LocalStorage (STORAGE, localStorage)
 import Control.Monad.Aff (Aff)
+import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Except.Trans (runExceptT)
 import Control.Monad.Reader.Trans (runReaderT)
@@ -32,57 +35,66 @@ import Gonimo.UI.Html (viewLogo)
 import Gonimo.WebAPI (postFunnyName, SPParams_(SPParams_), postAccounts)
 import Gonimo.WebAPI.Types (AuthData(AuthData))
 import Partial.Unsafe (unsafeCrashWith)
-import Pux (renderToDOM, fromSimple, start)
+import Pux (App, renderToDOM, fromSimple, start)
 import Pux.Html (text, span, Html, img, div)
 import Pux.Router (sampleUrl)
 import Servant.PureScript.Affjax (AjaxError)
 import Servant.PureScript.Settings (defaultSettings, SPSettings_(SPSettings_))
-import Signal (constant, Signal)
-import Signal.Channel (send, subscribe, channel)
+import Servant.Subscriber (Subscriber, SubscriberEff)
+import Signal (runSignal, constant, Signal)
+import Signal.Channel (CHANNEL, Channel, send, subscribe, channel)
+import Unsafe.Coerce (unsafeCoerce)
 
 data State = LoadingS LoadingS'
            | LoadedS LoadedC.State
 
-type LoadingS' = { actionQueue :: List LoadedC.Action } -- | We queue actions until we are loaded.
+type LoadingS' = { subscriber :: Subscriber () LoadedC.Action
+                 , actionQueue :: List LoadedC.Action } -- | We queue actions until we are loaded.
 
 type LoadedState = {
                authData :: AuthData
              , settings :: Settings
              }
 
-init :: State
-init = LoadingS { actionQueue : Nil }
+init :: Subscriber () LoadedC.Action -> State
+init subscriber' = LoadingS { subscriber : subscriber' , actionQueue : Nil }
 
 data Action = Start
             | Init LoadedC.State
             | ReportError Gonimo.Error
-            | Nop
             | LoadedA LoadedC.Action
+            | Nop
 
 instance reportErrorActionAction :: ReportErrorAction Action where
   reportError = ReportError
 
 --------------------------------------------------------------------------------
+
+
 update :: forall eff. Action -> State -> EffModel eff State Action
 update action (LoadingS state)          = updateLoading action state
 update (LoadedA action) (LoadedS state) = updateLoaded action state
 update (ReportError err) (LoadedS state)= updateLoaded (LoadedC.ReportError err) state
-update _ state                          =
-  onlyEffects state [do Gonimo.log "Only LoadedA actions are supported when loaded"
-                        pure Nop
-                    ]
+update _ state                          = onlyEffects state
+                                            [do Gonimo.log "Only LoadedA actions are supported when loaded"
+                                                pure Nop
+                                            ]
 
 updateLoading :: forall eff. Action -> LoadingS' -> EffModel eff State Action
-updateLoading Start state             = onlyEffect (LoadingS state) load
-updateLoading (LoadedA action) state  = trace "Queuing action! " $ \_ -> noEffects $ LoadingS $ state {
-    actionQueue = Cons action state.actionQueue
-  }
-updateLoading (Init ls) state         = EffModel {
-    state : LoadedS ls
-  , effects : map (pure <<< LoadedA) <<< toUnfoldable <<< reverse $ state.actionQueue
-  }
-updateLoading (ReportError err) state = onlyEffect (LoadingS state) $ handleError Nop err
-updateLoading Nop state               = noEffects $ LoadingS state
+updateLoading action state             = case action of
+  Start             -> onlyEffect (LoadingS state) $ load state.subscriber
+  (LoadedA action)  -> trace "Queuing action! " $ \_ -> noEffects $ LoadingS $ state {
+                         actionQueue = Cons action state.actionQueue
+                       }
+  (Init ls)         -> EffModel {
+                         state : LoadedS ls
+                       , effects : map (pure <<< LoadedA)
+                                    <<< toUnfoldable
+                                    <<< reverse
+                                    $ state.actionQueue
+                       }
+  (ReportError err) -> onlyEffect (LoadingS state) $ handleError Nop err
+  Nop               -> noEffects $ LoadingS state
 
 
 updateLoaded :: forall eff. LoadedC.Action -> LoadedC.State -> EffModel eff State Action
@@ -90,14 +102,15 @@ updateLoaded action state  = bimap LoadedS LoadedA $ LoadedC.update action state
 
 
 fromRoute :: Route -> Action
-fromRoute Home = Nop
-fromRoute (AcceptInvitation secret) = trace ("Translating AcceptInvitation!") $ \_ -> LoadedA $ LoadedC.HandleInvite secret
-fromRoute (DecodingFailed err) = ReportError $ URLRouteError err
+fromRoute Home                      = Nop
+fromRoute (AcceptInvitation secret) = trace ("Translating AcceptInvitation!") $
+                                      \_ -> LoadedA $ LoadedC.HandleInvite secret
+fromRoute (DecodingFailed err)      = ReportError $ URLRouteError err
 --------------------------------------------------------------------------------
 
 view :: State -> Html Action
-view (LoadingS _) = viewLoading
-view (LoadedS state)  = map LoadedA  $ LoadedC.view state
+view (LoadingS _)    = viewLoading
+view (LoadedS state) = map LoadedA  $ LoadedC.view state
 
 viewLoading :: Html Action
 viewLoading = viewLogo $ div []
@@ -107,28 +120,35 @@ viewLoading = viewLogo $ div []
 --------------------------------------------------------------------------------
 
 
-load :: forall eff. Aff (GonimoEff eff) Action
-load = Gonimo.toAff initSettings $ authToAction =<< getAuthData
+load :: forall eff. Subscriber () LoadedC.Action -> Aff (GonimoEff eff) Action
+load subscriber' = Gonimo.toAff initSettings $ authToAction =<< getAuthData
   where
     initSettings = mkSettings $ GonimoSecret (Secret "blabala")
 
     mkSettings :: AuthToken -> Settings
     mkSettings secret = defaultSettings $ SPParams_ {
           authorization : secret
-        , baseURL : "http://localhost:8081/"
+        , baseURL       : "http://localhost:8081/"
         }
 
     authToAction :: AuthData -> Gonimo eff Action
-    authToAction (authData@(AuthData auth))
-      = let doInit inviteState =  Init { authData : authData
-            , settings : mkSettings auth.authToken
-            , inviteS : inviteState
-            , acceptS : AcceptC.init
-            , central : LoadedC.CentralInvite
+    authToAction (authData@(AuthData auth)) = do
+      inviteState <- InviteC.init
+      pure $ Init
+            { authData   : authData
+            , settings   : mkSettings auth.authToken
+            , subscriber : subscriber'
+            , inviteS    : inviteState
+            , acceptS    : AcceptC.init
+            , central    : LoadedC.CentralInvite
+            , families   : []
             }
-        in doInit <$> InviteC.init
 
+makeCallback :: forall eff. Channel Action ->  (LoadedC.Action -> SubscriberEff (channel :: CHANNEL | eff) Unit)
+makeCallback c = send c <<< LoadedA
 
+makeNotify :: forall eff. Channel Action ->  (Sub.Notification -> SubscriberEff (channel :: CHANNEL | eff) Unit)
+makeNotify c = send c <<< LoadedA <<< LoadedC.HandleSubscriber
 
 getAuthData :: forall eff. Gonimo eff AuthData
 getAuthData = do
@@ -144,17 +164,37 @@ getAuthData = do
     Just d  -> pure d
 
 
+deploySubscriptions :: forall eff. State -> SubscriberEff eff Unit
+deploySubscriptions (LoadingS _) = pure unit
+deploySubscriptions (LoadedS s) = Sub.deploy (LoadedC.subscriptions s)
+                                             (coerceSubscriberEffects s.subscriber)
+
 main = do
   urlSignal <- sampleUrl
-  startUp <- channel Nop
-  let startUpSig = subscribe startUp
+  controlChan <- channel Nop
+  let controlSig = subscribe controlChan
   let routeSignal = map (fromRoute <<< match) urlSignal
+  subscriber' <- Sub.makeSubscriber
+                    { url      : "ws://localhost:8081/subscriber"
+                    , callback : makeCallback controlChan
+                    , notify   : makeNotify controlChan
+                    }
   app <- start $
-    { initialState: init
+    { initialState: init (coerceSubscriberEffects subscriber')
     , update: toPux update
     , view: view
-    , inputs: [startUpSig, routeSignal]
+    , inputs: [controlSig, routeSignal]
     }
   -- We have to send Start after the fact, because on merging const signals one gets lost!
-  send startUp Start
+  send controlChan Start
+  runSignal $ map deploySubscriptions app.state
   renderToDOM "#app" app.html
+
+coerceEffects :: forall eff1 eff2 a. Eff eff1 a -> Eff eff2 a
+coerceEffects = unsafeCoerce
+
+toGonimoEffects :: forall eff a. Eff eff a -> Eff (GonimoEff eff) a
+toGonimoEffects = unsafeCoerce
+
+coerceSubscriberEffects :: forall eff1 eff2 a. Subscriber eff1 a -> Subscriber eff2 a
+coerceSubscriberEffects = unsafeCoerce

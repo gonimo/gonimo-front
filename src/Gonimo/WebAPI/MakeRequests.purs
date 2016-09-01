@@ -12,9 +12,9 @@ import Data.Maybe (Maybe(..))
 import Data.Nullable (Nullable(), toNullable)
 import Data.Tuple (Tuple, Tuple(..))
 import Global (encodeURIComponent)
-import Gonimo.Server.DbEntities (Client, Invitation)
+import Gonimo.Server.DbEntities (Account, Client, Family, Invitation)
 import Gonimo.Server.Types (AuthToken, ClientType, Coffee)
-import Gonimo.Types (Family, Key, Secret)
+import Gonimo.Types (Key, Secret)
 import Gonimo.WebAPI (SPParams_(..))
 import Gonimo.WebAPI.Types (AuthData, InvitationInfo, InvitationReply, SendInvitation)
 import Network.HTTP.Affjax (AJAX)
@@ -165,6 +165,29 @@ postFamilies reqBody = do
                 , httpHeaders: reqHeaders
                 , httpQuery: reqQuery
                 , httpBody: printJson <<< encodeJson $ reqBody
+                }
+  pure spReq
+
+getFamiliesByAccountId :: forall m. MonadReader (SPSettings_ SPParams_) m =>
+                          Key Account -> m HttpRequest
+getFamiliesByAccountId accountId = do
+  spOpts_' <- ask
+  let spOpts_ = case spOpts_' of SPSettings_ o -> o
+  let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
+  let authorization = spParams_.authorization
+  let baseURL = spParams_.baseURL
+  let httpMethod = "GET"
+  let reqPath = Path ["families" , gDefaultToURLPiece accountId]
+  let reqHeaders =
+        [Tuple "Authorization" (gDefaultToURLPiece authorization)]
+  let reqQuery =
+        []
+  let spReq = HttpRequest
+                { httpMethod: httpMethod
+                , httpPath: reqPath
+                , httpHeaders: reqHeaders
+                , httpQuery: reqQuery
+                , httpBody: ""
                 }
   pure spReq
 

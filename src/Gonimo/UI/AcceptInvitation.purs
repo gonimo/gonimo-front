@@ -25,7 +25,7 @@ import Gonimo.Client.Types (Error(UnexpectedAction), Gonimo, Settings, runGonimo
 import Gonimo.Pux (noEffects, onlyEffect, onlyGonimo, justEffect, onlyEffects, EffModel(EffModel), justGonimo)
 import Gonimo.Server.DbEntities (Invitation(Invitation))
 import Gonimo.Server.Types (InvitationDelivery(EmailInvitation), AuthToken, AuthToken(GonimoSecret))
-import Gonimo.Types (Key(Key), Family(Family), Secret(Secret))
+import Gonimo.Types (Key(Key), Secret(Secret))
 import Gonimo.WebAPI (deleteInvitationsByInvitationSecret, putInvitationInfoByInvitationSecret, postInvitations, postFamilies, SPParams_(SPParams_), postAccounts)
 import Gonimo.WebAPI.Types (InvitationReply(InvitationReject, InvitationAccept), InvitationReply(InvitationReject, InvitationAccept), InvitationInfo(InvitationInfo), AuthData(AuthData))
 import Partial.Unsafe (unsafeCrashWith)

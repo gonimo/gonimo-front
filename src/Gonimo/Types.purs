@@ -15,4 +15,3 @@ newtype Key a = Key Int
 
 derive instance genericKey :: Generic (Key a)
 
-data Family = Family -- Dummy type for Key Family
