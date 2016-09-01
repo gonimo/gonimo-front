@@ -12,11 +12,12 @@
   "dependencies": {
     "purescript-pux": "git@github.com:eskimor/purescript-pux#fix_router",
     "purescript-affjax": "^1.1.0",
-    "purescript-argonaut-generic-codecs": "^2.0.0",
+    "purescript-argonaut-generic-codecs": "^3.0.0",
     "purescript-generics": "^1.0.0",
     "purescript-partial": "^1.1.2",
     "purescript-localstorage": "^1.0.0",
-    "purescript-servant-support": "^1.0.1"
+    "purescript-servant-support": "^1.0.3",
+    "purescript-subscriber": "git@github.com:eskimor/purescript-subscriber#master"
   },
   "devDependencies": {
     "purescript-debug": "^1.0.0"
