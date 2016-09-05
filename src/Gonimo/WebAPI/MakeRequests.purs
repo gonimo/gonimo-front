@@ -16,7 +16,7 @@ import Gonimo.Server.DbEntities (Account, Client, Family, Invitation)
 import Gonimo.Server.Types (AuthToken, ClientType, Coffee)
 import Gonimo.Types (Key, Secret)
 import Gonimo.WebAPI (SPParams_(..))
-import Gonimo.WebAPI.Types (AuthData, InvitationInfo, InvitationReply, SendInvitation)
+import Gonimo.WebAPI.Types (AuthData, ClientInfo, InvitationInfo, InvitationReply, SendInvitation)
 import Network.HTTP.Affjax (AJAX)
 import Prelude (Unit)
 import Prim (Array, String)
@@ -132,6 +132,29 @@ putInvitationInfoByInvitationSecret invitationSecret = do
   let baseURL = spParams_.baseURL
   let httpMethod = "PUT"
   let reqPath = Path ["invitationInfo" , gDefaultToURLPiece invitationSecret]
+  let reqHeaders =
+        [Tuple "Authorization" (gDefaultToURLPiece authorization)]
+  let reqQuery =
+        []
+  let spReq = HttpRequest
+                { httpMethod: httpMethod
+                , httpPath: reqPath
+                , httpHeaders: reqHeaders
+                , httpQuery: reqQuery
+                , httpBody: ""
+                }
+  pure spReq
+
+getDeviceInfosByFamilyId :: forall m. MonadReader (SPSettings_ SPParams_) m =>
+                            Key Family -> m HttpRequest
+getDeviceInfosByFamilyId familyId = do
+  spOpts_' <- ask
+  let spOpts_ = case spOpts_' of SPSettings_ o -> o
+  let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
+  let authorization = spParams_.authorization
+  let baseURL = spParams_.baseURL
+  let httpMethod = "GET"
+  let reqPath = Path ["deviceInfos" , gDefaultToURLPiece familyId]
   let reqHeaders =
         [Tuple "Authorization" (gDefaultToURLPiece authorization)]
   let reqQuery =

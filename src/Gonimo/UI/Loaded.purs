@@ -1,8 +1,10 @@
 -- | Loaded application ui logic
 module Gonimo.UI.Loaded where
 
-import Prelude
 import Gonimo.UI.Html
+import Data.List as List
+import Data.Map as Map
+import Gonimo.WebAPI.MakeRequests as Reqs
 import Gonimo.Client.Effects as Gonimo
 import Gonimo.Client.LocalStorage as Key
 import Gonimo.Client.Types as Gonimo
@@ -11,42 +13,48 @@ import Gonimo.UI.Invite as InviteC
 import Gonimo.WebAPI.Subscriber as Sub
 import Pux.Html.Attributes as A
 import Pux.Html.Events as E
+import Servant.Subscriber as Sub
+import Servant.Subscriber.Connection as Sub
 import Browser.LocalStorage (STORAGE, localStorage)
 import Control.Monad.Aff (Aff)
+import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Except.Trans (runExceptT)
 import Control.Monad.Reader (runReader)
 import Control.Monad.Reader.Trans (runReaderT)
-import Data.Array (head)
+import Data.Array (fromFoldable, concat, catMaybes, head)
 import Data.Bifunctor (bimap)
 import Data.Either (Either(Right, Left))
 import Data.Foldable (foldl)
 import Data.Generic (gShow)
+import Data.Map (Map)
 import Data.Maybe (maybe, Maybe(..))
 import Data.Monoid (mempty)
 import Data.Semigroup (append)
 import Data.Traversable (traverse)
-import Data.Tuple (Tuple(Tuple))
+import Data.Tuple (fst, Tuple(Tuple))
 import Debug.Trace (trace)
 import Gonimo.Client.Effects (handleError)
-import Gonimo.Client.Types (runGonimoT, Settings)
+import Gonimo.Client.Types (GonimoEff, runGonimoT, Settings)
 import Gonimo.Pux (justEffect, noEffects, onlyEffects, EffModel(EffModel))
-import Gonimo.Server.DbEntities (Family(Family))
+import Gonimo.Server.DbEntities (Client(Client), Family(Family))
 import Gonimo.Server.DbEntities.Helpers (runFamily)
-import Gonimo.Server.Types (AuthToken, AuthToken(GonimoSecret))
-import Gonimo.Types (Key(Key), Secret(Secret))
+import Gonimo.Server.Types (ClientType(Undefined), AuthToken, AuthToken(GonimoSecret))
+import Gonimo.Types (dateToString, Key(Key), Secret(Secret))
 import Gonimo.WebAPI (SPParams_(SPParams_), postAccounts)
-import Gonimo.WebAPI.Types (AuthData(AuthData))
+import Gonimo.WebAPI.Types (ClientInfo(ClientInfo), AuthData(AuthData))
 import Gonimo.WebAPI.Types.Helpers (runAuthData)
 import Partial.Unsafe (unsafeCrashWith)
 import Pux (renderToDOM, fromSimple, start)
-import Pux.Html (button, input, p, h1, text, span, Html, img, div)
+import Pux.Html (h3, h2, td, tbody, th, tr, thead, table, ul, p, button, input, h1, text, span, Html, img, div)
 import Servant.PureScript.Affjax (AjaxError)
 import Servant.PureScript.Settings (defaultSettings, SPSettings_(SPSettings_))
 import Servant.Subscriber (Subscriber)
 import Servant.Subscriber.Connection (Notification)
+import Servant.Subscriber.Internal (coerceEffects)
 import Servant.Subscriber.Subscriptions (Subscriptions)
 import Signal (constant, Signal)
+import Prelude hiding (div)
 
 type State = { authData :: AuthData
              , settings :: Settings
@@ -55,6 +63,8 @@ type State = { authData :: AuthData
              , acceptS  :: AcceptC.State
              , central  :: Central
              , families :: Array (Tuple (Key Family) Family)
+             , onlineDevices :: Map (Key Client) ClientType
+             , deviceInfos :: Map (Key Client) ClientInfo
              }
 
 data Action = ReportError Gonimo.Error
@@ -63,6 +73,8 @@ data Action = ReportError Gonimo.Error
             | AcceptA AcceptC.Action
             | HandleInvite Secret
             | SetFamilies (Array (Tuple (Key Family) Family))
+            | SetOnlineDevices (Array (Tuple (Key Client) ClientType))
+            | SetDeviceInfos (Array (Tuple (Key Client) ClientInfo))
             | HandleSubscriber Notification
             | Nop
 
@@ -81,17 +93,22 @@ getInviteState state = case head state.families of
 --------------------------------------------------------------------------------
 
 update :: forall eff. Action -> State -> EffModel eff State Action
-update (SetState state)      = const $ noEffects state
-update (ReportError err)     = justEffect $ handleError Nop err
-update (InviteA action)      = updateInvite action
-update (HandleInvite secret) = setCentral CentralAccept
-                               >>> justEffect (inviteEffect secret)
-update (AcceptA action)      = updateAccept action
-update (SetFamilies families') = \state -> noEffects (state {families = families'})
-update (HandleSubscriber msg) = justEffect (do
+update (SetState state)           = const $ noEffects state
+update (ReportError err)          = justEffect $ handleError Nop err
+update (InviteA action)           = updateInvite action
+update (HandleInvite secret)      = setCentral CentralAccept
+                                    >>> justEffect (inviteEffect secret)
+update (AcceptA action)           = updateAccept action
+update (SetFamilies families')    = \state -> EffModel
+                                              { state : state { families = families'}
+                                              , effects : [ liftEff $ initSubscriber (state { families = families'})]
+                                              }
+update (SetOnlineDevices devices) = \state -> noEffects (state {onlineDevices = Map.fromFoldable devices})
+update (SetDeviceInfos devices)   = \state -> noEffects (state {deviceInfos = Map.fromFoldable devices})
+update (HandleSubscriber msg)     = justEffect (do
                                             Gonimo.log <<< gShow $ msg
                                             pure Nop)
-update Nop                   = noEffects
+update Nop                        = noEffects
 
 
 updateInvite :: forall eff. InviteC.Action -> State -> EffModel eff State Action
@@ -104,26 +121,83 @@ updateAccept action state = bimap (state {acceptS = _}) AcceptA
 
 inviteEffect :: forall m. Monad m => Secret -> m Action
 inviteEffect = pure <<< AcceptA <<< AcceptC.LoadInvitation
+
+initSubscriber :: forall eff. State -> Eff (GonimoEff eff) Action
+initSubscriber state = coerceEffects $ do
+  let conn = Sub.getConnection state.subscriber
+  let clientId = (runAuthData state.authData).clientId
+  let clientData = Tuple clientId Undefined
+  let familyId = fst <$> head state.families -- Currently we just pick the first family
+  let pongReq = flip runReader state.settings <<< Reqs.postOnlineStatusByFamilyId clientData <$> familyId
+  let closeReq = flip runReader state.settings <<< flip Reqs.deleteOnlineStatusByFamilyIdByClientId clientId <$> familyId
+  case pongReq of
+    Nothing -> unsafeCrashWith "WTF - no familyid?!"
+    Just req' -> Sub.setPongRequest req' conn
+  case closeReq of
+    Nothing -> pure unit
+    Just req' -> Sub.setCloseRequest req' conn
+  Sub.realize conn
+  pure $ Nop
 --------------------------------------------------------------------------------
 
 view :: State -> Html Action
-view = viewCentral
-
+view state =
+  let
+    numDevices = Map.size state.onlineDevices
+  in
+    div []
+    [ viewCentral state
+    , div []
+      [ h3 [] [ text $ show numDevices <> " Device(s) currently online:" ]
+      , div [] [ viewOnlineDevices state ]
+      ]
+    ]
 
 viewCentral :: State -> Html Action
 viewCentral state = case state.central of
   CentralInvite -> map InviteA $ InviteC.view (getInviteState state)
   CentralAccept -> map AcceptA $ AcceptC.view state.acceptS
 
+viewOnlineDevices :: State -> Html Action
+viewOnlineDevices state = table [ A.className "table", A.className "table-striped"]
+                          [ head
+                          , body
+                          ]
+  where
+    head = thead []
+           [ tr []
+             [ th [] [ text "Name" ]
+             , th [] [ text "Last Accessed"]
+             ]
+           ]
+    body = tbody []
+           <<< fromFoldable
+           <<< List.mapMaybe viewOnlineDevice
+           $ Map.keys state.onlineDevices
+    viewOnlineDevice deviceId = do
+        (ClientInfo info) <- Map.lookup deviceId state.deviceInfos
+        let name = info.clientInfoName
+        let lastAccessed = dateToString info.clientInfoLastAccessed
+        pure $ tr []
+               [ td [] [ text name ]
+               , td [] [ text lastAccessed ]
+               ]
+
 --------------------------------------------------------------------------------
 
 subscriptions :: State -> Subscriptions Action
 subscriptions state =
   let
+    familyId = fst <$> head state.families -- Currently we just pick the first family
     subArray :: Array (Subscriptions Action)
-    subArray = map (flip runReader state.settings)
-      [ Sub.getFamiliesByAccountId (maybe Nop SetFamilies)
-                                  (runAuthData state.authData).accountId
+    subArray = map (flip runReader state.settings) <<< concat $
+      [ [ Sub.getFamiliesByAccountId (maybe Nop SetFamilies)
+                                          (runAuthData state.authData).accountId
+        ]
+      , fromFoldable $
+        Sub.getOnlineStatusByFamilyId (maybe Nop SetOnlineDevices) <$> familyId
+      , fromFoldable $
+        Sub.getDeviceInfosByFamilyId (maybe Nop SetDeviceInfos) <$> familyId
       ]
   in
    foldl append mempty subArray

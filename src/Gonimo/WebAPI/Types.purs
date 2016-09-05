@@ -4,7 +4,7 @@ module Gonimo.WebAPI.Types where
 import Data.Maybe (Maybe)
 import Gonimo.Server.DbEntities (Account, Client, Invitation)
 import Gonimo.Server.Types (AuthToken, InvitationDelivery)
-import Gonimo.Types (Key)
+import Gonimo.Types (Date, Key)
 import Prim (String)
 
 import Data.Generic (class Generic)
@@ -38,4 +38,14 @@ data SendInvitation =
     SendInvitation (Key Invitation) InvitationDelivery
 
 derive instance genericSendInvitation :: Generic SendInvitation
+
+data ClientInfo =
+    ClientInfo {
+      clientInfoName :: String
+    , clientInfoAccountId :: Key Account
+    , clientInfoLastAccessed :: Date
+    , clientInfoUserAgent :: String
+    }
+
+derive instance genericClientInfo :: Generic ClientInfo
 

@@ -16,6 +16,7 @@ import Gonimo.Server.DbEntities (Account, Client, Family)
 import Gonimo.Server.Types (AuthToken, ClientType)
 import Gonimo.Types (Key, Secret)
 import Gonimo.WebAPI (SPParams_(..))
+import Gonimo.WebAPI.Types (ClientInfo)
 import Network.HTTP.Affjax (AJAX)
 import Prim (Array, String)
 import Servant.PureScript.Affjax (AjaxError(..), affjax, defaultRequest)
@@ -28,6 +29,13 @@ import Servant.Subscriber.Types (Path(..))
 import Servant.Subscriber.Util (TypedToUser, subGenFlagQuery, subGenListQuery, subGenNormalQuery, toUserType)
 
 import Gonimo.WebAPI.MakeRequests as MakeRequests
+
+getDeviceInfosByFamilyId :: forall m a. MonadReader (SPSettings_ SPParams_) m =>
+                            TypedToUser (Array (Tuple (Key Client) ClientInfo)) a
+                            -> Key Family -> m (Subscriptions a)
+getDeviceInfosByFamilyId spToUser_ familyId = do
+  spReq <- MakeRequests.getDeviceInfosByFamilyId familyId
+  pure $ makeSubscriptions spReq (toUserType spToUser_)
 
 getFamiliesByAccountId :: forall m a. MonadReader (SPSettings_ SPParams_) m =>
                           TypedToUser (Array (Tuple (Key Family) Family)) a

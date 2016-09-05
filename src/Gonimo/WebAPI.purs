@@ -15,7 +15,7 @@ import Global (encodeURIComponent)
 import Gonimo.Server.DbEntities (Account, Client, Family, Invitation)
 import Gonimo.Server.Types (AuthToken, ClientType, Coffee)
 import Gonimo.Types (Key, Secret)
-import Gonimo.WebAPI.Types (AuthData, InvitationInfo, InvitationReply, SendInvitation)
+import Gonimo.WebAPI.Types (AuthData, ClientInfo, InvitationInfo, InvitationReply, SendInvitation)
 import Network.HTTP.Affjax (AJAX)
 import Prelude (Unit)
 import Prim (Array, String)
@@ -128,6 +128,30 @@ putInvitationInfoByInvitationSecret invitationSecret = do
   let httpMethod = "PUT"
   let reqUrl = baseURL <> "invitationInfo"
         <> "/" <> encodeURLPiece spOpts_' invitationSecret
+  let reqHeaders =
+        [{ field : "Authorization"
+         , value : encodeURLPiece spOpts_' authorization
+         }]
+  affResp <- liftAff $ affjax defaultRequest
+                                { method = httpMethod
+                                , url = reqUrl
+                                , headers = defaultRequest.headers <> reqHeaders
+                                }
+  getResult decodeJson affResp
+  
+getDeviceInfosByFamilyId :: forall eff m.
+                            (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
+                            => Key Family
+                            -> m (Array (Tuple (Key Client) ClientInfo))
+getDeviceInfosByFamilyId familyId = do
+  spOpts_' <- ask
+  let spOpts_ = case spOpts_' of SPSettings_ o -> o
+  let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
+  let authorization = spParams_.authorization
+  let baseURL = spParams_.baseURL
+  let httpMethod = "GET"
+  let reqUrl = baseURL <> "deviceInfos"
+        <> "/" <> encodeURLPiece spOpts_' familyId
   let reqHeaders =
         [{ field : "Authorization"
          , value : encodeURLPiece spOpts_' authorization

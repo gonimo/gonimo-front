@@ -1,15 +1,14 @@
 module Main where
 
-import Prelude
-import Gonimo.Client.Router
-import Gonimo.UI.AcceptInvitation
 import Gonimo.Client.Effects as Gonimo
+import Control.Monad.Eff.Console as Console
 import Gonimo.Client.Effects as Gonimo
 import Gonimo.Client.LocalStorage as Key
 import Gonimo.Client.Types as Gonimo
 import Gonimo.UI.AcceptInvitation as AcceptC
 import Gonimo.UI.Invite as InviteC
 import Gonimo.UI.Loaded as LoadedC
+import Gonimo.WebAPI.MakeRequests as Reqs
 import Pux.Html.Attributes as A
 import Servant.Subscriber as Sub
 import Servant.Subscriber.Connection as Sub
@@ -18,22 +17,27 @@ import Control.Monad.Aff (Aff)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Except.Trans (runExceptT)
+import Control.Monad.Reader (runReader)
 import Control.Monad.Reader.Trans (runReaderT)
+import Data.Array (head)
 import Data.Bifunctor (bimap)
 import Data.Either (Either(Right, Left))
 import Data.Generic (gShow)
 import Data.List (toUnfoldable, reverse, List(Nil, Cons))
 import Data.Maybe (Maybe(..))
+import Data.Tuple (fst, Tuple(Tuple))
 import Debug.Trace (trace)
 import Gonimo.Client.Effects (handleError)
+import Gonimo.Client.Router (match, Route(DecodingFailed, AcceptInvitation, Home))
 import Gonimo.Client.Types (GonimoEff, Gonimo, class ReportErrorAction)
 import Gonimo.Client.Types (Error(URLRouteError), runGonimoT, Settings)
 import Gonimo.Pux (onlyEffect, justEffect, onlyEffects, noEffects, EffModel(EffModel), toPux)
-import Gonimo.Server.Types (AuthToken, AuthToken(GonimoSecret))
+import Gonimo.Server.Types (ClientType(Undefined), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (Secret(Secret))
 import Gonimo.UI.Html (viewLogo)
 import Gonimo.WebAPI (postFunnyName, SPParams_(SPParams_), postAccounts)
 import Gonimo.WebAPI.Types (AuthData(AuthData))
+import Gonimo.WebAPI.Types.Helpers (runAuthData)
 import Partial.Unsafe (unsafeCrashWith)
 import Pux (App, renderToDOM, fromSimple, start)
 import Pux.Html (text, span, Html, img, div)
@@ -44,6 +48,9 @@ import Servant.Subscriber (Subscriber, SubscriberEff)
 import Signal (runSignal, constant, Signal)
 import Signal.Channel (CHANNEL, Channel, send, subscribe, channel)
 import Unsafe.Coerce (unsafeCoerce)
+import Prelude hiding (div)
+import Data.Map as Map
+import Servant.Subscriber.Subscriptions as Sub
 
 data State = LoadingS LoadingS'
            | LoadedS LoadedC.State
@@ -75,6 +82,7 @@ update :: forall eff. Action -> State -> EffModel eff State Action
 update action (LoadingS state)          = updateLoading action state
 update (LoadedA action) (LoadedS state) = updateLoaded action state
 update (ReportError err) (LoadedS state)= updateLoaded (LoadedC.ReportError err) state
+update Nop state                        = noEffects state
 update _ state                          = onlyEffects state
                                             [do Gonimo.log "Only LoadedA actions are supported when loaded"
                                                 pure Nop
@@ -86,13 +94,7 @@ updateLoading action state             = case action of
   (LoadedA action)  -> trace "Queuing action! " $ \_ -> noEffects $ LoadingS $ state {
                          actionQueue = Cons action state.actionQueue
                        }
-  (Init ls)         -> EffModel {
-                         state : LoadedS ls
-                       , effects : map (pure <<< LoadedA)
-                                    <<< toUnfoldable
-                                    <<< reverse
-                                    $ state.actionQueue
-                       }
+  (Init ls)         -> handleInit ls state
   (ReportError err) -> onlyEffect (LoadingS state) $ handleError Nop err
   Nop               -> noEffects $ LoadingS state
 
@@ -106,6 +108,16 @@ fromRoute Home                      = Nop
 fromRoute (AcceptInvitation secret) = trace ("Translating AcceptInvitation!") $
                                       \_ -> LoadedA $ LoadedC.HandleInvite secret
 fromRoute (DecodingFailed err)      = ReportError $ URLRouteError err
+
+handleInit :: forall eff. LoadedC.State -> LoadingS' -> EffModel eff State Action
+handleInit ls state = EffModel {
+                         state : LoadedS ls
+                       , effects : toUnfoldable queueEffects
+                       }
+  where
+    queueEffects = map (pure <<< LoadedA) <<< reverse $ state.actionQueue
+
+
 --------------------------------------------------------------------------------
 
 view :: State -> Html Action
@@ -135,13 +147,15 @@ load subscriber' = Gonimo.toAff initSettings $ authToAction =<< getAuthData
     authToAction (authData@(AuthData auth)) = do
       inviteState <- InviteC.init
       pure $ Init
-            { authData   : authData
-            , settings   : mkSettings auth.authToken
-            , subscriber : subscriber'
-            , inviteS    : inviteState
-            , acceptS    : AcceptC.init
-            , central    : LoadedC.CentralInvite
-            , families   : []
+            { authData      : authData
+            , settings      : mkSettings auth.authToken
+            , subscriber    : subscriber'
+            , inviteS       : inviteState
+            , acceptS       : AcceptC.init
+            , central       : LoadedC.CentralInvite
+            , families      : []
+            , onlineDevices : Map.empty
+            , deviceInfos   : Map.empty
             }
 
 makeCallback :: forall eff. Channel Action ->  (LoadedC.Action -> SubscriberEff (channel :: CHANNEL | eff) Unit)
@@ -166,8 +180,11 @@ getAuthData = do
 
 deploySubscriptions :: forall eff. State -> SubscriberEff eff Unit
 deploySubscriptions (LoadingS _) = pure unit
-deploySubscriptions (LoadedS s) = Sub.deploy (LoadedC.subscriptions s)
-                                             (coerceSubscriberEffects s.subscriber)
+deploySubscriptions (LoadedS s) = do
+  let subscriptions = LoadedC.subscriptions s
+  coerceEffects $ Console.log $ "Deploying " <> show (Sub.size subscriptions) <> " subscriptions!"
+  Sub.deploy subscriptions (coerceSubscriberEffects s.subscriber)
+  coerceEffects $ Console.log $ "Deployed " <> show (Sub.size subscriptions) <> " subscriptions!"
 
 main = do
   urlSignal <- sampleUrl
@@ -188,6 +205,7 @@ main = do
   -- We have to send Start after the fact, because on merging const signals one gets lost!
   send controlChan Start
   runSignal $ map deploySubscriptions app.state
+  runSignal $ map (\_ -> Console.log "State changed!") app.state
   renderToDOM "#app" app.html
 
 coerceEffects :: forall eff1 eff2 a. Eff eff1 a -> Eff eff2 a
