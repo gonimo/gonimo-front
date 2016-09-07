@@ -4,12 +4,12 @@ module Gonimo.UI.Loaded where
 import Gonimo.UI.Html
 import Data.List as List
 import Data.Map as Map
-import Gonimo.WebAPI.MakeRequests as Reqs
 import Gonimo.Client.Effects as Gonimo
 import Gonimo.Client.LocalStorage as Key
 import Gonimo.Client.Types as Gonimo
 import Gonimo.UI.AcceptInvitation as AcceptC
 import Gonimo.UI.Invite as InviteC
+import Gonimo.WebAPI.MakeRequests as Reqs
 import Gonimo.WebAPI.Subscriber as Sub
 import Pux.Html.Attributes as A
 import Pux.Html.Events as E
@@ -50,15 +50,16 @@ import Pux.Html (h3, h2, td, tbody, th, tr, thead, table, ul, p, button, input, 
 import Servant.PureScript.Affjax (AjaxError)
 import Servant.PureScript.Settings (defaultSettings, SPSettings_(SPSettings_))
 import Servant.Subscriber (Subscriber)
-import Servant.Subscriber.Connection (Notification)
+import Servant.Subscriber.Connection (Notification(HttpRequestFailed))
 import Servant.Subscriber.Internal (coerceEffects)
+import Servant.Subscriber.Request (HttpRequest(HttpRequest))
 import Servant.Subscriber.Subscriptions (Subscriptions)
 import Signal (constant, Signal)
 import Prelude hiding (div)
 
 type State = { authData :: AuthData
              , settings :: Settings
-             , subscriber :: Subscriber () Action -- Hack: I don't want to carry eff everywhere.
+             , subscriberUrl :: String
              , inviteS  :: InviteC.State
              , acceptS  :: AcceptC.State
              , central  :: Central
@@ -99,10 +100,7 @@ update (InviteA action)           = updateInvite action
 update (HandleInvite secret)      = setCentral CentralAccept
                                     >>> justEffect (inviteEffect secret)
 update (AcceptA action)           = updateAccept action
-update (SetFamilies families')    = \state -> EffModel
-                                              { state : state { families = families'}
-                                              , effects : [ liftEff $ initSubscriber (state { families = families'})]
-                                              }
+update (SetFamilies families')    = \state -> noEffects (state { families = families'})
 update (SetOnlineDevices devices) = \state -> noEffects (state {onlineDevices = Map.fromFoldable devices})
 update (SetDeviceInfos devices)   = \state -> noEffects (state {deviceInfos = Map.fromFoldable devices})
 update (HandleSubscriber msg)     = justEffect (do
@@ -122,22 +120,6 @@ updateAccept action state = bimap (state {acceptS = _}) AcceptA
 inviteEffect :: forall m. Monad m => Secret -> m Action
 inviteEffect = pure <<< AcceptA <<< AcceptC.LoadInvitation
 
-initSubscriber :: forall eff. State -> Eff (GonimoEff eff) Action
-initSubscriber state = coerceEffects $ do
-  let conn = Sub.getConnection state.subscriber
-  let clientId = (runAuthData state.authData).clientId
-  let clientData = Tuple clientId Undefined
-  let familyId = fst <$> head state.families -- Currently we just pick the first family
-  let pongReq = flip runReader state.settings <<< Reqs.postOnlineStatusByFamilyId clientData <$> familyId
-  let closeReq = flip runReader state.settings <<< flip Reqs.deleteOnlineStatusByFamilyIdByClientId clientId <$> familyId
-  case pongReq of
-    Nothing -> unsafeCrashWith "WTF - no familyid?!"
-    Just req' -> Sub.setPongRequest req' conn
-  case closeReq of
-    Nothing -> pure unit
-    Just req' -> Sub.setCloseRequest req' conn
-  Sub.realize conn
-  pure $ Nop
 --------------------------------------------------------------------------------
 
 view :: State -> Html Action
@@ -185,8 +167,8 @@ viewOnlineDevices state = table [ A.className "table", A.className "table-stripe
 
 --------------------------------------------------------------------------------
 
-subscriptions :: State -> Subscriptions Action
-subscriptions state =
+getSubscriptions :: State -> Subscriptions Action
+getSubscriptions state =
   let
     familyId = fst <$> head state.families -- Currently we just pick the first family
     subArray :: Array (Subscriptions Action)
@@ -201,3 +183,20 @@ subscriptions state =
       ]
   in
    foldl append mempty subArray
+
+getPongRequest :: State -> Maybe HttpRequest
+getPongRequest state =
+  let
+    clientId = (runAuthData state.authData).clientId
+    clientData = Tuple clientId Undefined
+    familyId = fst <$> head state.families -- Currently we just pick the first family
+  in
+    flip runReader state.settings <<< Reqs.postOnlineStatusByFamilyId clientData <$> familyId
+
+getCloseRequest :: State -> Maybe HttpRequest
+getCloseRequest state =
+  let
+    clientId = (runAuthData state.authData).clientId
+    familyId = fst <$> head state.families -- Currently we just pick the first family
+  in
+    flip runReader state.settings <<< flip Reqs.deleteOnlineStatusByFamilyIdByClientId clientId <$> familyId

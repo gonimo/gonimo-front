@@ -7,6 +7,8 @@ import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.Class (liftAff, class MonadAff)
 import Control.Monad.Eff.Class (liftEff, class MonadEff)
 import Control.Monad.Eff.Console (CONSOLE)
+import Control.Monad.Eff.Exception (EXCEPTION)
+import Control.Monad.Eff.Ref (REF)
 import Control.Monad.Error.Class (catchError, throwError)
 import Control.Monad.Except.Trans (runExceptT, class MonadError, ExceptT)
 import Control.Monad.Reader.Class (local, ask, class MonadReader)
@@ -18,6 +20,7 @@ import Network.HTTP.Affjax (AJAX)
 import Servant.PureScript.Affjax (AjaxError)
 import Servant.PureScript.Settings (SPSettings_)
 import Signal.Channel (CHANNEL)
+import WebSocket (WEBSOCKET)
 
 
 type Settings = SPSettings_ SPParams_
@@ -35,7 +38,10 @@ class ReportErrorAction action where
 type GonimoEff eff = ( ajax :: AJAX
                       , channel :: CHANNEL
                       , console :: CONSOLE
-                      , storage :: STORAGE | eff
+                      , storage :: STORAGE
+                      , ws :: WEBSOCKET
+                      , err :: EXCEPTION
+                      , ref :: REF | eff
                       )
 
 newtype GonimoT eff a = GonimoT (ReaderT Settings (ExceptT Error (Aff eff)) a)

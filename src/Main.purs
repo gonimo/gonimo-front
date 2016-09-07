@@ -1,7 +1,8 @@
 module Main where
 
-import Gonimo.Client.Effects as Gonimo
 import Control.Monad.Eff.Console as Console
+import Data.Map as Map
+import Gonimo.Client.Effects as Gonimo
 import Gonimo.Client.Effects as Gonimo
 import Gonimo.Client.LocalStorage as Key
 import Gonimo.Client.Types as Gonimo
@@ -12,19 +13,23 @@ import Gonimo.WebAPI.MakeRequests as Reqs
 import Pux.Html.Attributes as A
 import Servant.Subscriber as Sub
 import Servant.Subscriber.Connection as Sub
+import Servant.Subscriber.Subscriptions as Sub
 import Browser.LocalStorage (STORAGE, localStorage)
 import Control.Monad.Aff (Aff)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
+import Control.Monad.Eff.Ref (newRef, writeRef, readRef, REF, Ref)
 import Control.Monad.Except.Trans (runExceptT)
 import Control.Monad.Reader (runReader)
 import Control.Monad.Reader.Trans (runReaderT)
 import Data.Array (head)
 import Data.Bifunctor (bimap)
 import Data.Either (Either(Right, Left))
+import Data.Foldable (traverse_)
 import Data.Generic (gShow)
 import Data.List (toUnfoldable, reverse, List(Nil, Cons))
 import Data.Maybe (Maybe(..))
+import Data.Traversable (traverse)
 import Data.Tuple (fst, Tuple(Tuple))
 import Debug.Trace (trace)
 import Gonimo.Client.Effects (handleError)
@@ -45,26 +50,24 @@ import Pux.Router (sampleUrl)
 import Servant.PureScript.Affjax (AjaxError)
 import Servant.PureScript.Settings (defaultSettings, SPSettings_(SPSettings_))
 import Servant.Subscriber (Subscriber, SubscriberEff)
-import Signal (runSignal, constant, Signal)
+import Servant.Subscriber.Connection (setPongRequest)
+import Signal (foldp, map2, runSignal, constant, Signal)
 import Signal.Channel (CHANNEL, Channel, send, subscribe, channel)
 import Unsafe.Coerce (unsafeCoerce)
 import Prelude hiding (div)
-import Data.Map as Map
-import Servant.Subscriber.Subscriptions as Sub
 
 data State = LoadingS LoadingS'
            | LoadedS LoadedC.State
 
-type LoadingS' = { subscriber :: Subscriber () LoadedC.Action
-                 , actionQueue :: List LoadedC.Action } -- | We queue actions until we are loaded.
+type LoadingS' = { actionQueue :: List LoadedC.Action } -- | We queue actions until we are loaded.
 
 type LoadedState = {
                authData :: AuthData
              , settings :: Settings
              }
 
-init :: Subscriber () LoadedC.Action -> State
-init subscriber' = LoadingS { subscriber : subscriber' , actionQueue : Nil }
+init :: State
+init = LoadingS {  actionQueue : Nil }
 
 data Action = Start
             | Init LoadedC.State
@@ -75,6 +78,8 @@ data Action = Start
 instance reportErrorActionAction :: ReportErrorAction Action where
   reportError = ReportError
 
+
+type MySubscriber = Subscriber () LoadedC.Action
 --------------------------------------------------------------------------------
 
 
@@ -90,7 +95,7 @@ update _ state                          = onlyEffects state
 
 updateLoading :: forall eff. Action -> LoadingS' -> EffModel eff State Action
 updateLoading action state             = case action of
-  Start             -> onlyEffect (LoadingS state) $ load state.subscriber
+  Start             -> onlyEffect (LoadingS state) load
   (LoadedA action)  -> trace "Queuing action! " $ \_ -> noEffects $ LoadingS $ state {
                          actionQueue = Cons action state.actionQueue
                        }
@@ -132,8 +137,8 @@ viewLoading = viewLogo $ div []
 --------------------------------------------------------------------------------
 
 
-load :: forall eff. Subscriber () LoadedC.Action -> Aff (GonimoEff eff) Action
-load subscriber' = Gonimo.toAff initSettings $ authToAction =<< getAuthData
+load :: forall eff. Aff (GonimoEff eff) Action
+load = Gonimo.toAff initSettings $ authToAction =<< getAuthData
   where
     initSettings = mkSettings $ GonimoSecret (Secret "blabala")
 
@@ -149,7 +154,7 @@ load subscriber' = Gonimo.toAff initSettings $ authToAction =<< getAuthData
       pure $ Init
             { authData      : authData
             , settings      : mkSettings auth.authToken
-            , subscriber    : subscriber'
+            , subscriberUrl : "ws://localhost:8081/subscriber"
             , inviteS       : inviteState
             , acceptS       : AcceptC.init
             , central       : LoadedC.CentralInvite
@@ -178,33 +183,70 @@ getAuthData = do
     Just d  -> pure d
 
 
-deploySubscriptions :: forall eff. State -> SubscriberEff eff Unit
-deploySubscriptions (LoadingS _) = pure unit
-deploySubscriptions (LoadedS s) = do
-  let subscriptions = LoadedC.subscriptions s
-  coerceEffects $ Console.log $ "Deploying " <> show (Sub.size subscriptions) <> " subscriptions!"
-  Sub.deploy subscriptions (coerceSubscriberEffects s.subscriber)
-  coerceEffects $ Console.log $ "Deployed " <> show (Sub.size subscriptions) <> " subscriptions!"
+deploySubscriptions :: forall eff. SubscriberEff eff (Maybe MySubscriber) -> State -> SubscriberEff eff Unit
+deploySubscriptions _ (LoadingS _) = pure unit
+deploySubscriptions getSubscriber (LoadedS s) = do
+  let subscriptions = LoadedC.getSubscriptions s
+  subscriber <- getSubscriber
+  case subscriber of
+    Nothing -> coerceEffects $ Console.log "Not deploying - no subscriber yet!"
+    Just subscriber' -> do
+      coerceEffects $ Console.log "Setting pong and close requests ..."
+      let mySubscriber = coerceSubscriberEffects subscriber'
+      traverse_ (flip Sub.setPongRequest  (Sub.getConnection mySubscriber)) $ LoadedC.getPongRequest s
+      traverse_ (flip Sub.setCloseRequest (Sub.getConnection mySubscriber)) $ LoadedC.getCloseRequest s
+      coerceEffects $ Console.log $ "Deploying " <> show (Sub.size subscriptions) <> " subscriptions!"
+      Sub.deploy subscriptions mySubscriber
+      coerceEffects $ Console.log $ "Deployed " <> show (Sub.size subscriptions) <> " subscriptions!"
+
+-- | Don't use a foldp instead of Ref - you will build up an endless thunk of actions in memory.
+renewSubscriber :: forall eff. Channel Action -> Ref (Maybe MySubscriber)
+                   -> State -> SubscriberEff (channel :: CHANNEL | eff) (Maybe MySubscriber)
+renewSubscriber controlChan subscriberRef state = do
+    oldSub <- readRef subscriberRef
+    let oldUrl = Sub.getUrl <<< Sub.getConnection <$> oldSub
+    let newUrl = case state of
+          LoadedS lState -> Just lState.subscriberUrl
+          _ -> Nothing
+    coerceEffects $ Console.log $ "Old url: " <> show oldUrl
+    coerceEffects $ Console.log $ "New url: " <> show newUrl
+    coerceEffects $ Console.log $ "Is different: " <> show (newUrl /= oldUrl)
+    if (newUrl /= oldUrl)
+      then do
+        coerceEffects $ Console.log $ "Closing old subscriber ..."
+        coerceEffects $ traverse_ (Sub.close <<< Sub.getConnection) oldSub
+        newSub <- traverse makeMySubscriber newUrl
+        writeRef subscriberRef newSub
+        pure newSub
+       else
+        pure oldSub
+  where
+    makeMySubscriber :: String -> SubscriberEff (channel :: CHANNEL | eff) MySubscriber
+    makeMySubscriber url' = do
+        sub <- Sub.makeSubscriber
+                  { url : url'
+                  , callback : makeCallback controlChan
+                  , notify : makeNotify controlChan
+                  }
+        pure $ coerceSubscriberEffects sub
 
 main = do
   urlSignal <- sampleUrl
   controlChan <- channel Nop
+  subscriberRef <- newRef Nothing
   let controlSig = subscribe controlChan
   let routeSignal = map (fromRoute <<< match) urlSignal
-  subscriber' <- Sub.makeSubscriber
-                    { url      : "ws://localhost:8081/subscriber"
-                    , callback : makeCallback controlChan
-                    , notify   : makeNotify controlChan
-                    }
   app <- start $
-    { initialState: init (coerceSubscriberEffects subscriber')
+    { initialState: init
     , update: toPux update
     , view: view
     , inputs: [controlSig, routeSignal]
     }
   -- We have to send Start after the fact, because on merging const signals one gets lost!
   send controlChan Start
-  runSignal $ map deploySubscriptions app.state
+  let subscriberSignal = map (renewSubscriber controlChan subscriberRef) app.state
+  let subscribeSignal = deploySubscriptions <$> subscriberSignal <*> app.state
+  runSignal $ subscribeSignal
   runSignal $ map (\_ -> Console.log "State changed!") app.state
   renderToDOM "#app" app.html
 
