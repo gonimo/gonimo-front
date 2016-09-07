@@ -37,12 +37,12 @@ import Debug.Trace (trace)
 import Gonimo.Client.Effects (handleError)
 import Gonimo.Client.Types (GonimoEff, runGonimoT, Settings)
 import Gonimo.Pux (justEffect, noEffects, onlyEffects, EffModel(EffModel))
-import Gonimo.Server.DbEntities (Client(Client), Family(Family))
+import Gonimo.Server.DbEntities (Device(Device), Family(Family))
 import Gonimo.Server.DbEntities.Helpers (runFamily)
-import Gonimo.Server.Types (ClientType(Undefined), AuthToken, AuthToken(GonimoSecret))
+import Gonimo.Server.Types (DeviceType(NoBaby), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (dateToString, Key(Key), Secret(Secret))
 import Gonimo.WebAPI (SPParams_(SPParams_), postAccounts)
-import Gonimo.WebAPI.Types (ClientInfo(ClientInfo), AuthData(AuthData))
+import Gonimo.WebAPI.Types (DeviceInfo(DeviceInfo), AuthData(AuthData))
 import Gonimo.WebAPI.Types.Helpers (runAuthData)
 import Partial.Unsafe (unsafeCrashWith)
 import Pux (renderToDOM, fromSimple, start)
@@ -64,8 +64,8 @@ type State = { authData :: AuthData
              , acceptS  :: AcceptC.State
              , central  :: Central
              , families :: Array (Tuple (Key Family) Family)
-             , onlineDevices :: Map (Key Client) ClientType
-             , deviceInfos :: Map (Key Client) ClientInfo
+             , onlineDevices :: Map (Key Device) DeviceType
+             , deviceInfos :: Map (Key Device) DeviceInfo
              }
 
 data Action = ReportError Gonimo.Error
@@ -74,8 +74,8 @@ data Action = ReportError Gonimo.Error
             | AcceptA AcceptC.Action
             | HandleInvite Secret
             | SetFamilies (Array (Tuple (Key Family) Family))
-            | SetOnlineDevices (Array (Tuple (Key Client) ClientType))
-            | SetDeviceInfos (Array (Tuple (Key Client) ClientInfo))
+            | SetOnlineDevices (Array (Tuple (Key Device) DeviceType))
+            | SetDeviceInfos (Array (Tuple (Key Device) DeviceInfo))
             | HandleSubscriber Notification
             | Nop
 
@@ -157,9 +157,9 @@ viewOnlineDevices state = table [ A.className "table", A.className "table-stripe
            <<< List.mapMaybe viewOnlineDevice
            $ Map.keys state.onlineDevices
     viewOnlineDevice deviceId = do
-        (ClientInfo info) <- Map.lookup deviceId state.deviceInfos
-        let name = info.clientInfoName
-        let lastAccessed = dateToString info.clientInfoLastAccessed
+        (DeviceInfo info) <- Map.lookup deviceId state.deviceInfos
+        let name = info.deviceInfoName
+        let lastAccessed = dateToString info.deviceInfoLastAccessed
         pure $ tr []
                [ td [] [ text name ]
                , td [] [ text lastAccessed ]
@@ -187,16 +187,16 @@ getSubscriptions state =
 getPongRequest :: State -> Maybe HttpRequest
 getPongRequest state =
   let
-    clientId = (runAuthData state.authData).clientId
-    clientData = Tuple clientId Undefined
+    deviceId = (runAuthData state.authData).deviceId
+    deviceData = Tuple deviceId NoBaby
     familyId = fst <$> head state.families -- Currently we just pick the first family
   in
-    flip runReader state.settings <<< Reqs.postOnlineStatusByFamilyId clientData <$> familyId
+    flip runReader state.settings <<< Reqs.postOnlineStatusByFamilyId deviceData <$> familyId
 
 getCloseRequest :: State -> Maybe HttpRequest
 getCloseRequest state =
   let
-    clientId = (runAuthData state.authData).clientId
+    deviceId = (runAuthData state.authData).deviceId
     familyId = fst <$> head state.families -- Currently we just pick the first family
   in
-    flip runReader state.settings <<< flip Reqs.deleteOnlineStatusByFamilyIdByClientId clientId <$> familyId
+    flip runReader state.settings <<< flip Reqs.deleteOnlineStatusByFamilyIdByDeviceId deviceId <$> familyId

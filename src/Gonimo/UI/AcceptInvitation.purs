@@ -112,7 +112,7 @@ viewAskUser (InvitationInfo invitation) =
             ]
         , p []
             [ text $ "You got invited by a device answering to the name: "
-            , em [] [ text invitation.invitationInfoSendingClient ]
+            , em [] [ text invitation.invitationInfoSendingDevice ]
             , text "."
             ]
 

@@ -12,11 +12,11 @@ import Data.Maybe (Maybe(..))
 import Data.Nullable (Nullable(), toNullable)
 import Data.Tuple (Tuple, Tuple(..))
 import Global (encodeURIComponent)
-import Gonimo.Server.DbEntities (Account, Client, Family, Invitation)
-import Gonimo.Server.Types (AuthToken, ClientType, Coffee)
+import Gonimo.Server.DbEntities (Account, Device, Family, Invitation)
+import Gonimo.Server.Types (AuthToken, Coffee, DeviceType)
 import Gonimo.Types (Key, Secret)
 import Gonimo.WebAPI (SPParams_(..))
-import Gonimo.WebAPI.Types (AuthData, ClientInfo, InvitationInfo, InvitationReply, SendInvitation)
+import Gonimo.WebAPI.Types (AuthData, DeviceInfo, InvitationInfo, InvitationReply, SendInvitation)
 import Network.HTTP.Affjax (AJAX)
 import Prelude (Unit)
 import Prim (Array, String)
@@ -214,11 +214,11 @@ getFamiliesByAccountId accountId = do
                 }
   pure spReq
 
-postSocketByFamilyIdByToClient :: forall m.
+postSocketByFamilyIdByToDevice :: forall m.
                                   MonadReader (SPSettings_ SPParams_) m =>
-                                  Key Client -> Key Family -> Key Client
+                                  Key Device -> Key Family -> Key Device
                                   -> m HttpRequest
-postSocketByFamilyIdByToClient reqBody familyId toClient = do
+postSocketByFamilyIdByToDevice reqBody familyId toDevice = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
@@ -226,7 +226,7 @@ postSocketByFamilyIdByToClient reqBody familyId toClient = do
   let baseURL = spParams_.baseURL
   let httpMethod = "POST"
   let reqPath = Path ["socket" , gDefaultToURLPiece familyId
-        , gDefaultToURLPiece toClient]
+        , gDefaultToURLPiece toDevice]
   let reqHeaders =
         [Tuple "Authorization" (gDefaultToURLPiece authorization)]
   let reqQuery =
@@ -240,10 +240,10 @@ postSocketByFamilyIdByToClient reqBody familyId toClient = do
                 }
   pure spReq
 
-receiveSocketByFamilyIdByToClient :: forall m.
+receiveSocketByFamilyIdByToDevice :: forall m.
                                      MonadReader (SPSettings_ SPParams_) m =>
-                                     Key Family -> Key Client -> m HttpRequest
-receiveSocketByFamilyIdByToClient familyId toClient = do
+                                     Key Family -> Key Device -> m HttpRequest
+receiveSocketByFamilyIdByToDevice familyId toDevice = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
@@ -251,7 +251,7 @@ receiveSocketByFamilyIdByToClient familyId toClient = do
   let baseURL = spParams_.baseURL
   let httpMethod = "RECEIVE"
   let reqPath = Path ["socket" , gDefaultToURLPiece familyId
-        , gDefaultToURLPiece toClient]
+        , gDefaultToURLPiece toDevice]
   let reqHeaders =
         [Tuple "Authorization" (gDefaultToURLPiece authorization)]
   let reqQuery =
@@ -265,14 +265,14 @@ receiveSocketByFamilyIdByToClient familyId toClient = do
                 }
   pure spReq
 
-putSocketByFamilyIdByFromClientByToClientByChannelId :: forall m.
+putSocketByFamilyIdByFromDeviceByToDeviceByChannelId :: forall m.
                                                         MonadReader (SPSettings_ SPParams_) m
                                                         => String -> Key Family
-                                                        -> Key Client
-                                                        -> Key Client -> Secret
+                                                        -> Key Device
+                                                        -> Key Device -> Secret
                                                         -> m HttpRequest
-putSocketByFamilyIdByFromClientByToClientByChannelId reqBody familyId fromClient
-                                                     toClient channelId = do
+putSocketByFamilyIdByFromDeviceByToDeviceByChannelId reqBody familyId fromDevice
+                                                     toDevice channelId = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
@@ -280,7 +280,7 @@ putSocketByFamilyIdByFromClientByToClientByChannelId reqBody familyId fromClient
   let baseURL = spParams_.baseURL
   let httpMethod = "PUT"
   let reqPath = Path ["socket" , gDefaultToURLPiece familyId
-        , gDefaultToURLPiece fromClient , gDefaultToURLPiece toClient
+        , gDefaultToURLPiece fromDevice , gDefaultToURLPiece toDevice
         , gDefaultToURLPiece channelId]
   let reqHeaders =
         [Tuple "Authorization" (gDefaultToURLPiece authorization)]
@@ -295,15 +295,15 @@ putSocketByFamilyIdByFromClientByToClientByChannelId reqBody familyId fromClient
                 }
   pure spReq
 
-receiveSocketByFamilyIdByFromClientByToClientByChannelId :: forall m.
+receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId :: forall m.
                                                             MonadReader (SPSettings_ SPParams_) m
                                                             => Key Family
-                                                            -> Key Client
-                                                            -> Key Client
+                                                            -> Key Device
+                                                            -> Key Device
                                                             -> Secret
                                                             -> m HttpRequest
-receiveSocketByFamilyIdByFromClientByToClientByChannelId familyId fromClient
-                                                         toClient channelId = do
+receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId familyId fromDevice
+                                                         toDevice channelId = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
@@ -311,7 +311,7 @@ receiveSocketByFamilyIdByFromClientByToClientByChannelId familyId fromClient
   let baseURL = spParams_.baseURL
   let httpMethod = "RECEIVE"
   let reqPath = Path ["socket" , gDefaultToURLPiece familyId
-        , gDefaultToURLPiece fromClient , gDefaultToURLPiece toClient
+        , gDefaultToURLPiece fromDevice , gDefaultToURLPiece toDevice
         , gDefaultToURLPiece channelId]
   let reqHeaders =
         [Tuple "Authorization" (gDefaultToURLPiece authorization)]
@@ -327,7 +327,7 @@ receiveSocketByFamilyIdByFromClientByToClientByChannelId familyId fromClient
   pure spReq
 
 postOnlineStatusByFamilyId :: forall m. MonadReader (SPSettings_ SPParams_) m =>
-                              Tuple (Key Client) ClientType -> Key Family
+                              Tuple (Key Device) DeviceType -> Key Family
                               -> m HttpRequest
 postOnlineStatusByFamilyId reqBody familyId = do
   spOpts_' <- ask
@@ -350,11 +350,11 @@ postOnlineStatusByFamilyId reqBody familyId = do
                 }
   pure spReq
 
-putOnlineStatusByFamilyIdByClientId :: forall m.
+putOnlineStatusByFamilyIdByDeviceId :: forall m.
                                        MonadReader (SPSettings_ SPParams_) m =>
-                                       ClientType -> Key Family -> Key Client
+                                       DeviceType -> Key Family -> Key Device
                                        -> m HttpRequest
-putOnlineStatusByFamilyIdByClientId reqBody familyId clientId = do
+putOnlineStatusByFamilyIdByDeviceId reqBody familyId deviceId = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
@@ -362,7 +362,7 @@ putOnlineStatusByFamilyIdByClientId reqBody familyId clientId = do
   let baseURL = spParams_.baseURL
   let httpMethod = "PUT"
   let reqPath = Path ["onlineStatus" , gDefaultToURLPiece familyId
-        , gDefaultToURLPiece clientId]
+        , gDefaultToURLPiece deviceId]
   let reqHeaders =
         [Tuple "Authorization" (gDefaultToURLPiece authorization)]
   let reqQuery =
@@ -376,11 +376,11 @@ putOnlineStatusByFamilyIdByClientId reqBody familyId clientId = do
                 }
   pure spReq
 
-deleteOnlineStatusByFamilyIdByClientId :: forall m.
+deleteOnlineStatusByFamilyIdByDeviceId :: forall m.
                                           MonadReader (SPSettings_ SPParams_) m
-                                          => Key Family -> Key Client
+                                          => Key Family -> Key Device
                                           -> m HttpRequest
-deleteOnlineStatusByFamilyIdByClientId familyId clientId = do
+deleteOnlineStatusByFamilyIdByDeviceId familyId deviceId = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
@@ -388,7 +388,7 @@ deleteOnlineStatusByFamilyIdByClientId familyId clientId = do
   let baseURL = spParams_.baseURL
   let httpMethod = "DELETE"
   let reqPath = Path ["onlineStatus" , gDefaultToURLPiece familyId
-        , gDefaultToURLPiece clientId]
+        , gDefaultToURLPiece deviceId]
   let reqHeaders =
         [Tuple "Authorization" (gDefaultToURLPiece authorization)]
   let reqQuery =

@@ -12,11 +12,11 @@ import Data.Maybe (Maybe(..))
 import Data.Nullable (Nullable(), toNullable)
 import Data.Tuple (Tuple, Tuple(..))
 import Global (encodeURIComponent)
-import Gonimo.Server.DbEntities (Account, Client, Family)
-import Gonimo.Server.Types (AuthToken, ClientType)
+import Gonimo.Server.DbEntities (Account, Device, Family)
+import Gonimo.Server.Types (AuthToken, DeviceType)
 import Gonimo.Types (Key, Secret)
 import Gonimo.WebAPI (SPParams_(..))
-import Gonimo.WebAPI.Types (ClientInfo)
+import Gonimo.WebAPI.Types (DeviceInfo)
 import Network.HTTP.Affjax (AJAX)
 import Prim (Array, String)
 import Servant.PureScript.Affjax (AjaxError(..), affjax, defaultRequest)
@@ -31,7 +31,7 @@ import Servant.Subscriber.Util (TypedToUser, subGenFlagQuery, subGenListQuery, s
 import Gonimo.WebAPI.MakeRequests as MakeRequests
 
 getDeviceInfosByFamilyId :: forall m a. MonadReader (SPSettings_ SPParams_) m =>
-                            TypedToUser (Array (Tuple (Key Client) ClientInfo)) a
+                            TypedToUser (Array (Tuple (Key Device) DeviceInfo)) a
                             -> Key Family -> m (Subscriptions a)
 getDeviceInfosByFamilyId spToUser_ familyId = do
   spReq <- MakeRequests.getDeviceInfosByFamilyId familyId
@@ -44,36 +44,36 @@ getFamiliesByAccountId spToUser_ accountId = do
   spReq <- MakeRequests.getFamiliesByAccountId accountId
   pure $ makeSubscriptions spReq (toUserType spToUser_)
 
-receiveSocketByFamilyIdByToClient :: forall m a.
+receiveSocketByFamilyIdByToDevice :: forall m a.
                                      MonadReader (SPSettings_ SPParams_) m =>
-                                     TypedToUser (Tuple (Key Client) Secret) a
-                                     -> Key Family -> Key Client
+                                     TypedToUser (Tuple (Key Device) Secret) a
+                                     -> Key Family -> Key Device
                                      -> m (Subscriptions a)
-receiveSocketByFamilyIdByToClient spToUser_ familyId toClient = do
-  spReq <- MakeRequests.receiveSocketByFamilyIdByToClient familyId toClient
+receiveSocketByFamilyIdByToDevice spToUser_ familyId toDevice = do
+  spReq <- MakeRequests.receiveSocketByFamilyIdByToDevice familyId toDevice
   pure $ makeSubscriptions spReq (toUserType spToUser_)
 
-receiveSocketByFamilyIdByFromClientByToClientByChannelId :: forall m a.
+receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId :: forall m a.
                                                             MonadReader (SPSettings_ SPParams_) m
                                                             =>
                                                             TypedToUser String a
                                                             -> Key Family
-                                                            -> Key Client
-                                                            -> Key Client
+                                                            -> Key Device
+                                                            -> Key Device
                                                             -> Secret
                                                             -> m (Subscriptions a)
-receiveSocketByFamilyIdByFromClientByToClientByChannelId spToUser_ familyId
-                                                         fromClient toClient
+receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId spToUser_ familyId
+                                                         fromDevice toDevice
                                                          channelId = do
-  spReq <- MakeRequests.receiveSocketByFamilyIdByFromClientByToClientByChannelId familyId
-                                                                                 fromClient
-                                                                                 toClient
+  spReq <- MakeRequests.receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId familyId
+                                                                                 fromDevice
+                                                                                 toDevice
                                                                                  channelId
   pure $ makeSubscriptions spReq (toUserType spToUser_)
 
 getOnlineStatusByFamilyId :: forall m a. MonadReader (SPSettings_ SPParams_) m
                              =>
-                             TypedToUser (Array (Tuple (Key Client) ClientType)) a
+                             TypedToUser (Array (Tuple (Key Device) DeviceType)) a
                              -> Key Family -> m (Subscriptions a)
 getOnlineStatusByFamilyId spToUser_ familyId = do
   spReq <- MakeRequests.getOnlineStatusByFamilyId familyId

@@ -37,7 +37,7 @@ import Gonimo.Client.Router (match, Route(DecodingFailed, AcceptInvitation, Home
 import Gonimo.Client.Types (GonimoEff, Gonimo, class ReportErrorAction)
 import Gonimo.Client.Types (Error(URLRouteError), runGonimoT, Settings)
 import Gonimo.Pux (onlyEffect, justEffect, onlyEffects, noEffects, EffModel(EffModel), toPux)
-import Gonimo.Server.Types (ClientType(Undefined), AuthToken, AuthToken(GonimoSecret))
+import Gonimo.Server.Types (DeviceType(NoBaby), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (Secret(Secret))
 import Gonimo.UI.Html (viewLogo)
 import Gonimo.WebAPI (postFunnyName, SPParams_(SPParams_), postAccounts)

@@ -23,9 +23,9 @@ data InvitationDelivery =
 
 derive instance genericInvitationDelivery :: Generic InvitationDelivery
 
-data ClientType =
-    Undefined 
+data DeviceType =
+    NoBaby 
   | Baby String
 
-derive instance genericClientType :: Generic ClientType
+derive instance genericDeviceType :: Generic DeviceType
 

@@ -16,16 +16,16 @@ data Account =
 
 derive instance genericAccount :: Generic Account
 
-data Client =
-    Client {
-      clientName :: String
-    , clientAuthToken :: AuthToken
-    , clientAccountId :: Key Account
-    , clientLastAccessed :: Date
-    , clientUserAgent :: String
+data Device =
+    Device {
+      deviceName :: String
+    , deviceAuthToken :: AuthToken
+    , deviceAccountId :: Key Account
+    , deviceLastAccessed :: Date
+    , deviceUserAgent :: String
     }
 
-derive instance genericClient :: Generic Client
+derive instance genericDevice :: Generic Device
 
 data Invitation =
     Invitation {
@@ -33,7 +33,7 @@ data Invitation =
     , invitationFamilyId :: Key Family
     , invitationCreated :: Date
     , invitationDelivery :: InvitationDelivery
-    , invitationSenderId :: Key Client
+    , invitationSenderId :: Key Device
     , invitationReceiverId :: Maybe (Key Account)
     }
 

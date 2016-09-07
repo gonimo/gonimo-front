@@ -2,7 +2,7 @@
 module Gonimo.WebAPI.Types where
 
 import Data.Maybe (Maybe)
-import Gonimo.Server.DbEntities (Account, Client, Invitation)
+import Gonimo.Server.DbEntities (Account, Device, Invitation)
 import Gonimo.Server.Types (AuthToken, InvitationDelivery)
 import Gonimo.Types (Date, Key)
 import Prim (String)
@@ -13,7 +13,7 @@ import Data.Generic (class Generic)
 data AuthData =
     AuthData {
       accountId :: Key Account
-    , clientId :: Key Client
+    , deviceId :: Key Device
     , authToken :: AuthToken
     }
 
@@ -22,7 +22,7 @@ derive instance genericAuthData :: Generic AuthData
 data InvitationInfo =
     InvitationInfo {
       invitationInfoFamily :: String
-    , invitationInfoSendingClient :: String
+    , invitationInfoSendingDevice :: String
     , invitationInfoSendingUser :: Maybe String
     }
 
@@ -39,13 +39,13 @@ data SendInvitation =
 
 derive instance genericSendInvitation :: Generic SendInvitation
 
-data ClientInfo =
-    ClientInfo {
-      clientInfoName :: String
-    , clientInfoAccountId :: Key Account
-    , clientInfoLastAccessed :: Date
-    , clientInfoUserAgent :: String
+data DeviceInfo =
+    DeviceInfo {
+      deviceInfoName :: String
+    , deviceInfoAccountId :: Key Account
+    , deviceInfoLastAccessed :: Date
+    , deviceInfoUserAgent :: String
     }
 
-derive instance genericClientInfo :: Generic ClientInfo
+derive instance genericDeviceInfo :: Generic DeviceInfo
 

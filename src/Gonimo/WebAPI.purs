@@ -12,10 +12,10 @@ import Data.Maybe (Maybe(..))
 import Data.Nullable (Nullable(), toNullable)
 import Data.Tuple (Tuple)
 import Global (encodeURIComponent)
-import Gonimo.Server.DbEntities (Account, Client, Family, Invitation)
-import Gonimo.Server.Types (AuthToken, ClientType, Coffee)
+import Gonimo.Server.DbEntities (Account, Device, Family, Invitation)
+import Gonimo.Server.Types (AuthToken, Coffee, DeviceType)
 import Gonimo.Types (Key, Secret)
-import Gonimo.WebAPI.Types (AuthData, ClientInfo, InvitationInfo, InvitationReply, SendInvitation)
+import Gonimo.WebAPI.Types (AuthData, DeviceInfo, InvitationInfo, InvitationReply, SendInvitation)
 import Network.HTTP.Affjax (AJAX)
 import Prelude (Unit)
 import Prim (Array, String)
@@ -142,7 +142,7 @@ putInvitationInfoByInvitationSecret invitationSecret = do
 getDeviceInfosByFamilyId :: forall eff m.
                             (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
                             => Key Family
-                            -> m (Array (Tuple (Key Client) ClientInfo))
+                            -> m (Array (Tuple (Key Device) DeviceInfo))
 getDeviceInfosByFamilyId familyId = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
@@ -209,11 +209,11 @@ getFamiliesByAccountId accountId = do
                                 }
   getResult decodeJson affResp
   
-postSocketByFamilyIdByToClient :: forall eff m.
+postSocketByFamilyIdByToDevice :: forall eff m.
                                   (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-                                  => Key Client -> Key Family -> Key Client
+                                  => Key Device -> Key Family -> Key Device
                                   -> m Secret
-postSocketByFamilyIdByToClient reqBody familyId toClient = do
+postSocketByFamilyIdByToDevice reqBody familyId toDevice = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
@@ -221,7 +221,7 @@ postSocketByFamilyIdByToClient reqBody familyId toClient = do
   let baseURL = spParams_.baseURL
   let httpMethod = "POST"
   let reqUrl = baseURL <> "socket" <> "/" <> encodeURLPiece spOpts_' familyId
-        <> "/" <> encodeURLPiece spOpts_' toClient
+        <> "/" <> encodeURLPiece spOpts_' toDevice
   let reqHeaders =
         [{ field : "Authorization"
          , value : encodeURLPiece spOpts_' authorization
@@ -234,11 +234,11 @@ postSocketByFamilyIdByToClient reqBody familyId toClient = do
                                 }
   getResult decodeJson affResp
   
-receiveSocketByFamilyIdByToClient :: forall eff m.
+receiveSocketByFamilyIdByToDevice :: forall eff m.
                                      (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-                                     => Key Family -> Key Client
-                                     -> m (Tuple (Key Client) Secret)
-receiveSocketByFamilyIdByToClient familyId toClient = do
+                                     => Key Family -> Key Device
+                                     -> m (Tuple (Key Device) Secret)
+receiveSocketByFamilyIdByToDevice familyId toDevice = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
@@ -246,7 +246,7 @@ receiveSocketByFamilyIdByToClient familyId toClient = do
   let baseURL = spParams_.baseURL
   let httpMethod = "RECEIVE"
   let reqUrl = baseURL <> "socket" <> "/" <> encodeURLPiece spOpts_' familyId
-        <> "/" <> encodeURLPiece spOpts_' toClient
+        <> "/" <> encodeURLPiece spOpts_' toDevice
   let reqHeaders =
         [{ field : "Authorization"
          , value : encodeURLPiece spOpts_' authorization
@@ -258,14 +258,14 @@ receiveSocketByFamilyIdByToClient familyId toClient = do
                                 }
   getResult decodeJson affResp
   
-putSocketByFamilyIdByFromClientByToClientByChannelId :: forall eff m.
+putSocketByFamilyIdByFromDeviceByToDeviceByChannelId :: forall eff m.
                                                         (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
                                                         => String -> Key Family
-                                                        -> Key Client
-                                                        -> Key Client -> Secret
+                                                        -> Key Device
+                                                        -> Key Device -> Secret
                                                         -> m Unit
-putSocketByFamilyIdByFromClientByToClientByChannelId reqBody familyId fromClient
-                                                     toClient channelId = do
+putSocketByFamilyIdByFromDeviceByToDeviceByChannelId reqBody familyId fromDevice
+                                                     toDevice channelId = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
@@ -273,8 +273,8 @@ putSocketByFamilyIdByFromClientByToClientByChannelId reqBody familyId fromClient
   let baseURL = spParams_.baseURL
   let httpMethod = "PUT"
   let reqUrl = baseURL <> "socket" <> "/" <> encodeURLPiece spOpts_' familyId
-        <> "/" <> encodeURLPiece spOpts_' fromClient
-        <> "/" <> encodeURLPiece spOpts_' toClient
+        <> "/" <> encodeURLPiece spOpts_' fromDevice
+        <> "/" <> encodeURLPiece spOpts_' toDevice
         <> "/" <> encodeURLPiece spOpts_' channelId
   let reqHeaders =
         [{ field : "Authorization"
@@ -288,15 +288,15 @@ putSocketByFamilyIdByFromClientByToClientByChannelId reqBody familyId fromClient
                                 }
   getResult decodeJson affResp
   
-receiveSocketByFamilyIdByFromClientByToClientByChannelId :: forall eff m.
+receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId :: forall eff m.
                                                             (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
                                                             => Key Family
-                                                            -> Key Client
-                                                            -> Key Client
+                                                            -> Key Device
+                                                            -> Key Device
                                                             -> Secret
                                                             -> m String
-receiveSocketByFamilyIdByFromClientByToClientByChannelId familyId fromClient
-                                                         toClient channelId = do
+receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId familyId fromDevice
+                                                         toDevice channelId = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
@@ -304,8 +304,8 @@ receiveSocketByFamilyIdByFromClientByToClientByChannelId familyId fromClient
   let baseURL = spParams_.baseURL
   let httpMethod = "RECEIVE"
   let reqUrl = baseURL <> "socket" <> "/" <> encodeURLPiece spOpts_' familyId
-        <> "/" <> encodeURLPiece spOpts_' fromClient
-        <> "/" <> encodeURLPiece spOpts_' toClient
+        <> "/" <> encodeURLPiece spOpts_' fromDevice
+        <> "/" <> encodeURLPiece spOpts_' toDevice
         <> "/" <> encodeURLPiece spOpts_' channelId
   let reqHeaders =
         [{ field : "Authorization"
@@ -320,7 +320,7 @@ receiveSocketByFamilyIdByFromClientByToClientByChannelId familyId fromClient
   
 postOnlineStatusByFamilyId :: forall eff m.
                               (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-                              => Tuple (Key Client) ClientType -> Key Family
+                              => Tuple (Key Device) DeviceType -> Key Family
                               -> m Unit
 postOnlineStatusByFamilyId reqBody familyId = do
   spOpts_' <- ask
@@ -343,11 +343,11 @@ postOnlineStatusByFamilyId reqBody familyId = do
                                 }
   getResult decodeJson affResp
   
-putOnlineStatusByFamilyIdByClientId :: forall eff m.
+putOnlineStatusByFamilyIdByDeviceId :: forall eff m.
                                        (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-                                       => ClientType -> Key Family -> Key Client
+                                       => DeviceType -> Key Family -> Key Device
                                        -> m Unit
-putOnlineStatusByFamilyIdByClientId reqBody familyId clientId = do
+putOnlineStatusByFamilyIdByDeviceId reqBody familyId deviceId = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
@@ -356,7 +356,7 @@ putOnlineStatusByFamilyIdByClientId reqBody familyId clientId = do
   let httpMethod = "PUT"
   let reqUrl = baseURL <> "onlineStatus"
         <> "/" <> encodeURLPiece spOpts_' familyId
-        <> "/" <> encodeURLPiece spOpts_' clientId
+        <> "/" <> encodeURLPiece spOpts_' deviceId
   let reqHeaders =
         [{ field : "Authorization"
          , value : encodeURLPiece spOpts_' authorization
@@ -369,10 +369,10 @@ putOnlineStatusByFamilyIdByClientId reqBody familyId clientId = do
                                 }
   getResult decodeJson affResp
   
-deleteOnlineStatusByFamilyIdByClientId :: forall eff m.
+deleteOnlineStatusByFamilyIdByDeviceId :: forall eff m.
                                           (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-                                          => Key Family -> Key Client -> m Unit
-deleteOnlineStatusByFamilyIdByClientId familyId clientId = do
+                                          => Key Family -> Key Device -> m Unit
+deleteOnlineStatusByFamilyIdByDeviceId familyId deviceId = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
@@ -381,7 +381,7 @@ deleteOnlineStatusByFamilyIdByClientId familyId clientId = do
   let httpMethod = "DELETE"
   let reqUrl = baseURL <> "onlineStatus"
         <> "/" <> encodeURLPiece spOpts_' familyId
-        <> "/" <> encodeURLPiece spOpts_' clientId
+        <> "/" <> encodeURLPiece spOpts_' deviceId
   let reqHeaders =
         [{ field : "Authorization"
          , value : encodeURLPiece spOpts_' authorization
@@ -396,7 +396,7 @@ deleteOnlineStatusByFamilyIdByClientId familyId clientId = do
 getOnlineStatusByFamilyId :: forall eff m.
                              (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
                              => Key Family
-                             -> m (Array (Tuple (Key Client) ClientType))
+                             -> m (Array (Tuple (Key Device) DeviceType))
 getOnlineStatusByFamilyId familyId = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
