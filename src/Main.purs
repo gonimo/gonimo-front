@@ -33,7 +33,7 @@ import Data.Traversable (traverse)
 import Data.Tuple (fst, Tuple(Tuple))
 import Debug.Trace (trace)
 import Gonimo.Client.Effects (handleError)
-import Gonimo.Client.Router (match, Route(DecodingFailed, AcceptInvitation, Home))
+import Gonimo.Client.Router (match, Route(AcceptInvitation, Home))
 import Gonimo.Client.Types (GonimoEff, Gonimo, class ReportErrorAction)
 import Gonimo.Client.Types (Error(URLRouteError), runGonimoT, Settings)
 import Gonimo.Pux (onlyEffect, justEffect, onlyEffects, noEffects, EffModel(EffModel), toPux)
@@ -109,10 +109,9 @@ updateLoaded action state  = bimap LoadedS LoadedA $ LoadedC.update action state
 
 
 fromRoute :: Route -> Action
-fromRoute Home                      = Nop
+fromRoute Home                      = trace ("We are going home! ") $ \_ -> Nop
 fromRoute (AcceptInvitation secret) = trace ("Translating AcceptInvitation!") $
                                       \_ -> LoadedA $ LoadedC.HandleInvite secret
-fromRoute (DecodingFailed err)      = ReportError $ URLRouteError err
 
 handleInit :: forall eff. LoadedC.State -> LoadingS' -> EffModel eff State Action
 handleInit ls state = EffModel {
@@ -161,6 +160,7 @@ load = Gonimo.toAff initSettings $ authToAction =<< getAuthData
             , families      : []
             , onlineDevices : Map.empty
             , deviceInfos   : Map.empty
+            , userError     : LoadedC.NoError
             }
 
 makeCallback :: forall eff. Channel Action ->  (LoadedC.Action -> SubscriberEff (channel :: CHANNEL | eff) Unit)
@@ -248,6 +248,8 @@ main = do
   let subscribeSignal = deploySubscriptions <$> subscriberSignal <*> app.state
   runSignal $ subscribeSignal
   runSignal $ map (\_ -> Console.log "State changed!") app.state
+  runSignal $ Console.log <$> urlSignal
+  runSignal $ (Console.log <<< ("Central widget: " <> _ ) <<< showCentral) <$> app.state
   renderToDOM "#app" app.html
 
 coerceEffects :: forall eff1 eff2 a. Eff eff1 a -> Eff eff2 a
@@ -258,3 +260,7 @@ toGonimoEffects = unsafeCoerce
 
 coerceSubscriberEffects :: forall eff1 eff2 a. Subscriber eff1 a -> Subscriber eff2 a
 coerceSubscriberEffects = unsafeCoerce
+
+showCentral :: State -> String
+showCentral (LoadingS _) = ""
+showCentral (LoadedS s) = gShow s.central
