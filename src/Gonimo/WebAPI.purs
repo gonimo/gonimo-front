@@ -163,6 +163,30 @@ getDeviceInfosByFamilyId familyId = do
                                 }
   getResult decodeJson affResp
   
+getAccountsByAccountIdFamilies :: forall eff m.
+                                  (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
+                                  => Key Account
+                                  -> m (Array (Tuple (Key Family) Family))
+getAccountsByAccountIdFamilies accountId = do
+  spOpts_' <- ask
+  let spOpts_ = case spOpts_' of SPSettings_ o -> o
+  let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
+  let authorization = spParams_.authorization
+  let baseURL = spParams_.baseURL
+  let httpMethod = "GET"
+  let reqUrl = baseURL <> "accounts" <> "/" <> encodeURLPiece spOpts_' accountId
+        <> "/" <> "families"
+  let reqHeaders =
+        [{ field : "Authorization"
+         , value : encodeURLPiece spOpts_' authorization
+         }]
+  affResp <- liftAff $ affjax defaultRequest
+                                { method = httpMethod
+                                , url = reqUrl
+                                , headers = defaultRequest.headers <> reqHeaders
+                                }
+  getResult decodeJson affResp
+  
 postFamilies :: forall eff m.
                 (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
                 => String -> m (Key Family)
@@ -183,29 +207,6 @@ postFamilies reqBody = do
                                 , url = reqUrl
                                 , headers = defaultRequest.headers <> reqHeaders
                                 , content = toNullable <<< Just <<< printJson <<< encodeJson $ reqBody
-                                }
-  getResult decodeJson affResp
-  
-getFamiliesByAccountId :: forall eff m.
-                          (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-                          => Key Account
-                          -> m (Array (Tuple (Key Family) Family))
-getFamiliesByAccountId accountId = do
-  spOpts_' <- ask
-  let spOpts_ = case spOpts_' of SPSettings_ o -> o
-  let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
-  let authorization = spParams_.authorization
-  let baseURL = spParams_.baseURL
-  let httpMethod = "GET"
-  let reqUrl = baseURL <> "families" <> "/" <> encodeURLPiece spOpts_' accountId
-  let reqHeaders =
-        [{ field : "Authorization"
-         , value : encodeURLPiece spOpts_' authorization
-         }]
-  affResp <- liftAff $ affjax defaultRequest
-                                { method = httpMethod
-                                , url = reqUrl
-                                , headers = defaultRequest.headers <> reqHeaders
                                 }
   getResult decodeJson affResp
   

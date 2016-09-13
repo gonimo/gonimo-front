@@ -168,6 +168,30 @@ getDeviceInfosByFamilyId familyId = do
                 }
   pure spReq
 
+getAccountsByAccountIdFamilies :: forall m.
+                                  MonadReader (SPSettings_ SPParams_) m =>
+                                  Key Account -> m HttpRequest
+getAccountsByAccountIdFamilies accountId = do
+  spOpts_' <- ask
+  let spOpts_ = case spOpts_' of SPSettings_ o -> o
+  let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
+  let authorization = spParams_.authorization
+  let baseURL = spParams_.baseURL
+  let httpMethod = "GET"
+  let reqPath = Path ["accounts" , gDefaultToURLPiece accountId , "families"]
+  let reqHeaders =
+        [Tuple "Authorization" (gDefaultToURLPiece authorization)]
+  let reqQuery =
+        []
+  let spReq = HttpRequest
+                { httpMethod: httpMethod
+                , httpPath: reqPath
+                , httpHeaders: reqHeaders
+                , httpQuery: reqQuery
+                , httpBody: ""
+                }
+  pure spReq
+
 postFamilies :: forall m. MonadReader (SPSettings_ SPParams_) m => String
                 -> m HttpRequest
 postFamilies reqBody = do
@@ -188,29 +212,6 @@ postFamilies reqBody = do
                 , httpHeaders: reqHeaders
                 , httpQuery: reqQuery
                 , httpBody: printJson <<< encodeJson $ reqBody
-                }
-  pure spReq
-
-getFamiliesByAccountId :: forall m. MonadReader (SPSettings_ SPParams_) m =>
-                          Key Account -> m HttpRequest
-getFamiliesByAccountId accountId = do
-  spOpts_' <- ask
-  let spOpts_ = case spOpts_' of SPSettings_ o -> o
-  let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
-  let authorization = spParams_.authorization
-  let baseURL = spParams_.baseURL
-  let httpMethod = "GET"
-  let reqPath = Path ["families" , gDefaultToURLPiece accountId]
-  let reqHeaders =
-        [Tuple "Authorization" (gDefaultToURLPiece authorization)]
-  let reqQuery =
-        []
-  let spReq = HttpRequest
-                { httpMethod: httpMethod
-                , httpPath: reqPath
-                , httpHeaders: reqHeaders
-                , httpQuery: reqQuery
-                , httpBody: ""
                 }
   pure spReq
 

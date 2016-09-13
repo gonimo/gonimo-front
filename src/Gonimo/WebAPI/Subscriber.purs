@@ -37,11 +37,12 @@ getDeviceInfosByFamilyId spToUser_ familyId = do
   spReq <- MakeRequests.getDeviceInfosByFamilyId familyId
   pure $ makeSubscriptions spReq (toUserType spToUser_)
 
-getFamiliesByAccountId :: forall m a. MonadReader (SPSettings_ SPParams_) m =>
-                          TypedToUser (Array (Tuple (Key Family) Family)) a
-                          -> Key Account -> m (Subscriptions a)
-getFamiliesByAccountId spToUser_ accountId = do
-  spReq <- MakeRequests.getFamiliesByAccountId accountId
+getAccountsByAccountIdFamilies :: forall m a.
+                                  MonadReader (SPSettings_ SPParams_) m =>
+                                  TypedToUser (Array (Tuple (Key Family) Family)) a
+                                  -> Key Account -> m (Subscriptions a)
+getAccountsByAccountIdFamilies spToUser_ accountId = do
+  spReq <- MakeRequests.getAccountsByAccountIdFamilies accountId
   pure $ makeSubscriptions spReq (toUserType spToUser_)
 
 receiveSocketByFamilyIdByToDevice :: forall m a.
