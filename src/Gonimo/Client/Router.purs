@@ -17,42 +17,34 @@ import Servant.PureScript.Settings (gDefaultEncodeURLPiece)
 import Debug.Trace (trace)
 import Data.Maybe (Maybe(..))
 import Data.Array (index)
-import Data.Either (fromRight)
+import Data.Either (fromRight, either)
 import Partial.Unsafe (unsafePartial)
 
 import Data.String.Regex as R
 
 
-data Route = Home | AcceptInvitation Secret | DecodingFailed String
-
-data RouteP = HomeP | AcceptInvitationP String | DecodingFailedP String
+data Route = Home | AcceptInvitation Secret
 
 render (AcceptInvitation secret) = "acceptInvitation=" <> gDefaultEncodeURLPiece secret
 render Home = ""
 
-match' :: String -> RouteP
+-- Use simple plain old regex for matching route - pux routing does not work reliably!
+match :: String -> Route
 -- match' url =trace ("Routing: " <> url) $ \_ -> (fromMaybe (DecodingFailedP $ "No such route: " <> url) $ router url $
 --        AcceptInvitationP <$> (lit "index.html" *> param "acceptInvitation") <* end
 --    <|> HomeP <$ lit "index.html" <* end
 -- )
-match' url = let
+match url = let
     matcher = unsafePartial $ fromRight $ R.regex ".*acceptInvitation=([^&]*)" R.noFlags
     matched = R.match matcher url
+    decode :: String -> Either String Secret
+    decode = Aeson.decodeJson <=< (jsonParser <<< decodeURIComponent)
+    decodeJust :: String -> Maybe Secret
+    decodeJust = either (const Nothing) Just <<< decode
   in
-     case matched of
-       Nothing -> HomeP
-       Just arr -> case index arr 1 of
-         Nothing -> HomeP
-         (Just Nothing) -> HomeP
-         (Just (Just val)) -> AcceptInvitationP val
+     fromMaybe Home $ do
+       arr <- matched
+       element <- index arr 1
+       decoded <- decodeJust =<< element
+       pure $ AcceptInvitation decoded
 
-match :: String -> Route
-match url = let r' = match' url
-            in case r' of
-              HomeP -> trace ("Routing: " <> url <> ", to Home") $ \_ -> Home
-              DecodingFailedP err -> trace ("Routing:" <> url <> ", to DecodingFailed") $ \_ -> DecodingFailed err
-              AcceptInvitationP str -> trace ("Routing:" <> url <> ", to AcceptInvitationP, match: " <> str) $ \_ ->
-                let eVal = Aeson.decodeJson =<< (jsonParser <<< decodeURIComponent) str
-                in case eVal of
-                  Left err  -> DecodingFailed err
-                  Right val -> AcceptInvitation val
