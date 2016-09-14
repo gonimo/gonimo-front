@@ -63,7 +63,7 @@ onlyGonimos settings state = onlyEffects state <<< map (Gonimo.toAff settings)
 
 -- | Like `onlyGonimos` but for a single effect
 onlyGonimo :: forall state action eff
-               . ReportErrorAction action => Settings ->state -> Gonimo eff action
+               . ReportErrorAction action => Settings -> state -> Gonimo eff action
                -> EffModel eff state action
 onlyGonimo settings state eff = onlyGonimos settings state [eff]
 
