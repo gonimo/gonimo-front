@@ -3,9 +3,9 @@ module Gonimo.UI.Loaded where
 
 import Gonimo.UI.Html
 import Data.List as List
-import Data.Generic (class Generic)
 import Data.Map as Map
 import Gonimo.Client.Effects as Gonimo
+import Gonimo.Client.LocalStorage as Key
 import Gonimo.Client.LocalStorage as Key
 import Gonimo.Client.Types as Gonimo
 import Gonimo.UI.AcceptInvitation as AcceptC
@@ -28,6 +28,7 @@ import Data.Array (fromFoldable, concat, catMaybes, head)
 import Data.Bifunctor (bimap)
 import Data.Either (either, Either(Right, Left))
 import Data.Foldable (foldl)
+import Data.Generic (class Generic)
 import Data.Generic (gShow)
 import Data.Map (Map)
 import Data.Maybe (maybe, Maybe(..))
@@ -37,13 +38,15 @@ import Data.Traversable (traverse)
 import Data.Tuple (fst, Tuple(Tuple))
 import Debug.Trace (trace)
 import Gonimo.Client.Effects (handleError)
-import Gonimo.Client.Types (GonimoEff, runGonimoT, Settings)
-import Gonimo.Pux (onlyEffects, onlyEffect, justEffect, noEffects, EffModel(EffModel))
+import Gonimo.Client.Types (Settings, GonimoError, class ReportErrorAction, Gonimo, GonimoEff, runGonimoT)
+import Gonimo.Pux (onlyGonimo, onlyEffects, onlyEffect, justEffect, noEffects, EffModel(EffModel))
 import Gonimo.Server.DbEntities (Device(Device), Family(Family))
 import Gonimo.Server.DbEntities.Helpers (runFamily)
 import Gonimo.Server.Error (ServerError(InvalidAuthToken))
 import Gonimo.Server.Types (DeviceType(NoBaby), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (dateToString, Key(Key), Secret(Secret))
+import Gonimo.UI.Loaded.Error (viewError, handleSubscriber)
+import Gonimo.UI.Loaded.Types (State, Action(..), Central(..), setCentral, UserError(..))
 import Gonimo.WebAPI (SPParams_(SPParams_), postAccounts)
 import Gonimo.WebAPI.Types (DeviceInfo(DeviceInfo), AuthData(AuthData))
 import Gonimo.WebAPI.Types.Helpers (runAuthData)
@@ -63,42 +66,6 @@ import Servant.Subscriber.Util (toUserType)
 import Signal (constant, Signal)
 import Prelude hiding (div)
 
-type State = { authData :: AuthData
-             , settings :: Settings
-             , subscriberUrl :: String
-             , inviteS  :: InviteC.State
-             , acceptS  :: AcceptC.State
-             , central  :: Central
-             , families :: Array (Tuple (Key Family) Family)
-             , onlineDevices :: Map (Key Device) DeviceType
-             , deviceInfos :: Map (Key Device) DeviceInfo
-             , userError :: UserError
-             }
-
-data Action = ReportError Gonimo.Error
-            | SetState State
-            | InviteA InviteC.Action
-            | AcceptA AcceptC.Action
-            | HandleInvite Secret
-            | SetFamilies (Array (Tuple (Key Family) Family))
-            | SetOnlineDevices (Array (Tuple (Key Device) DeviceType))
-            | SetDeviceInfos (Array (Tuple (Key Device) DeviceInfo))
-            | HandleSubscriber Notification
-            | ResetDevice -- Reinitialize basically everything.
-            | Nop
-
-data Central = CentralInvite
-             | CentralAccept
-
-derive instance genericCentral :: Generic Central
-
-setCentral :: Central -> State -> State
-setCentral central = _ { central = central }
-
--- | Errors which are of concern for the user and should be displayed.
-data UserError = NoError
-               | DeviceInvalid -- Server does not accept our device secret.
-               | Crashed -- An unexpected error occurred - we can not continue. - The user obviously should never see this in production.
 
 getInviteState :: State -> InviteC.State
 getInviteState state = case head state.families of
@@ -119,55 +86,34 @@ update (SetFamilies families')    = \state -> noEffects (state { families = fami
 update (SetOnlineDevices devices) = \state -> noEffects (state {onlineDevices = Map.fromFoldable devices})
 update (SetDeviceInfos devices)   = \state -> noEffects (state {deviceInfos = Map.fromFoldable devices})
 update (HandleSubscriber msg)     = handleSubscriber msg
-update ResetDevice                = noEffects
+update ResetDevice                = handleResetDevice
+update (SetAuthData auth)         = handleSetAuthData auth
 update Nop                        = noEffects
 
 
 updateInvite :: forall eff. InviteC.Action -> State -> EffModel eff State Action
 updateInvite action state = bimap (state {inviteS = _}) InviteA
-                            $ InviteC.update state.settings action (getInviteState state)
+                            $ InviteC.update (mkSettings state.authData) action (getInviteState state)
 
 updateAccept :: forall eff. AcceptC.Action -> State -> EffModel eff State Action
 updateAccept action state = bimap (state {acceptS = _}) AcceptA
-                            $ AcceptC.update state.settings action state.acceptS
+                            $ AcceptC.update (mkSettings state.authData) action state.acceptS
 
 inviteEffect :: forall m. Monad m => Secret -> m Action
 inviteEffect = pure <<< AcceptA <<< AcceptC.LoadInvitation
 
-handleSubscriber :: forall eff. Notification -> State -> EffModel eff State Action
-handleSubscriber notification state =
-  case notification of
-    WebSocketError msg           -> onlyEffect state $ do
-      Gonimo.log $ "A websocket error occurred: " <> msg
-      pure Nop
-    WebSocketClosed msg          -> onlyEffect state $ do
-      Gonimo.log $ "The websocket connection got closed: " <> msg
-      pure Nop
-    ParseError msg               -> onlyEffect state $ do
-      Gonimo.log $ "A parsing error occurred: " <> msg
-      pure Nop
-    HttpRequestFailed req' resp' -> handleFailedHttpRequest state req' resp'
+handleResetDevice :: forall eff. State -> EffModel eff State Action
+handleResetDevice state = onlyGonimo (mkSettings state.authData) state $ do
+  liftEff $ localStorage.removeItem Key.authData
+  SetAuthData <$> getAuthData
 
-handleFailedHttpRequest :: forall eff. State -> HttpRequest -> HttpResponse -> EffModel eff State Action
-handleFailedHttpRequest state req' fResp@(HttpResponse resp') = onlyEffects newState $ case decodingResult of
-    Right _ -> []
-    Left err -> [ do
-                     Gonimo.log $ "Decoding error while handling failed http request: " <> err
-                     Gonimo.log $ "For request: " <> gShow req'
-                     Gonimo.log $ "Response was: " <> gShow fResp
-                     pure Nop
-                ]
-  where
-    newState = case error of
-        NoError -> state
-        _       -> state { userError = error }
-    fromServer :: Maybe ServerError -> UserError
-    fromServer mErr = case mErr of
-        Nothing -> NoError
-        Just InvalidAuthToken -> DeviceInvalid
-        Just _ -> Crashed -- TODO: Check other errors as well.
-    decodingResult = doDecode (toUserType fromServer) resp'.httpBody
-    error = either (const Crashed) id decodingResult
+handleSetAuthData :: forall eff. AuthData -> State -> EffModel eff State Action
+handleSetAuthData auth state = noEffects $ state
+                                  { authData = auth
+                                  , userError = case state.userError of
+                                                  DeviceInvalid -> NoError
+                                                  _ -> state.userError
+                                  }
 --------------------------------------------------------------------------------
 
 view :: State -> Html Action
@@ -216,36 +162,13 @@ viewOnlineDevices state = table [ A.className "table table-stripped"]
                , td [] [ text lastAccessed ]
                ]
 
-viewError :: State -> Html Action
-viewError state = case state.userError of
-  NoError -> text "No error occurred - everything is fine!"
-  DeviceInvalid ->
-    div [ A.className "alert alert-danger", A.role "alert"]
-    [ h1 [] [ text "Your account is no (longer) known by gonimo server!"]
-    , p []
-      [ text $ "We are sorry, but your account is no longer known by our server."
-            <> "To proceed I would create a new account for you. You will have to rejoin any"
-            <> "families you were in already. I am sorry for any inconveniences!"
-      ]
-    , button [ E.onClick $ const ResetDevice ]
-      [ text "Proceed"]
-    ]
-  Crashed ->
-    div [ A.className "alert alert-danger", A.role "alert"]
-    [ h1 [] [ text "Your gonimo has crashed!"]
-    , p []
-      [ text $ "Something unexpected happened - and I don't know what to do!"
-            <> "Please try again later - hopefully we have fixed the problem then!"
-      ]
-    ]
 --------------------------------------------------------------------------------
-
 getSubscriptions :: State -> Subscriptions Action
 getSubscriptions state =
   let
     familyId = fst <$> head state.families -- Currently we just pick the first family
     subArray :: Array (Subscriptions Action)
-    subArray = map (flip runReader state.settings) <<< concat $
+    subArray = map (flip runReader (mkSettings state.authData)) <<< concat $
       [ [ Sub.getAccountsByAccountIdFamilies (maybe Nop SetFamilies)
                                           (runAuthData state.authData).accountId
         ]
@@ -267,7 +190,7 @@ getPongRequest state =
     familyId = fst <$> head state.families -- Currently we just pick the first family
   in
    case state.userError of
-     NoError -> flip runReader state.settings <<< Reqs.postOnlineStatusByFamilyId deviceData <$> familyId
+     NoError -> flip runReader (mkSettings state.authData) <<< Reqs.postOnlineStatusByFamilyId deviceData <$> familyId
      _ -> Nothing
 
 getCloseRequest :: State -> Maybe HttpRequest
@@ -277,6 +200,26 @@ getCloseRequest state =
     familyId = fst <$> head state.families -- Currently we just pick the first family
   in
    case state.userError of
-     NoError -> flip runReader state.settings <<< flip Reqs.deleteOnlineStatusByFamilyIdByDeviceId deviceId <$> familyId
+     NoError -> flip runReader (mkSettings state.authData) <<< flip Reqs.deleteOnlineStatusByFamilyIdByDeviceId deviceId <$> familyId
      _ -> Nothing
 
+
+-- | Retrieve AuthData from local storage or if not present get new one from server
+getAuthData :: forall eff. Gonimo eff AuthData
+getAuthData = do
+  md <- liftEff $ localStorage.getItem Key.authData
+  Gonimo.log $ "Got authdata from local storage: " <> gShow md
+  case md of
+    Nothing -> do
+      auth <- postAccounts
+      Gonimo.log $ "Got Nothing - called postAccounts and got: " <> gShow auth
+      Gonimo.log $ "Calling setItem with : " <> gShow Key.authData
+      liftEff $ localStorage.setItem Key.authData auth
+      pure auth
+    Just d  -> pure d
+
+mkSettings :: AuthData -> Settings
+mkSettings (AuthData auth) = defaultSettings $ SPParams_ {
+      authorization : auth.authToken
+    , baseURL       : "http://localhost:8081/"
+    }

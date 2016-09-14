@@ -9,6 +9,7 @@ import Gonimo.Client.Types as Gonimo
 import Gonimo.UI.AcceptInvitation as AcceptC
 import Gonimo.UI.Invite as InviteC
 import Gonimo.UI.Loaded as LoadedC
+import Gonimo.UI.Loaded.Types as LoadedC
 import Gonimo.WebAPI.MakeRequests as Reqs
 import Pux.Html.Attributes as A
 import Servant.Subscriber as Sub
@@ -137,7 +138,7 @@ viewLoading = viewLogo $ div []
 
 
 load :: forall eff. Aff (GonimoEff eff) Action
-load = Gonimo.toAff initSettings $ authToAction =<< getAuthData
+load = Gonimo.toAff initSettings $ authToAction =<< LoadedC.getAuthData
   where
     initSettings = mkSettings $ GonimoSecret (Secret "blabala")
 
@@ -152,7 +153,6 @@ load = Gonimo.toAff initSettings $ authToAction =<< getAuthData
       inviteState <- InviteC.init
       pure $ Init
             { authData      : authData
-            , settings      : mkSettings auth.authToken
             , subscriberUrl : "ws://localhost:8081/subscriber"
             , inviteS       : inviteState
             , acceptS       : AcceptC.init
@@ -168,19 +168,6 @@ makeCallback c = send c <<< LoadedA
 
 makeNotify :: forall eff. Channel Action ->  (Sub.Notification -> SubscriberEff (channel :: CHANNEL | eff) Unit)
 makeNotify c = send c <<< LoadedA <<< LoadedC.HandleSubscriber
-
-getAuthData :: forall eff. Gonimo eff AuthData
-getAuthData = do
-  md <- liftEff $ localStorage.getItem Key.authData
-  Gonimo.log $ "Got authdata from local storage: " <> gShow md
-  case md of
-    Nothing -> do
-      auth <- postAccounts
-      Gonimo.log $ "Got Nothing - called postAccounts and got: " <> gShow auth
-      Gonimo.log $ "Calling setItem with : " <> gShow Key.authData
-      liftEff $ localStorage.setItem Key.authData auth
-      pure auth
-    Just d  -> pure d
 
 
 deploySubscriptions :: forall eff. SubscriberEff eff (Maybe MySubscriber) -> State -> SubscriberEff eff Unit
