@@ -21,7 +21,7 @@ import Data.Generic (gShow)
 import Data.Maybe (isJust, isNothing, Maybe(..))
 import Data.Tuple (Tuple(Tuple))
 import Gonimo.Client.Effects (handleError)
-import Gonimo.Client.Types (Error(UnexpectedAction), Gonimo, Settings, runGonimoT, class ReportErrorAction)
+import Gonimo.Client.Types (GonimoError(UnexpectedAction), Gonimo, Settings, runGonimoT, class ReportErrorAction)
 import Gonimo.Pux (noEffects, onlyEffect, onlyGonimo, justEffect, onlyEffects, EffModel(EffModel), justGonimo)
 import Gonimo.Server.DbEntities (Invitation(Invitation))
 import Gonimo.Server.Types (InvitationDelivery(EmailInvitation), AuthToken, AuthToken(GonimoSecret))
@@ -53,7 +53,7 @@ data Action = LoadInvitation Secret
             | Accept
             | Decline
             | SetAccepted Boolean
-            | ReportError Gonimo.Error
+            | ReportError GonimoError
             | Nop
 
 instance reportErrorActionAction :: ReportErrorAction Action where

@@ -7,7 +7,7 @@ import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.Class (liftAff, class MonadAff)
 import Control.Monad.Eff.Class (liftEff, class MonadEff)
 import Control.Monad.Eff.Console (CONSOLE)
-import Control.Monad.Eff.Exception (EXCEPTION)
+import Control.Monad.Eff.Exception (Error, EXCEPTION)
 import Control.Monad.Eff.Ref (REF)
 import Control.Monad.Error.Class (catchError, throwError)
 import Control.Monad.Except.Trans (runExceptT, class MonadError, ExceptT)
@@ -25,15 +25,22 @@ import WebSocket (WEBSOCKET)
 
 type Settings = SPSettings_ SPParams_
 
-data Error = AjaxError Affjax.AjaxError
+data GonimoError = AjaxError Affjax.AjaxError
            | UnexpectedAction String
            | URLRouteError String
 
-derive instance genericError :: Generic Error
+derive instance genericGonimoError :: Generic GonimoError
+
+-- | Action type to use when errors should be handled by the parent component.
+data ReportParent action = ReportError GonimoError
+                         | Child action
 
 -- | Action types that can be used for error reporting:
 class ReportErrorAction action where
-  reportError :: Error -> action
+  reportError :: GonimoError -> action
+
+instance reportErrorActionReportParent :: ReportErrorAction (ReportParent action) where
+  reportError = ReportError
 
 type GonimoEff eff = ( ajax :: AJAX
                       , channel :: CHANNEL
@@ -44,11 +51,11 @@ type GonimoEff eff = ( ajax :: AJAX
                       , ref :: REF | eff
                       )
 
-newtype GonimoT eff a = GonimoT (ReaderT Settings (ExceptT Error (Aff eff)) a)
+newtype GonimoT eff a = GonimoT (ReaderT Settings (ExceptT GonimoError (Aff eff)) a)
 
 type Gonimo eff = GonimoT (GonimoEff eff)
 
-runGonimoT :: forall eff a. GonimoT eff a -> (ReaderT Settings (ExceptT Error (Aff eff)) a)
+runGonimoT :: forall eff a. GonimoT eff a -> (ReaderT Settings (ExceptT GonimoError (Aff eff)) a)
 runGonimoT (GonimoT m) = m
 
 toAff :: forall eff action. ReportErrorAction action
@@ -75,7 +82,7 @@ instance monadReaderSettingsGonimoT :: MonadReader (SPSettings_ SPParams_) (Goni
   --local :: forall a. (r -> r) -> m a -> m a
   local f (GonimoT ma) = GonimoT (local f ma)
 
-instance monadErrorErrorGonimoT :: MonadError Error (GonimoT eff) where
+instance monadErrorErrorGonimoT :: MonadError GonimoError (GonimoT eff) where
   throwError = GonimoT <<< throwError
   catchError (GonimoT ma) ef = GonimoT $ catchError ma (runGonimoT <<< ef)
 

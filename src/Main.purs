@@ -35,7 +35,7 @@ import Debug.Trace (trace)
 import Gonimo.Client.Effects (handleError)
 import Gonimo.Client.Router (match, Route(AcceptInvitation, Home))
 import Gonimo.Client.Types (GonimoEff, Gonimo, class ReportErrorAction)
-import Gonimo.Client.Types (Error(URLRouteError), runGonimoT, Settings)
+import Gonimo.Client.Types (GonimoError(URLRouteError), runGonimoT, Settings)
 import Gonimo.Pux (onlyEffect, justEffect, onlyEffects, noEffects, EffModel(EffModel), toPux)
 import Gonimo.Server.Types (DeviceType(NoBaby), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (Secret(Secret))
@@ -71,7 +71,7 @@ init = LoadingS {  actionQueue : Nil }
 
 data Action = Start
             | Init LoadedC.State
-            | ReportError Gonimo.Error
+            | ReportError GonimoError
             | LoadedA LoadedC.Action
             | Nop
 

@@ -21,10 +21,10 @@ import Data.Generic (gShow)
 import Data.Maybe (isJust, isNothing, Maybe(..))
 import Data.Tuple (Tuple(Tuple))
 import Gonimo.Client.Effects (handleError)
-import Gonimo.Client.Types (Gonimo, Settings, runGonimoT, class ReportErrorAction)
+import Gonimo.Client.Types (GonimoError, Gonimo, Settings, runGonimoT, class ReportErrorAction)
 import Gonimo.Pux (noEffects, justEffect, onlyEffects, EffModel(EffModel), justGonimo)
-import Gonimo.Server.Types (InvitationDelivery(EmailInvitation), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Server.DbEntities (Family(Family))
+import Gonimo.Server.Types (InvitationDelivery(EmailInvitation), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (Key(Key), Secret(Secret))
 import Gonimo.WebAPI (postInvitationOutbox, postInvitations, postFamilies, SPParams_(SPParams_), postAccounts, postFunnyName)
 import Gonimo.WebAPI.Types (AuthData(AuthData))
@@ -41,7 +41,7 @@ type State =
   , email          :: String
   , familyId       :: Maybe (Key Family)
   , invitationSent :: Boolean
-  , errorOccurred  :: Maybe Gonimo.Error
+  , errorOccurred  :: Maybe GonimoError
   }
 
 init :: forall eff. Gonimo eff State
@@ -59,7 +59,7 @@ data Action = SetFamilyName String
             | SetEmail String
             | SendInvitation
             | InvitationSent
-            | ReportError Gonimo.Error
+            | ReportError GonimoError
             | Nop
 
 instance reportErrorActionAction :: ReportErrorAction Action where
