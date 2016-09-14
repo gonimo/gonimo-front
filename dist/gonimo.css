@@ -26,3 +26,18 @@ body {
 input.funnyName {
     width: 22em;
 }
+
+.centered-content {
+    display: flex;
+    justify-content: center;
+    flex-direction: row;
+    width: 100%;
+}
+
+.btn-group {
+    width: 100%;
+}
+ 
+.btn {
+    margin: 1em;
+}
