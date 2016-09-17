@@ -100,9 +100,10 @@ viewSend state =
   [ div [A.className "container"]
     [ h1 [] [ text "Welcome to Gonimo!"]
     , p []  [ text "In order to get you started, invite a second device via email to your family:"]
-    , h2 [] [span [A.className "label label-default"]  [i [A.className "fa fa-users"] []
-            , text " "
-            , text state.familyName ]
+    , h2 [] [ div [ A.className "well"]
+                [ i [A.className "fa fa-users"] []
+                , text " "
+                , text state.familyName ]
             ]
     , div [ E.onKeyUp handleEnter ]
       [ p [] [text "Choose a name for your family."]
@@ -112,8 +113,6 @@ viewSend state =
           [ span [A.className "input-group-addon glyphicon glyphicon-edit"] []
           , input [ A.type_ "text"
                   , A.className "form-control"
-                  , A.maxLength "70"
-                  , A.size 70
                   , E.onInput $ \ev -> SetFamilyName ev.target.value
                   , A.value state.familyName
                   ] []
