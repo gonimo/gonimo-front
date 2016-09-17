@@ -3,10 +3,11 @@
 module Gonimo.Pux where
 
 import Prelude
-import Control.Monad.Aff (Aff)
-import Data.Bifunctor (class Bifunctor)
-import Gonimo.Client.Types (GonimoEff, Gonimo, Settings, class ReportErrorAction)
 import Gonimo.Client.Types as Gonimo
+import Control.Monad.Aff (Aff)
+import Data.Bifunctor (bimap, class Bifunctor)
+import Data.Lens ((.~), (^.), LensP)
+import Gonimo.Client.Types (GonimoEff, Gonimo, Settings, class ReportErrorAction)
 
 type EffModelImpl state action eff =
   { state :: state
@@ -25,6 +26,30 @@ instance bifunctorEffModelEff :: Bifunctor (EffModel eff) where
     , effects : map (map g) model.effects
     }
 
+updateChild :: forall eff parentState childState parentAction childAction props.
+            LensP parentState childState
+            -> (childAction -> parentAction)
+            -> (props -> childAction -> childState -> EffModel eff childState childAction)
+            -> props -> childAction -> parentState -> EffModel eff parentState parentAction
+updateChild lens mkAction childUpdate props action state =
+    bimap smartUpdate mkAction $ childUpdate props action (state ^. lens)
+  where
+    smartUpdate :: childState -> parentState
+    smartUpdate newChild = if differentObject newChild (state ^. lens)
+                           then lens .~ newChild $ state
+                           else state
+
+toParent :: forall eff parentState childState parentAction childAction.
+            LensP parentState childState
+            -> (childAction -> parentAction)
+            -> parentState -> EffModel eff childState childAction
+            -> EffModel eff parentState parentAction
+toParent lens mkAction state = bimap smartUpdate mkAction
+  where
+    smartUpdate :: childState -> parentState
+    smartUpdate newChild = if differentObject newChild (state ^. lens)
+                           then lens .~ newChild $ state
+                           else state
 
 onlyEffects :: forall state action eff
                .  state -> Array (Aff (GonimoEff eff) action)
@@ -55,32 +80,34 @@ justEffect eff = justEffects [eff]
 noEffects :: forall state action eff. state -> EffModel eff state action
 noEffects state = EffModel { state : state, effects : [] }
 
+type Props ps = { settings :: Settings | ps }
 
-onlyGonimos :: forall state action eff
-               . ReportErrorAction action => Settings -> state -> Array (Gonimo eff action)
+onlyGonimos :: forall state action eff ps
+               . ReportErrorAction action => Props ps -> state -> Array (Gonimo eff action)
                -> EffModel eff state action
-onlyGonimos settings state = onlyEffects state <<< map (Gonimo.toAff settings)
+onlyGonimos props state = onlyEffects state <<< map (Gonimo.toAff props.settings)
 
 -- | Like `onlyGonimos` but for a single effect
-onlyGonimo :: forall state action eff
-               . ReportErrorAction action => Settings -> state -> Gonimo eff action
+onlyGonimo :: forall state action eff ps
+               . ReportErrorAction action => Props ps -> state -> Gonimo eff action
                -> EffModel eff state action
-onlyGonimo settings state eff = onlyGonimos settings state [eff]
+onlyGonimo props state eff = onlyGonimos props state [eff]
 
 -- | Like onlyGonimos but with arguments flipped
-justGonimos :: forall state action eff
-               . ReportErrorAction action => Settings -> Array (Gonimo eff action)
+justGonimos :: forall state action eff ps
+               . ReportErrorAction action => Props ps -> Array (Gonimo eff action)
                -> state -> EffModel eff state action
-justGonimos settings = flip $ onlyGonimos settings
+justGonimos props = flip $ onlyGonimos props
 
 -- | Like `justGonimos` but for a single effect
-justGonimo :: forall state action eff
-               . ReportErrorAction action => Settings -> Gonimo eff action
+justGonimo :: forall state action eff ps
+               . ReportErrorAction action => Props ps -> Gonimo eff action
                -> state -> EffModel eff state action
-justGonimo settings eff = justGonimos settings [eff]
+justGonimo props eff = justGonimos props [eff]
 
 -- | Convert an our EffModel using update function to one usable for Pux.Config
 toPux :: forall state action eff. (action -> state -> EffModel eff state action)
          -> action -> state -> EffModelImpl state action eff
 toPux ours action state = runEffModel $ ours action state
 
+foreign import differentObject :: forall a b. a -> b -> Boolean
