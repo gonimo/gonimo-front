@@ -26,10 +26,7 @@ import WebSocket (WEBSOCKET)
 type Settings = SPSettings_ SPParams_
 
 data GonimoError = AjaxError Affjax.AjaxError
-           | UnexpectedAction String
-           | URLRouteError String
-
-derive instance genericGonimoError :: Generic GonimoError
+                 | UnexpectedAction String
 
 -- | Action type to use when errors should be handled by the parent component.
 data ReportParent action = ReportError GonimoError
