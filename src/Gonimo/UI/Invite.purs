@@ -29,7 +29,7 @@ import Gonimo.WebAPI (postInvitationOutbox, postInvitations, postFamilies, SPPar
 import Gonimo.WebAPI.Types (AuthData(AuthData))
 import Partial.Unsafe (unsafeCrashWith)
 import Pux (renderToDOM, fromSimple, start)
-import Pux.Html (button, input, p, h1, text, span, Html, img, div)
+import Pux.Html (button, i, input, p, h1, h2, h3, text, span, Html, img, div)
 import Servant.PureScript.Affjax (AjaxError)
 import Servant.PureScript.Settings (defaultSettings, SPSettings_(SPSettings_))
 import Signal (constant, Signal)
@@ -96,37 +96,56 @@ view state = if state.invitationSent
 
 viewSend :: State -> Html Action
 viewSend state =
-  div []
-      [ h1 [] [ text "Welcome To Gonimo!"]
-      , p []  [ text $ "In order to get you started, invite a second device via email to your family " <> state.familyName <> ":"]
-      , div [ E.onKeyUp handleEnter ]
-            [ p []
-                if isNothing state.familyId -- We can only set the family name here, if we are creating one!
-                then
-                  [ text "FamilyName: "
-                  , input [ A.type_ "text"
-                          , A.className "funnyName"
-                          , E.onInput $ \ev -> SetFamilyName ev.target.value
-                          , A.value state.familyName
-                          ] []
-                  ]
-                else
-                  []
-            , p []
-                [ text "email Address: "
-                , input [ A.type_ "text"
-                        , E.onInput $ \ev -> SetEmail ev.target.value
-                        , A.value state.email
-                        ] []
-                ]
-            , button [ E.onClick $ const $ SendInvitation ]
-                      [ text "Send Invitation!" ]
-            , p []
-                if isJust state.errorOccurred
-                then [ text $ "Error occurred!"]
-                else []
+  div [A.className "jumbotron"]
+  [ div [A.className "container"]
+    [ h1 [] [ text "Welcome to Gonimo!"]
+    , p []  [ text "In order to get you started, invite a second device via email to your family:"]
+    , h2 [] [span [A.className "label label-default"]  [i [A.className "fa fa-users"] []
+            , text " "
+            , text state.familyName ]
             ]
+    , div [ E.onKeyUp handleEnter ]
+      [ p [] [text "Choose a name for your family."]
+      , div [A.className "input-group"]
+          if isNothing state.familyId -- We can only set the family name here, if we are creating one!
+          then
+          [ span [A.className "input-group-addon glyphicon glyphicon-edit"] []
+          , input [ A.type_ "text"
+                  , A.className "form-control"
+                  , A.maxLength "70"
+                  , A.size 70
+                  , E.onInput $ \ev -> SetFamilyName ev.target.value
+                  , A.value state.familyName
+                  ] []
+          ]
+          else
+          []
+
+      , p [] []
+      , div [A.className "input-group"]
+        [ span [A.className "input-group-addon glyphicon glyphicon-envelope"] []
+        , input [ A.type_ "text"
+                , A.className "form-control"
+                , A.placeholder "mail@example.com"
+                , E.onInput $ \ev -> SetEmail ev.target.value
+                , A.value state.email
+                ] []
+        ]
       ]
+    , button [ A.className "btn btn-block btn-info"
+             , A.style [Tuple "margin-left" "0px"]
+             , A.type_ "button"
+             , E.onClick $ const $ SendInvitation
+             ]
+             [ text " Send Invitation! "
+             , span [A.className "glyphicon glyphicon-send"] []
+             ]
+    , p []
+        if isJust state.errorOccurred
+        then [ text $ "Error occurred!"]
+        else []
+    ]
+  ]
   where
     handleEnter :: E.KeyboardEvent -> Action
     handleEnter ev = if ev.keyCode == 13 then SendInvitation else Nop
