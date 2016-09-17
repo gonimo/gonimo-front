@@ -20,8 +20,7 @@ import Data.Either (Either(Right, Left))
 import Data.Generic (gShow)
 import Data.Maybe (isJust, isNothing, Maybe(..))
 import Data.Tuple (Tuple(Tuple))
-import Gonimo.Client.Effects (handleError)
-import Gonimo.Client.Types (GonimoError, Gonimo, Settings, runGonimoT, class ReportErrorAction)
+import Gonimo.Client.Types (Settings, GonimoError, Gonimo, runGonimoT, class ReportErrorAction)
 import Gonimo.Pux (noEffects, justEffect, onlyEffects, EffModel(EffModel), justGonimo)
 import Gonimo.Server.DbEntities (Family(Family))
 import Gonimo.Server.Types (InvitationDelivery(EmailInvitation), AuthToken, AuthToken(GonimoSecret))
@@ -35,6 +34,7 @@ import Servant.PureScript.Affjax (AjaxError)
 import Servant.PureScript.Settings (defaultSettings, SPSettings_(SPSettings_))
 import Signal (constant, Signal)
 
+type Props ps = { settings :: Settings | ps }
 
 type State =
   { familyName     :: String
@@ -65,15 +65,14 @@ data Action = SetFamilyName String
 instance reportErrorActionAction :: ReportErrorAction Action where
   reportError = ReportError
 
-update :: forall eff. Settings -> Action -> State -> EffModel eff State Action
-update settings action = case action of
+update :: forall eff ps. Props ps -> Action -> State -> EffModel eff State Action
+update props action = case action of
   (SetFamilyName name ) -> \state -> noEffects state { familyName = name }
   (SetEmail email )     -> \state -> noEffects state { email = email }
   InvitationSent        -> \state -> noEffects state { invitationSent = true }
-  SendInvitation        -> \state -> justGonimo settings (handleSendInvitation state) state
+  SendInvitation        -> \state -> justGonimo props (handleSendInvitation state) state
   Nop                   -> noEffects
-  ReportError err       -> \state -> justEffect (Gonimo.handleError Nop err)
-                                                state { errorOccurred = Just err }
+  ReportError err       -> \state -> noEffects $ state { errorOccurred = Just err }
 
 
 handleSendInvitation :: forall eff. State -> Gonimo eff Action

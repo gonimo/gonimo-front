@@ -24,7 +24,7 @@ import Control.Monad.Except.Trans (runExceptT)
 import Control.Monad.Reader (runReader)
 import Control.Monad.Reader.Trans (runReaderT)
 import Data.Array (head)
-import Data.Bifunctor (bimap)
+import Data.Bifunctor (lmap, bimap)
 import Data.Either (Either(Right, Left))
 import Data.Foldable (traverse_)
 import Data.Generic (gShow)
@@ -33,13 +33,13 @@ import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse)
 import Data.Tuple (fst, Tuple(Tuple))
 import Debug.Trace (trace)
-import Gonimo.Client.Effects (handleError)
 import Gonimo.Client.Router (match, Route(AcceptInvitation, Home))
-import Gonimo.Client.Types (GonimoEff, Gonimo, class ReportErrorAction)
-import Gonimo.Client.Types (GonimoError(URLRouteError), runGonimoT, Settings)
-import Gonimo.Pux (onlyEffect, justEffect, onlyEffects, noEffects, EffModel(EffModel), toPux)
+import Gonimo.Client.Types (GonimoError, GonimoEff, Gonimo, class ReportErrorAction)
+import Gonimo.Client.Types (runGonimoT, Settings)
+import Gonimo.Pux (onlyGonimo, onlyEffect, justEffect, onlyEffects, noEffects, EffModel(EffModel), toPux)
 import Gonimo.Server.Types (DeviceType(NoBaby), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (Secret(Secret))
+import Gonimo.UI.Error (viewError, handleError, class ErrorAction, UserError(NoError))
 import Gonimo.UI.Html (viewLogo)
 import Gonimo.WebAPI (postFunnyName, SPParams_(SPParams_), postAccounts)
 import Gonimo.WebAPI.Types (AuthData(AuthData))
@@ -60,7 +60,9 @@ import Prelude hiding (div)
 data State = LoadingS LoadingS'
            | LoadedS LoadedC.State
 
-type LoadingS' = { actionQueue :: List LoadedC.Action } -- | We queue actions until we are loaded.
+type LoadingS' = { actionQueue :: List LoadedC.Action -- | We queue actions until we are loaded.
+                 , userError :: UserError
+                 }
 
 type LoadedState = {
                authData :: AuthData
@@ -68,17 +70,23 @@ type LoadedState = {
              }
 
 init :: State
-init = LoadingS {  actionQueue : Nil }
+init = LoadingS { actionQueue : Nil
+                , userError : NoError
+                }
 
 data Action = Start
             | Init LoadedC.State
             | ReportError GonimoError
             | LoadedA LoadedC.Action
+            | ResetDevice
             | Nop
 
 instance reportErrorActionAction :: ReportErrorAction Action where
   reportError = ReportError
 
+instance errorActionAction :: ErrorAction Action where
+  resetDevice = ResetDevice
+  nop = Nop
 
 type MySubscriber = Subscriber () LoadedC.Action
 --------------------------------------------------------------------------------
@@ -101,9 +109,14 @@ updateLoading action state             = case action of
                          actionQueue = Cons action state.actionQueue
                        }
   (Init ls)         -> handleInit ls state
-  (ReportError err) -> onlyEffect (LoadingS state) $ handleError Nop err
+  (ReportError err) -> lmap LoadingS $ handleError err state
+  ResetDevice       -> handleResetDevice (LoadingS state)
   Nop               -> noEffects $ LoadingS state
 
+handleResetDevice :: forall eff. State -> EffModel eff State Action
+handleResetDevice state = onlyEffect state $ do
+  liftEff $ localStorage.removeItem Key.authData
+  pure Start
 
 updateLoaded :: forall eff. LoadedC.Action -> LoadedC.State -> EffModel eff State Action
 updateLoaded action state  = bimap LoadedS LoadedA $ LoadedC.update action state
@@ -126,13 +139,15 @@ handleInit ls state = EffModel {
 --------------------------------------------------------------------------------
 
 view :: State -> Html Action
-view (LoadingS _)    = viewLoading
-view (LoadedS state) = map LoadedA  $ LoadedC.view state
+view (LoadingS state) = viewLoading state
+view (LoadedS state)  = map LoadedA  $ LoadedC.view state
 
-viewLoading :: Html Action
-viewLoading = viewLogo $ div []
-      [ span [] [ text "Loading your gonimo, stay tight ..."]
-      ]
+viewLoading :: LoadingS' -> Html Action
+viewLoading state = case state.userError of
+      NoError -> viewLogo $ div []
+                            [ span [] [ text "Loading your gonimo, stay tight ..."]
+                            ]
+      _ -> viewError state
 
 --------------------------------------------------------------------------------
 
@@ -154,13 +169,13 @@ load = Gonimo.toAff initSettings $ authToAction =<< LoadedC.getAuthData
       pure $ Init
             { authData      : authData
             , subscriberUrl : "ws://localhost:8081/subscriber"
-            , inviteS       : inviteState
-            , acceptS       : AcceptC.init
+            , _inviteS       : inviteState
+            , _acceptS       : AcceptC.init
             , central       : LoadedC.CentralInvite
             , families      : []
             , onlineDevices : Map.empty
             , deviceInfos   : Map.empty
-            , userError     : LoadedC.NoError
+            , userError     : NoError
             }
 
 makeCallback :: forall eff. Channel Action ->  (LoadedC.Action -> SubscriberEff (channel :: CHANNEL | eff) Unit)

@@ -9,6 +9,7 @@ import Gonimo.Client.LocalStorage as Key
 import Gonimo.Client.LocalStorage as Key
 import Gonimo.Client.Types as Gonimo
 import Gonimo.UI.AcceptInvitation as AcceptC
+import Gonimo.UI.Error as Error
 import Gonimo.UI.Invite as InviteC
 import Gonimo.WebAPI.MakeRequests as Reqs
 import Gonimo.WebAPI.Subscriber as Sub
@@ -37,16 +38,15 @@ import Data.Semigroup (append)
 import Data.Traversable (traverse)
 import Data.Tuple (fst, Tuple(Tuple))
 import Debug.Trace (trace)
-import Gonimo.Client.Effects (handleError)
 import Gonimo.Client.Types (Settings, GonimoError, class ReportErrorAction, Gonimo, GonimoEff, runGonimoT)
-import Gonimo.Pux (onlyGonimo, onlyEffects, onlyEffect, justEffect, noEffects, EffModel(EffModel))
+import Gonimo.Pux (updateChild, onlyGonimo, onlyEffects, onlyEffect, justEffect, noEffects, EffModel(EffModel))
 import Gonimo.Server.DbEntities (Device(Device), Family(Family))
 import Gonimo.Server.DbEntities.Helpers (runFamily)
 import Gonimo.Server.Error (ServerError(InvalidAuthToken))
 import Gonimo.Server.Types (DeviceType(NoBaby), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (dateToString, Key(Key), Secret(Secret))
-import Gonimo.UI.Loaded.Error (viewError, handleSubscriber)
-import Gonimo.UI.Loaded.Types (State, Action(..), Central(..), setCentral, UserError(..))
+import Gonimo.UI.Error (viewError, class ErrorAction, UserError(NoError, DeviceInvalid), handleSubscriber, handleError)
+import Gonimo.UI.Loaded.Types (Props, acceptS, inviteS, State, Action(..), Central(..), setCentral)
 import Gonimo.WebAPI (SPParams_(SPParams_), postAccounts)
 import Gonimo.WebAPI.Types (DeviceInfo(DeviceInfo), AuthData(AuthData))
 import Gonimo.WebAPI.Types.Helpers (runAuthData)
@@ -67,17 +67,9 @@ import Signal (constant, Signal)
 import Prelude hiding (div)
 
 
-getInviteState :: State -> InviteC.State
-getInviteState state = case head state.families of
-  Nothing -> state.inviteS
-  Just (Tuple key family) -> state.inviteS { familyId = Just key
-                                           , familyName = (runFamily family).familyName
-                                           }
---------------------------------------------------------------------------------
-
 update :: forall eff. Action -> State -> EffModel eff State Action
 update (SetState state)           = const $ noEffects state
-update (ReportError err)          = justEffect $ handleError Nop err
+update (ReportError err)          = handleError err
 update (InviteA action)           = updateInvite action
 update (HandleInvite secret)      = setCentral CentralAccept
                                     >>> justEffect (inviteEffect secret)
@@ -92,18 +84,16 @@ update Nop                        = noEffects
 
 
 updateInvite :: forall eff. InviteC.Action -> State -> EffModel eff State Action
-updateInvite action state = bimap (state {inviteS = _}) InviteA
-                            $ InviteC.update (mkSettings state.authData) action (getInviteState state)
+updateInvite action state = updateChild inviteS InviteA InviteC.update (mkProps state) action state
 
 updateAccept :: forall eff. AcceptC.Action -> State -> EffModel eff State Action
-updateAccept action state = bimap (state {acceptS = _}) AcceptA
-                            $ AcceptC.update (mkSettings state.authData) action state.acceptS
+updateAccept action state = updateChild acceptS AcceptA AcceptC.update (mkProps state) action state
 
 inviteEffect :: forall m. Monad m => Secret -> m Action
 inviteEffect = pure <<< AcceptA <<< AcceptC.LoadInvitation
 
 handleResetDevice :: forall eff. State -> EffModel eff State Action
-handleResetDevice state = onlyGonimo (mkSettings state.authData) state $ do
+handleResetDevice state = onlyGonimo (mkProps state) state $ do
   liftEff $ localStorage.removeItem Key.authData
   SetAuthData <$> getAuthData
 
@@ -114,6 +104,8 @@ handleSetAuthData auth state = noEffects $ state
                                                   DeviceInvalid -> NoError
                                                   _ -> state.userError
                                   }
+
+
 --------------------------------------------------------------------------------
 
 view :: State -> Html Action
@@ -134,8 +126,8 @@ view state =
 
 viewCentral :: State -> Html Action
 viewCentral state = case state.central of
-  CentralInvite -> map InviteA $ InviteC.view (getInviteState state)
-  CentralAccept -> map AcceptA $ AcceptC.view state.acceptS
+  CentralInvite -> map InviteA $ InviteC.view (state._inviteS)
+  CentralAccept -> map AcceptA $ AcceptC.view state._acceptS
 
 viewOnlineDevices :: State -> Html Action
 viewOnlineDevices state = table [ A.className "table table-stripped"]
@@ -161,7 +153,6 @@ viewOnlineDevices state = table [ A.className "table table-stripped"]
                [ td [] [ text name ]
                , td [] [ text lastAccessed ]
                ]
-
 --------------------------------------------------------------------------------
 getSubscriptions :: State -> Subscriptions Action
 getSubscriptions state =
@@ -217,6 +208,9 @@ getAuthData = do
       liftEff $ localStorage.setItem Key.authData auth
       pure auth
     Just d  -> pure d
+
+mkProps :: State -> Props
+mkProps state = { settings : mkSettings state.authData }
 
 mkSettings :: AuthData -> Settings
 mkSettings (AuthData auth) = defaultSettings $ SPParams_ {

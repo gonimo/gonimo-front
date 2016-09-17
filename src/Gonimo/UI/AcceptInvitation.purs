@@ -20,7 +20,6 @@ import Data.Either (Either(Right, Left))
 import Data.Generic (gShow)
 import Data.Maybe (isJust, isNothing, Maybe(..))
 import Data.Tuple (Tuple(Tuple))
-import Gonimo.Client.Effects (handleError)
 import Gonimo.Client.Types (GonimoError(UnexpectedAction), Gonimo, Settings, runGonimoT, class ReportErrorAction)
 import Gonimo.Pux (noEffects, onlyEffect, onlyGonimo, justEffect, onlyEffects, EffModel(EffModel), justGonimo)
 import Gonimo.Server.DbEntities (Invitation(Invitation))
@@ -37,6 +36,7 @@ import Signal (constant, Signal)
 import Prelude hiding (div)
 
 
+type Props ps = { settings :: Settings | ps }
 
 type State = Maybe StateImpl
 
@@ -59,33 +59,33 @@ data Action = LoadInvitation Secret
 instance reportErrorActionAction :: ReportErrorAction Action where
   reportError = ReportError
 
-update :: forall eff. Settings -> Action -> State -> EffModel eff State Action
-update settings action Nothing = case action of
-  LoadInvitation secret -> onlyGonimo settings Nothing $ loadInvitation secret
+update :: forall eff ps. Props ps -> Action -> State -> EffModel eff State Action
+update props action Nothing = case action of
+  LoadInvitation secret -> onlyGonimo props Nothing $ loadInvitation secret
   Init (Tuple secret inv) -> noEffects $ Just { invitationInfo : inv, invitationSecret : secret, accepted : Nothing }
   Nop                   -> noEffects Nothing
-  ReportError err       -> onlyEffect Nothing $ Gonimo.handleError Nop err
+  ReportError err       -> noEffects Nothing
   _                     -> onlyEffect Nothing <<< pure <<< ReportError
                             $ UnexpectedAction "Received some Action but State is Nothing!"
-update settings action (Just state) = lmap Just $ updateJust settings action state
+update props action (Just state) = lmap Just $ updateJust props action state
 
 
-updateJust :: forall eff. Settings -> Action -> StateImpl -> EffModel eff StateImpl Action
-updateJust settings action = case action of
-  LoadInvitation secret   -> justGonimo settings $ loadInvitation secret
+updateJust :: forall eff ps. Props ps -> Action -> StateImpl -> EffModel eff StateImpl Action
+updateJust props action = case action of
+  LoadInvitation secret   -> justGonimo props $ loadInvitation secret
   Init (Tuple secret inv) -> noEffects <<< _ { invitationInfo = inv, invitationSecret = secret, accepted = Nothing }
-  Accept                  -> answerInvitation settings InvitationAccept
-  Decline                 -> answerInvitation settings InvitationReject
+  Accept                  -> answerInvitation props InvitationAccept
+  Decline                 -> answerInvitation props InvitationReject
   SetAccepted accepted'   -> noEffects <<<  _ { accepted = Just accepted' }
   Nop                     -> noEffects
-  ReportError err         -> justEffect $ Gonimo.handleError Nop err
+  ReportError err         -> noEffects
 
 
 loadInvitation :: forall eff. Secret -> Gonimo eff Action
 loadInvitation secret = Init <<< Tuple secret <$> putInvitationInfoByInvitationSecret secret
 
-answerInvitation :: forall eff. Settings -> InvitationReply -> StateImpl -> EffModel eff StateImpl Action
-answerInvitation settings reply state = onlyGonimo settings state $ do
+answerInvitation :: forall eff ps. Props ps -> InvitationReply -> StateImpl -> EffModel eff StateImpl Action
+answerInvitation props reply state = onlyGonimo props state $ do
     deleteInvitationsByInvitationSecret reply state.invitationSecret
     pure $ SetAccepted $ case reply of
       InvitationAccept  -> true
