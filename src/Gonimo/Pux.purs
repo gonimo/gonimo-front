@@ -6,7 +6,8 @@ import Prelude
 import Gonimo.Client.Types as Gonimo
 import Control.Monad.Aff (Aff)
 import Data.Bifunctor (bimap, class Bifunctor)
-import Data.Lens ((.~), (^.), LensP)
+import Data.Lens (prism, (^?), PrismP, (.~), (^.), LensP)
+import Data.Maybe (Maybe(Just, Nothing))
 import Gonimo.Client.Types (GonimoEff, Gonimo, Settings, class ReportErrorAction)
 
 type EffModelImpl state action eff =
@@ -35,9 +36,24 @@ updateChild lens mkAction childUpdate props action state =
     bimap smartUpdate mkAction $ childUpdate props action (state ^. lens)
   where
     smartUpdate :: childState -> parentState
-    smartUpdate newChild = if differentObject newChild (state ^. lens)
-                           then lens .~ newChild $ state
-                           else state
+    smartUpdate newChild =if differentObject newChild (state ^. lens)
+                          then state # lens .~ newChild
+                          else  state
+
+updatePrismChild :: forall eff parentState childState parentAction childAction props.
+            PrismP parentState childState
+            -> (childAction -> parentAction)
+            -> (props -> childAction -> childState -> EffModel eff childState childAction)
+            -> props -> childAction -> parentState -> Maybe (EffModel eff parentState parentAction)
+updatePrismChild prism mkAction childUpdate props action state =
+    bimap smartUpdate mkAction <<< childUpdate props action <$> state ^? prism
+  where
+    smartUpdate :: childState -> parentState
+    smartUpdate newChild = case state ^? prism of
+                                Nothing -> state
+                                Just oldChild -> if differentObject newChild oldChild
+                                                    then state # prism .~ newChild
+                                                    else state
 
 toParent :: forall eff parentState childState parentAction childAction.
             LensP parentState childState

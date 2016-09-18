@@ -52,7 +52,7 @@ instance reportErrorActionAction :: ReportErrorAction Action where
 instance errorActionAction :: ErrorAction Action where
   resetDevice = ResetDevice
   nop = Nop
-  
+
 inviteS :: LensP State InviteC.State
 inviteS = lens _._inviteS (_ { _inviteS = _ })
 

@@ -16,6 +16,7 @@ import Servant.Subscriber as Sub
 import Servant.Subscriber.Connection as Sub
 import Servant.Subscriber.Subscriptions as Sub
 import Browser.LocalStorage (STORAGE, localStorage)
+import Control.Alt ((<|>))
 import Control.Monad.Aff (Aff)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
@@ -28,15 +29,16 @@ import Data.Bifunctor (lmap, bimap)
 import Data.Either (Either(Right, Left))
 import Data.Foldable (traverse_)
 import Data.Generic (gShow)
+import Data.Lens (prism', PrismP, (^?))
 import Data.List (toUnfoldable, reverse, List(Nil, Cons))
-import Data.Maybe (Maybe(..))
+import Data.Maybe (fromMaybe, Maybe(..))
 import Data.Traversable (traverse)
 import Data.Tuple (fst, Tuple(Tuple))
 import Debug.Trace (trace)
 import Gonimo.Client.Router (match, Route(AcceptInvitation, Home))
 import Gonimo.Client.Types (GonimoError, GonimoEff, Gonimo, class ReportErrorAction)
 import Gonimo.Client.Types (runGonimoT, Settings)
-import Gonimo.Pux (onlyGonimo, onlyEffect, justEffect, onlyEffects, noEffects, EffModel(EffModel), toPux)
+import Gonimo.Pux (updatePrismChild, onlyGonimo, onlyEffect, justEffect, onlyEffects, noEffects, EffModel(EffModel), toPux)
 import Gonimo.Server.Types (DeviceType(NoBaby), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (Secret(Secret))
 import Gonimo.UI.Error (viewError, handleError, class ErrorAction, UserError(NoError))
@@ -59,6 +61,17 @@ import Prelude hiding (div)
 
 data State = LoadingS LoadingS'
            | LoadedS LoadedC.State
+
+
+_LoadingS :: PrismP State LoadingS'
+_LoadingS = prism' LoadingS (\s -> case s of
+                                LoadingS x -> Just x
+                                _ -> Nothing)
+
+_LoadedS :: PrismP State LoadedC.State
+_LoadedS = prism' LoadedS (\s -> case s of
+                                LoadedS x -> Just x
+                                _ -> Nothing)
 
 type LoadingS' = { actionQueue :: List LoadedC.Action -- | We queue actions until we are loaded.
                  , userError :: UserError
@@ -93,33 +106,46 @@ type MySubscriber = Subscriber () LoadedC.Action
 
 
 update :: forall eff. Action -> State -> EffModel eff State Action
-update action (LoadingS state)          = updateLoading action state
-update (LoadedA action) (LoadedS state) = updateLoaded action state
-update (ReportError err) (LoadedS state)= updateLoaded (LoadedC.ReportError err) state
 update Nop state                        = noEffects state
-update _ state                          = onlyEffects state
-                                            [do Gonimo.log "Only LoadedA actions are supported when loaded"
-                                                pure Nop
-                                            ]
+update (Init ls) (LoadingS state)       = handleInit ls state
+update action state          = fromMaybe (noEffects state) $
+                                   updateLoading action state
+                               <|> updateLoaded action state
 
-updateLoading :: forall eff. Action -> LoadingS' -> EffModel eff State Action
-updateLoading action state             = case action of
-  Start             -> onlyEffect (LoadingS state) load
-  (LoadedA action)  -> trace "Queuing action! " $ \_ -> noEffects $ LoadingS $ state {
+updateLoading' :: forall eff. Unit -> Action -> LoadingS' -> EffModel eff LoadingS' Action
+updateLoading' _ action state             = case action of
+  Start             -> onlyEffect state load
+  (LoadedA action)  -> trace "Queuing action! " $ \_ -> noEffects $ state {
                          actionQueue = Cons action state.actionQueue
                        }
-  (Init ls)         -> handleInit ls state
-  (ReportError err) -> lmap LoadingS $ handleError err state
-  ResetDevice       -> handleResetDevice (LoadingS state)
-  Nop               -> noEffects $ LoadingS state
+  (Init ls)         -> onlyEffect state $ do
+                        Gonimo.log "Init command should be handled in toplevel update!"
+                        pure Nop
+  (ReportError err) -> handleError err state
+  ResetDevice       -> handleResetDevice state
+  Nop               -> noEffects state
 
-handleResetDevice :: forall eff. State -> EffModel eff State Action
+handleResetDevice :: forall eff. LoadingS' -> EffModel eff LoadingS' Action
 handleResetDevice state = onlyEffect state $ do
   liftEff $ localStorage.removeItem Key.authData
   pure Start
 
-updateLoaded :: forall eff. LoadedC.Action -> LoadedC.State -> EffModel eff State Action
-updateLoaded action state  = bimap LoadedS LoadedA $ LoadedC.update action state
+updateLoading :: forall eff. Action -> State -> Maybe (EffModel eff State Action)
+updateLoading action state  = updatePrismChild _LoadingS id updateLoading' unit action state
+
+updateLoaded :: forall eff. Action -> State -> Maybe (EffModel eff State Action)
+updateLoaded action state = case action of
+  LoadedA act -> updateLoaded' act state
+  (ReportError err) -> updateLoaded' (LoadedC.ReportError err) state
+  _ -> case state of
+        LoadedS _ -> Just $ onlyEffects state
+                    [ do Gonimo.log "Only LoadedA actions are supported when loaded"
+                         pure Nop
+                    ]
+        _ -> Nothing
+
+updateLoaded' :: forall eff. LoadedC.Action -> State -> Maybe (EffModel eff State Action)
+updateLoaded' action state  = updatePrismChild _LoadedS LoadedA LoadedC.update unit action state
 
 
 fromRoute :: Route -> Action

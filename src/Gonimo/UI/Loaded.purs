@@ -67,20 +67,20 @@ import Signal (constant, Signal)
 import Prelude hiding (div)
 
 
-update :: forall eff. Action -> State -> EffModel eff State Action
-update (SetState state)           = const $ noEffects state
-update (ReportError err)          = handleError err
-update (InviteA action)           = updateInvite action
-update (HandleInvite secret)      = setCentral CentralAccept
-                                    >>> justEffect (inviteEffect secret)
-update (AcceptA action)           = updateAccept action
-update (SetFamilies families')    = \state -> noEffects (state { families = families'})
-update (SetOnlineDevices devices) = \state -> noEffects (state {onlineDevices = Map.fromFoldable devices})
-update (SetDeviceInfos devices)   = \state -> noEffects (state {deviceInfos = Map.fromFoldable devices})
-update (HandleSubscriber msg)     = handleSubscriber msg
-update ResetDevice                = handleResetDevice
-update (SetAuthData auth)         = handleSetAuthData auth
-update Nop                        = noEffects
+update :: forall eff. Unit -> Action -> State -> EffModel eff State Action
+update _ (SetState state)           = const $ noEffects state
+update _ (ReportError err)          = handleError err
+update _ (InviteA action)           = updateInvite action
+update _ (HandleInvite secret)      = setCentral CentralAccept
+                                      >>> justEffect (inviteEffect secret)
+update _ (AcceptA action)           = updateAccept action
+update _ (SetFamilies families')    = \state -> noEffects (state { families = families'})
+update _ (SetOnlineDevices devices) = \state -> noEffects (state {onlineDevices = Map.fromFoldable devices})
+update _ (SetDeviceInfos devices)   = \state -> noEffects (state {deviceInfos = Map.fromFoldable devices})
+update _ (HandleSubscriber msg)     = handleSubscriber msg
+update _ ResetDevice                = handleResetDevice
+update _ (SetAuthData auth)         = handleSetAuthData auth
+update _ Nop                        = noEffects
 
 
 updateInvite :: forall eff. InviteC.Action -> State -> EffModel eff State Action
