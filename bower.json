@@ -18,7 +18,8 @@
     "purescript-localstorage": "^1.0.0",
     "purescript-servant-support": "^3.0.0",
     "purescript-subscriber": "#master",
-    "purescript-profunctor-lenses": "^1.0.0"
+    "purescript-profunctor-lenses": "^1.0.0",
+    "purescript-unfoldable": "git@github.com:eskimor/purescript-unfoldable.git#master"
   },
   "devDependencies": {
     "purescript-debug": "^1.0.0"
