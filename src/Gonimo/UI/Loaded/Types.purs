@@ -19,11 +19,12 @@ type State = { authData :: AuthData
              , subscriberUrl :: String
              , _inviteS  :: InviteC.State
              , _acceptS  :: AcceptC.State
-             , central  :: Central
+             , _central  :: Central
              , families :: Array (Tuple (Key Family) Family)
              , onlineDevices :: Map (Key Device) DeviceType
              , deviceInfos :: Map (Key Device) DeviceInfo
              , userError :: UserError
+             , url :: String
              }
 
 type Props = { settings :: Settings }
@@ -33,16 +34,20 @@ data Action = ReportError GonimoError
             | SetAuthData AuthData
             | InviteA InviteC.Action
             | AcceptA AcceptC.Action
-            | HandleInvite Secret
             | SetFamilies (Array (Tuple (Key Family) Family))
             | SetOnlineDevices (Array (Tuple (Key Device) DeviceType))
             | SetDeviceInfos (Array (Tuple (Key Device) DeviceInfo))
+            | SetURL String
             | HandleSubscriber Notification
             | ResetDevice -- Reinitialize basically everything.
+            | ClearError
             | Nop
 
 data Central = CentralInvite
              | CentralAccept
+
+centralHome :: Central
+centralHome = CentralInvite
 
 derive instance genericCentral :: Generic Central
 
@@ -51,6 +56,7 @@ instance reportErrorActionAction :: ReportErrorAction Action where
 
 instance errorActionAction :: ErrorAction Action where
   resetDevice = ResetDevice
+  clearError  = ClearError
   nop = Nop
 
 inviteS :: LensP State InviteC.State
@@ -59,6 +65,6 @@ inviteS = lens _._inviteS (_ { _inviteS = _ })
 acceptS :: LensP State AcceptC.State
 acceptS = lens _._acceptS (_ { _acceptS = _ })
 
-setCentral :: Central -> State -> State
-setCentral central = _ { central = central }
+central :: LensP State Central
+central = lens _._central (_ { _central = _})
 

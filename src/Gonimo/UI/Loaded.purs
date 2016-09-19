@@ -7,6 +7,7 @@ import Data.Map as Map
 import Gonimo.Client.Effects as Gonimo
 import Gonimo.Client.LocalStorage as Key
 import Gonimo.Client.LocalStorage as Key
+import Gonimo.Client.Router as Router
 import Gonimo.Client.Types as Gonimo
 import Gonimo.UI.AcceptInvitation as AcceptC
 import Gonimo.UI.Error as Error
@@ -35,6 +36,7 @@ import Data.Map (Map)
 import Data.Maybe (maybe, Maybe(..))
 import Data.Monoid (mempty)
 import Data.Semigroup (append)
+import Data.String (takeWhile)
 import Data.Traversable (traverse)
 import Data.Tuple (fst, Tuple(Tuple))
 import Debug.Trace (trace)
@@ -46,7 +48,7 @@ import Gonimo.Server.Error (ServerError(InvalidAuthToken))
 import Gonimo.Server.Types (DeviceType(NoBaby), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (dateToString, Key(Key), Secret(Secret))
 import Gonimo.UI.Error (viewError, class ErrorAction, UserError(NoError, DeviceInvalid), handleSubscriber, handleError)
-import Gonimo.UI.Loaded.Types (Props, acceptS, inviteS, State, Action(..), Central(..), setCentral)
+import Gonimo.UI.Loaded.Types (centralHome, Props, acceptS, inviteS, State, Action(..), Central(..))
 import Gonimo.WebAPI (SPParams_(SPParams_), postAccounts)
 import Gonimo.WebAPI.Types (DeviceInfo(DeviceInfo), AuthData(AuthData))
 import Gonimo.WebAPI.Types.Helpers (runAuthData)
@@ -54,6 +56,7 @@ import Partial.Unsafe (unsafeCrashWith)
 import Pux (renderToDOM, fromSimple, start)
 import Pux.Html (h3, h2, td, tbody, th, tr, thead, table, ul, p, button, input, h1, text, span, Html, img, div)
 import Pux.Html.Attributes (offset)
+import Pux.Router (navigateTo)
 import Servant.PureScript.Affjax (AjaxError)
 import Servant.PureScript.Settings (defaultSettings, SPSettings_(SPSettings_))
 import Servant.Subscriber (Subscriber)
@@ -68,19 +71,21 @@ import Prelude hiding (div)
 
 
 update :: forall eff. Unit -> Action -> State -> EffModel eff State Action
-update _ (SetState state)           = const $ noEffects state
-update _ (ReportError err)          = handleError err
-update _ (InviteA action)           = updateInvite action
-update _ (HandleInvite secret)      = setCentral CentralAccept
-                                      >>> justEffect (inviteEffect secret)
-update _ (AcceptA action)           = updateAccept action
-update _ (SetFamilies families')    = \state -> noEffects (state { families = families'})
-update _ (SetOnlineDevices devices) = \state -> noEffects (state {onlineDevices = Map.fromFoldable devices})
-update _ (SetDeviceInfos devices)   = \state -> noEffects (state {deviceInfos = Map.fromFoldable devices})
-update _ (HandleSubscriber msg)     = handleSubscriber msg
-update _ ResetDevice                = handleResetDevice
-update _ (SetAuthData auth)         = handleSetAuthData auth
-update _ Nop                        = noEffects
+update _ (SetState state)                    = const $ noEffects state
+update _ (ReportError err)                   = handleError err
+update _ (InviteA (InviteC.ReportError err)) = handleError err
+update _ (InviteA action)                    = updateInvite action
+update _ (AcceptA (AcceptC.ReportError err)) = handleError err
+update _ (AcceptA action)                    = updateAccept action
+update _ (SetFamilies families')             = \state -> noEffects (state { families = families'})
+update _ (SetOnlineDevices devices)          = \state -> noEffects (state {onlineDevices = Map.fromFoldable devices})
+update _ (SetDeviceInfos devices)            = \state -> noEffects (state {deviceInfos = Map.fromFoldable devices})
+update _ (SetURL url)                        = handleSetURL url
+update _ (HandleSubscriber msg)              = handleSubscriber msg
+update _ ResetDevice                         = handleResetDevice
+update _ ClearError                          = handleClearError
+update _ (SetAuthData auth)                  = handleSetAuthData auth
+update _ Nop                                 = noEffects
 
 
 updateInvite :: forall eff. InviteC.Action -> State -> EffModel eff State Action
@@ -105,7 +110,37 @@ handleSetAuthData auth state = noEffects $ state
                                                   _ -> state.userError
                                   }
 
+handleSetURL :: forall eff. String -> State -> EffModel eff State Action
+handleSetURL url state = let
+    route = Router.match url
+    withoutQuery = takeWhile (_ /= '?') url
+    navigateTo' :: String -> Eff (GonimoEff eff) Unit
+    navigateTo' = coerceEffects <<< navigateTo
+  in
+    case route of
+      Router.Home -> noEffects $ state { url = url }
+      Router.AcceptInvitation s ->
+        EffModel
+          { state : state { url = withoutQuery
+                          , _central = CentralAccept
+                          }
+          , effects : [ do
+                          liftEff $ navigateTo' withoutQuery
+                          inviteEffect s
+                      ]
+          }
 
+handleClearError :: forall eff. State -> EffModel eff State Action
+handleClearError state = let
+  newCentral = case state._central of
+    CentralAccept -> case state._acceptS of
+      Nothing -> centralHome
+      Just _ -> state._central
+    _ -> state._central
+  in
+   noEffects (state { userError = NoError
+                    , _central = newCentral
+                    })
 --------------------------------------------------------------------------------
 
 view :: State -> Html Action
@@ -125,7 +160,7 @@ view state =
       err -> viewError state
 
 viewCentral :: State -> Html Action
-viewCentral state = case state.central of
+viewCentral state = case state._central of
   CentralInvite -> map InviteA $ InviteC.view (state._inviteS)
   CentralAccept -> map AcceptA $ AcceptC.view state._acceptS
 

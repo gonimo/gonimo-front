@@ -92,6 +92,7 @@ data Action = Start
             | ReportError GonimoError
             | LoadedA LoadedC.Action
             | ResetDevice
+            | ClearError
             | Nop
 
 instance reportErrorActionAction :: ReportErrorAction Action where
@@ -100,6 +101,7 @@ instance reportErrorActionAction :: ReportErrorAction Action where
 instance errorActionAction :: ErrorAction Action where
   resetDevice = ResetDevice
   nop = Nop
+  clearError = ClearError
 
 type MySubscriber = Subscriber () LoadedC.Action
 --------------------------------------------------------------------------------
@@ -123,6 +125,7 @@ updateLoading' _ action state             = case action of
                         pure Nop
   (ReportError err) -> handleError err state
   ResetDevice       -> handleResetDevice state
+  ClearError        -> noEffects $ state { userError = NoError }
   Nop               -> noEffects state
 
 handleResetDevice :: forall eff. LoadingS' -> EffModel eff LoadingS' Action
@@ -147,11 +150,6 @@ updateLoaded action state = case action of
 updateLoaded' :: forall eff. LoadedC.Action -> State -> Maybe (EffModel eff State Action)
 updateLoaded' action state  = updatePrismChild _LoadedS LoadedA LoadedC.update unit action state
 
-
-fromRoute :: Route -> Action
-fromRoute Home                      = trace ("We are going home! ") $ \_ -> Nop
-fromRoute (AcceptInvitation secret) = trace ("Translating AcceptInvitation!") $
-                                      \_ -> LoadedA $ LoadedC.HandleInvite secret
 
 handleInit :: forall eff. LoadedC.State -> LoadingS' -> EffModel eff State Action
 handleInit ls state = EffModel {
@@ -197,8 +195,9 @@ load = Gonimo.toAff initSettings $ authToAction =<< LoadedC.getAuthData
             , subscriberUrl : "ws://localhost:8081/subscriber"
             , _inviteS       : inviteState
             , _acceptS       : AcceptC.init
-            , central       : LoadedC.CentralInvite
+            , _central       : LoadedC.CentralInvite
             , families      : []
+            , url           : ""
             , onlineDevices : Map.empty
             , deviceInfos   : Map.empty
             , userError     : NoError
@@ -263,7 +262,7 @@ main = do
   controlChan <- channel Nop
   subscriberRef <- newRef Nothing
   let controlSig = subscribe controlChan
-  let routeSignal = map (fromRoute <<< match) urlSignal
+  let routeSignal = map (LoadedA <<< LoadedC.SetURL) urlSignal
   app <- start $
     { initialState: init
     , update: toPux update
@@ -291,4 +290,4 @@ coerceSubscriberEffects = unsafeCoerce
 
 showCentral :: State -> String
 showCentral (LoadingS _) = ""
-showCentral (LoadedS s) = gShow s.central
+showCentral (LoadedS s) = gShow s._central
