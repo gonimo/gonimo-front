@@ -12,6 +12,7 @@ data ServerError =
   | InvitationAlreadyClaimed 
   | AlreadyFamilyMember 
   | NoSuchFamily (Key Family)
+  | NoSuchInvitation 
   | Forbidden 
   | NotFound 
   | TransactionTimeout 
