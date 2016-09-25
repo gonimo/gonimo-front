@@ -21,6 +21,7 @@ import Servant.PureScript.Affjax (AjaxError)
 import Servant.PureScript.Settings (SPSettings_)
 import Signal.Channel (CHANNEL)
 import WebSocket (WEBSOCKET)
+import Gonimo.WebAPI.Types (DeviceInfo)
 
 
 type Settings = SPSettings_ SPParams_
@@ -95,3 +96,10 @@ instance monadEffeffGonimoT :: MonadEff eff (GonimoT eff) where
 
 instance monadAffeffGonimoT :: MonadAff eff (GonimoT eff) where
   liftAff = GonimoT <<< liftAff
+
+
+-- | Info about an online baby station.
+type BabyStationInfo =
+  { deviceInfo :: DeviceInfo
+  , babyName :: String
+  }

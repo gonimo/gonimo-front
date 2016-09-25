@@ -7,7 +7,7 @@ module Gonimo.UI.Error ( class ErrorAction
                        , handleSubscriber
                        , viewError ) where
 
-import Data.Unfoldable.Maybe as Maybe
+import Data.Unfoldable as Unfoldable
 import Gonimo.Client.Effects as Gonimo
 import Gonimo.Server.Error as Server
 import Pux.Html.Attributes as A
@@ -144,7 +144,7 @@ errorView action heading body =
     $ [ h1 [] [ text heading ]
       , body
       ]
-      <> Maybe.toUnfoldable (map renderButton action)
+      <> Unfoldable.fromMaybe (map renderButton action)
   where
     renderButton :: action -> Html action
     renderButton action =

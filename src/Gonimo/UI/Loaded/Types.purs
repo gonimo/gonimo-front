@@ -3,6 +3,7 @@ module Gonimo.UI.Loaded.Types where
 import Prelude
 import Gonimo.UI.AcceptInvitation as AcceptC
 import Gonimo.UI.Invite as InviteC
+import Gonimo.UI.Home as HomeC
 import Data.Generic (class Generic)
 import Data.Lens (lens, LensP)
 import Data.Map (Map)
@@ -34,7 +35,9 @@ data Action = ReportError GonimoError
             | SetAuthData AuthData
             | InviteA InviteC.Action
             | AcceptA AcceptC.Action
+            | HomeA HomeC.Action
             | SetFamilies (Array (Tuple (Key Family) Family))
+            | SetCentral Central
             | SetOnlineDevices (Array (Tuple (Key Device) DeviceType))
             | SetDeviceInfos (Array (Tuple (Key Device) DeviceInfo))
             | SetURL String
@@ -45,9 +48,10 @@ data Action = ReportError GonimoError
 
 data Central = CentralInvite
              | CentralAccept
+             | CentralHome
 
 centralHome :: Central
-centralHome = CentralInvite
+centralHome = CentralHome
 
 derive instance genericCentral :: Generic Central
 

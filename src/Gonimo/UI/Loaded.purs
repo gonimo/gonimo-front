@@ -12,9 +12,11 @@ import Gonimo.Client.Types as Gonimo
 import Gonimo.UI.AcceptInvitation as AcceptC
 import Gonimo.UI.Error as Error
 import Gonimo.UI.Invite as InviteC
+import Gonimo.UI.Home as HomeC
 import Gonimo.WebAPI.MakeRequests as Reqs
 import Gonimo.WebAPI.Subscriber as Sub
 import Pux.Html.Attributes as A
+import Pux.Html.Attributes.Bootstrap as A
 import Pux.Html.Events as E
 import Servant.Subscriber as Sub
 import Servant.Subscriber.Connection as Sub
@@ -54,7 +56,7 @@ import Gonimo.WebAPI.Types (DeviceInfo(DeviceInfo), AuthData(AuthData))
 import Gonimo.WebAPI.Types.Helpers (runAuthData)
 import Partial.Unsafe (unsafeCrashWith)
 import Pux (renderToDOM, fromSimple, start)
-import Pux.Html (h3, h2, td, tbody, th, tr, thead, table, ul, p, button, input, h1, text, span, Html, img, div)
+import Pux.Html (text, small, script, li, a, nav, h3, h2, td, tbody, th, tr, thead, table, ul, p, button, input, h1, span, Html, img, div)
 import Pux.Html.Attributes (offset)
 import Pux.Router (navigateTo)
 import Servant.PureScript.Affjax (AjaxError)
@@ -78,6 +80,7 @@ update _ (InviteA action)                    = updateInvite action
 update _ (AcceptA (AcceptC.ReportError err)) = handleError err
 update _ (AcceptA action)                    = updateAccept action
 update _ (SetFamilies families')             = \state -> noEffects (state { families = families'})
+update _ (SetCentral c)                      = \state -> noEffects (state { _central = c })
 update _ (SetOnlineDevices devices)          = \state -> noEffects (state {onlineDevices = Map.fromFoldable devices})
 update _ (SetDeviceInfos devices)            = \state -> noEffects (state {deviceInfos = Map.fromFoldable devices})
 update _ (SetURL url)                        = handleSetURL url
@@ -86,6 +89,7 @@ update _ ResetDevice                         = handleResetDevice
 update _ ClearError                          = handleClearError
 update _ (SetAuthData auth)                  = handleSetAuthData auth
 update _ Nop                                 = noEffects
+update _ _                                   = noEffects
 
 
 updateInvite :: forall eff. InviteC.Action -> State -> EffModel eff State Action
@@ -151,7 +155,9 @@ view state =
     case state.userError of
       NoError ->
         div []
-        [ viewCentral state
+        [ viewHeader state
+        , viewNavbar state
+        , viewCentral state
         , div []
           [ h3 [] [ text $ show numDevices <> " Device(s) currently online:" ]
           , div [] [ viewOnlineDevices state ]
@@ -159,10 +165,74 @@ view state =
         ]
       err -> viewError state
 
+viewHeader :: State -> Html Action
+viewHeader state =
+      div [ A.className "page-header" ]
+      [ h1 []
+        [ text "gonimo.com "
+        , small [] [ text "Good Night Monitor!" ]
+        ]
+      ]
+viewNavbar :: State -> Html Action
+viewNavbar state =
+       nav [ A.className ".navbar .navbar-default" ]
+        [ div [ A.className "container-fluid" ]
+          [ -- Brand and toggle get grouped for better mobile display
+            div [ A.className "navbar-header" ]
+            [ button [ A.type_ "button"
+                     , A.className "navbar-toggle collapsed"
+                     , A.dataToggle "collapse"
+                     , A.dataTarget "navbar-collapse-1"
+                     ]
+              [ span [ A.className "sr-only" ] [ text "Toggle navigation" ]
+              , span [ A.className "icon-bar" ] []
+              , span [ A.className "icon-bar" ] []
+              , span [ A.className "icon-bar" ] []
+              ]
+            , a [ A.className "navbar-brand"
+                , A.role "button"
+                , E.onClick $ const $ SetCentral centralHome
+                ]
+              [ text "Home" ]
+            ]
+          , -- Collect the nav links, forms, and other content for toggling
+            div [ A.className "collapse navbar-collapse", A.id_ "navbar-collapse-1" ]
+            [
+              ul [ A.className "nav navbar-nav" ]
+              [ li []
+                [ a [ A.role "button", E.onClick $ const $ SetCentral centralHome ]
+                  [ text "Home again ;-)" ]
+                ]
+              ]
+            , ul [ A.className "nav navbar-nav navbar-right" ]
+              [ li [ A.className "dropdown" ]
+                [ a [ A.className "dropdown-toggle"
+                         , A.dataToggle "dropdown"
+                         , A.role "button"
+                         ]
+                  [ text "Account"
+                  , span [ A.className "carret" ] []
+                  ]
+                  , ul [ A.className "dropdown-menu" ]
+                    [ li []
+                      [ a [ A.href "#" ] [ text "Configure User Details" ] ]
+                    , li []
+                      [ a [ A.href "#" ] [ text "change password" ] ]
+                    , li [ A.role "separator",  A.className "divider" ] []
+                    , li []
+                      [ a [ A.href "#" ] [ text "Log out" ] ]
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          ]
+
 viewCentral :: State -> Html Action
 viewCentral state = case state._central of
-  CentralInvite -> map InviteA $ InviteC.view (state._inviteS)
+  CentralInvite -> map InviteA $ InviteC.view state._inviteS
   CentralAccept -> map AcceptA $ AcceptC.view state._acceptS
+  CentralHome   -> div [] [] ---map HomeA   $ HomeC.view   state._homeS
 
 viewOnlineDevices :: State -> Html Action
 viewOnlineDevices state = table [ A.className "table table-stripped"]
