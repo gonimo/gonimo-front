@@ -21,7 +21,7 @@ import Prelude (Unit)
 import Prim (Array, String)
 import Servant.PureScript.Affjax (AjaxError(..), affjax, defaultRequest)
 import Servant.PureScript.Settings (SPSettings_(..), gDefaultToURLPiece)
-import Servant.PureScript.Util (encodeListQuery, encodeQueryItem, encodeURLPiece, getResult)
+import Servant.PureScript.Util (encodeHeader, encodeListQuery, encodeQueryItem, encodeURLPiece, getResult)
 
 newtype SPParams_ = SPParams_ { authorization :: AuthToken
                               , baseURL :: String
@@ -59,8 +59,7 @@ postInvitations reqBody = do
   let httpMethod = "POST"
   let reqUrl = baseURL <> "invitations"
   let reqHeaders =
-        [{ field : "Authorization"
-         , value : encodeURLPiece spOpts_' authorization
+        [{ field : "Authorization" , value : encodeHeader spOpts_' authorization
          }]
   let affReq = defaultRequest
                  { method = httpMethod
@@ -84,8 +83,7 @@ deleteInvitationsByInvitationSecret reqBody invitationSecret = do
   let reqUrl = baseURL <> "invitations"
         <> "/" <> encodeURLPiece spOpts_' invitationSecret
   let reqHeaders =
-        [{ field : "Authorization"
-         , value : encodeURLPiece spOpts_' authorization
+        [{ field : "Authorization" , value : encodeHeader spOpts_' authorization
          }]
   let affReq = defaultRequest
                  { method = httpMethod
@@ -108,8 +106,7 @@ postInvitationOutbox reqBody = do
   let httpMethod = "POST"
   let reqUrl = baseURL <> "invitationOutbox"
   let reqHeaders =
-        [{ field : "Authorization"
-         , value : encodeURLPiece spOpts_' authorization
+        [{ field : "Authorization" , value : encodeHeader spOpts_' authorization
          }]
   let affReq = defaultRequest
                  { method = httpMethod
@@ -133,8 +130,7 @@ putInvitationInfoByInvitationSecret invitationSecret = do
   let reqUrl = baseURL <> "invitationInfo"
         <> "/" <> encodeURLPiece spOpts_' invitationSecret
   let reqHeaders =
-        [{ field : "Authorization"
-         , value : encodeURLPiece spOpts_' authorization
+        [{ field : "Authorization" , value : encodeHeader spOpts_' authorization
          }]
   let affReq = defaultRequest
                  { method = httpMethod
@@ -158,8 +154,7 @@ getDeviceInfosByFamilyId familyId = do
   let reqUrl = baseURL <> "deviceInfos"
         <> "/" <> encodeURLPiece spOpts_' familyId
   let reqHeaders =
-        [{ field : "Authorization"
-         , value : encodeURLPiece spOpts_' authorization
+        [{ field : "Authorization" , value : encodeHeader spOpts_' authorization
          }]
   let affReq = defaultRequest
                  { method = httpMethod
@@ -183,8 +178,7 @@ getAccountsByAccountIdFamilies accountId = do
   let reqUrl = baseURL <> "accounts" <> "/" <> encodeURLPiece spOpts_' accountId
         <> "/" <> "families"
   let reqHeaders =
-        [{ field : "Authorization"
-         , value : encodeURLPiece spOpts_' authorization
+        [{ field : "Authorization" , value : encodeHeader spOpts_' authorization
          }]
   let affReq = defaultRequest
                  { method = httpMethod
@@ -206,8 +200,7 @@ postFamilies reqBody = do
   let httpMethod = "POST"
   let reqUrl = baseURL <> "families"
   let reqHeaders =
-        [{ field : "Authorization"
-         , value : encodeURLPiece spOpts_' authorization
+        [{ field : "Authorization" , value : encodeHeader spOpts_' authorization
          }]
   let affReq = defaultRequest
                  { method = httpMethod
@@ -232,8 +225,7 @@ postSocketByFamilyIdByToDevice reqBody familyId toDevice = do
   let reqUrl = baseURL <> "socket" <> "/" <> encodeURLPiece spOpts_' familyId
         <> "/" <> encodeURLPiece spOpts_' toDevice
   let reqHeaders =
-        [{ field : "Authorization"
-         , value : encodeURLPiece spOpts_' authorization
+        [{ field : "Authorization" , value : encodeHeader spOpts_' authorization
          }]
   let affReq = defaultRequest
                  { method = httpMethod
@@ -258,8 +250,7 @@ receiveSocketByFamilyIdByToDevice familyId toDevice = do
   let reqUrl = baseURL <> "socket" <> "/" <> encodeURLPiece spOpts_' familyId
         <> "/" <> encodeURLPiece spOpts_' toDevice
   let reqHeaders =
-        [{ field : "Authorization"
-         , value : encodeURLPiece spOpts_' authorization
+        [{ field : "Authorization" , value : encodeHeader spOpts_' authorization
          }]
   let affReq = defaultRequest
                  { method = httpMethod
@@ -288,8 +279,7 @@ putSocketByFamilyIdByFromDeviceByToDeviceByChannelId reqBody familyId fromDevice
         <> "/" <> encodeURLPiece spOpts_' toDevice
         <> "/" <> encodeURLPiece spOpts_' channelId
   let reqHeaders =
-        [{ field : "Authorization"
-         , value : encodeURLPiece spOpts_' authorization
+        [{ field : "Authorization" , value : encodeHeader spOpts_' authorization
          }]
   let affReq = defaultRequest
                  { method = httpMethod
@@ -320,8 +310,7 @@ receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId familyId fromDevice
         <> "/" <> encodeURLPiece spOpts_' toDevice
         <> "/" <> encodeURLPiece spOpts_' channelId
   let reqHeaders =
-        [{ field : "Authorization"
-         , value : encodeURLPiece spOpts_' authorization
+        [{ field : "Authorization" , value : encodeHeader spOpts_' authorization
          }]
   let affReq = defaultRequest
                  { method = httpMethod
@@ -345,8 +334,7 @@ postOnlineStatusByFamilyId reqBody familyId = do
   let reqUrl = baseURL <> "onlineStatus"
         <> "/" <> encodeURLPiece spOpts_' familyId
   let reqHeaders =
-        [{ field : "Authorization"
-         , value : encodeURLPiece spOpts_' authorization
+        [{ field : "Authorization" , value : encodeHeader spOpts_' authorization
          }]
   let affReq = defaultRequest
                  { method = httpMethod
@@ -372,8 +360,7 @@ putOnlineStatusByFamilyIdByDeviceId reqBody familyId deviceId = do
         <> "/" <> encodeURLPiece spOpts_' familyId
         <> "/" <> encodeURLPiece spOpts_' deviceId
   let reqHeaders =
-        [{ field : "Authorization"
-         , value : encodeURLPiece spOpts_' authorization
+        [{ field : "Authorization" , value : encodeHeader spOpts_' authorization
          }]
   let affReq = defaultRequest
                  { method = httpMethod
@@ -398,8 +385,7 @@ deleteOnlineStatusByFamilyIdByDeviceId familyId deviceId = do
         <> "/" <> encodeURLPiece spOpts_' familyId
         <> "/" <> encodeURLPiece spOpts_' deviceId
   let reqHeaders =
-        [{ field : "Authorization"
-         , value : encodeURLPiece spOpts_' authorization
+        [{ field : "Authorization" , value : encodeHeader spOpts_' authorization
          }]
   let affReq = defaultRequest
                  { method = httpMethod
@@ -423,8 +409,7 @@ getOnlineStatusByFamilyId familyId = do
   let reqUrl = baseURL <> "onlineStatus"
         <> "/" <> encodeURLPiece spOpts_' familyId
   let reqHeaders =
-        [{ field : "Authorization"
-         , value : encodeURLPiece spOpts_' authorization
+        [{ field : "Authorization" , value : encodeHeader spOpts_' authorization
          }]
   let affReq = defaultRequest
                  { method = httpMethod
