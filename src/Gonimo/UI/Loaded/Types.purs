@@ -3,7 +3,6 @@ module Gonimo.UI.Loaded.Types where
 import Prelude
 import Gonimo.UI.AcceptInvitation as AcceptC
 import Gonimo.UI.Invite as InviteC
-import Gonimo.UI.Home as HomeC
 import Data.Generic (class Generic)
 import Data.Lens (lens, LensP)
 import Data.Map (Map)
@@ -26,6 +25,7 @@ type State = { authData :: AuthData
              , deviceInfos :: Map (Key Device) DeviceInfo
              , userError :: UserError
              , url :: String
+             , isBabyStation :: Boolean
              }
 
 type Props = { settings :: Settings }
@@ -35,7 +35,6 @@ data Action = ReportError GonimoError
             | SetAuthData AuthData
             | InviteA InviteC.Action
             | AcceptA AcceptC.Action
-            | HomeA HomeC.Action
             | SetFamilies (Array (Tuple (Key Family) Family))
             | SetCentral Central
             | SetOnlineDevices (Array (Tuple (Key Device) DeviceType))
@@ -44,6 +43,8 @@ data Action = ReportError GonimoError
             | HandleSubscriber Notification
             | ResetDevice -- Reinitialize basically everything.
             | ClearError
+            | StartBabyStation -- To be handled by parent
+            | ConnectToBaby (Key Device)
             | Nop
 
 data Central = CentralInvite

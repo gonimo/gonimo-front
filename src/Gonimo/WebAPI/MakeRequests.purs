@@ -50,16 +50,16 @@ postAccounts = do
                 }
   pure spReq
 
-postInvitations :: forall m. MonadReader (SPSettings_ SPParams_) m => Key Family
-                   -> m HttpRequest
-postInvitations reqBody = do
+postInvitationsByFamilyId :: forall m. MonadReader (SPSettings_ SPParams_) m =>
+                             Key Family -> m HttpRequest
+postInvitationsByFamilyId familyId = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
   let authorization = spParams_.authorization
   let baseURL = spParams_.baseURL
   let httpMethod = "POST"
-  let reqPath = Path ["invitations"]
+  let reqPath = Path ["invitations" , gDefaultToURLPiece familyId]
   let reqHeaders =
         [Tuple "Authorization" (gDefaultToURLPiece authorization)]
   let reqQuery =
@@ -69,7 +69,7 @@ postInvitations reqBody = do
                 , httpPath: reqPath
                 , httpHeaders: reqHeaders
                 , httpQuery: reqQuery
-                , httpBody: printJson <<< encodeJson $ reqBody
+                , httpBody: ""
                 }
   pure spReq
 
@@ -98,16 +98,16 @@ deleteInvitationsByInvitationSecret reqBody invitationSecret = do
                 }
   pure spReq
 
-postInvitationOutbox :: forall m. MonadReader (SPSettings_ SPParams_) m =>
-                        SendInvitation -> m HttpRequest
-postInvitationOutbox reqBody = do
+postInvitationsOutbox :: forall m. MonadReader (SPSettings_ SPParams_) m =>
+                         SendInvitation -> m HttpRequest
+postInvitationsOutbox reqBody = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
   let authorization = spParams_.authorization
   let baseURL = spParams_.baseURL
   let httpMethod = "POST"
-  let reqPath = Path ["invitationOutbox"]
+  let reqPath = Path ["invitations" , "outbox"]
   let reqHeaders =
         [Tuple "Authorization" (gDefaultToURLPiece authorization)]
   let reqQuery =
@@ -121,40 +121,18 @@ postInvitationOutbox reqBody = do
                 }
   pure spReq
 
-putInvitationInfoByInvitationSecret :: forall m.
-                                       MonadReader (SPSettings_ SPParams_) m =>
-                                       Secret -> m HttpRequest
-putInvitationInfoByInvitationSecret invitationSecret = do
+putInvitationsInfoByInvitationSecret :: forall m.
+                                        MonadReader (SPSettings_ SPParams_) m =>
+                                        Secret -> m HttpRequest
+putInvitationsInfoByInvitationSecret invitationSecret = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
   let authorization = spParams_.authorization
   let baseURL = spParams_.baseURL
   let httpMethod = "PUT"
-  let reqPath = Path ["invitationInfo" , gDefaultToURLPiece invitationSecret]
-  let reqHeaders =
-        [Tuple "Authorization" (gDefaultToURLPiece authorization)]
-  let reqQuery =
-        []
-  let spReq = HttpRequest
-                { httpMethod: httpMethod
-                , httpPath: reqPath
-                , httpHeaders: reqHeaders
-                , httpQuery: reqQuery
-                , httpBody: ""
-                }
-  pure spReq
-
-getDeviceInfosByFamilyId :: forall m. MonadReader (SPSettings_ SPParams_) m =>
-                            Key Family -> m HttpRequest
-getDeviceInfosByFamilyId familyId = do
-  spOpts_' <- ask
-  let spOpts_ = case spOpts_' of SPSettings_ o -> o
-  let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
-  let authorization = spParams_.authorization
-  let baseURL = spParams_.baseURL
-  let httpMethod = "GET"
-  let reqPath = Path ["deviceInfos" , gDefaultToURLPiece familyId]
+  let reqPath = Path ["invitations" , "info"
+        , gDefaultToURLPiece invitationSecret]
   let reqHeaders =
         [Tuple "Authorization" (gDefaultToURLPiece authorization)]
   let reqQuery =
@@ -212,6 +190,55 @@ postFamilies reqBody = do
                 , httpHeaders: reqHeaders
                 , httpQuery: reqQuery
                 , httpBody: printJson <<< encodeJson $ reqBody
+                }
+  pure spReq
+
+getFamiliesByFamilyIdLastBabyNames :: forall m.
+                                      MonadReader (SPSettings_ SPParams_) m =>
+                                      Key Family -> m HttpRequest
+getFamiliesByFamilyIdLastBabyNames familyId = do
+  spOpts_' <- ask
+  let spOpts_ = case spOpts_' of SPSettings_ o -> o
+  let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
+  let authorization = spParams_.authorization
+  let baseURL = spParams_.baseURL
+  let httpMethod = "GET"
+  let reqPath = Path ["families" , gDefaultToURLPiece familyId
+        , "lastBabyNames"]
+  let reqHeaders =
+        [Tuple "Authorization" (gDefaultToURLPiece authorization)]
+  let reqQuery =
+        []
+  let spReq = HttpRequest
+                { httpMethod: httpMethod
+                , httpPath: reqPath
+                , httpHeaders: reqHeaders
+                , httpQuery: reqQuery
+                , httpBody: ""
+                }
+  pure spReq
+
+getFamiliesByFamilyIdDeviceInfos :: forall m.
+                                    MonadReader (SPSettings_ SPParams_) m =>
+                                    Key Family -> m HttpRequest
+getFamiliesByFamilyIdDeviceInfos familyId = do
+  spOpts_' <- ask
+  let spOpts_ = case spOpts_' of SPSettings_ o -> o
+  let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
+  let authorization = spParams_.authorization
+  let baseURL = spParams_.baseURL
+  let httpMethod = "GET"
+  let reqPath = Path ["families" , gDefaultToURLPiece familyId , "deviceInfos"]
+  let reqHeaders =
+        [Tuple "Authorization" (gDefaultToURLPiece authorization)]
+  let reqQuery =
+        []
+  let spReq = HttpRequest
+                { httpMethod: httpMethod
+                , httpPath: reqPath
+                , httpHeaders: reqHeaders
+                , httpQuery: reqQuery
+                , httpBody: ""
                 }
   pure spReq
 

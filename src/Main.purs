@@ -201,6 +201,7 @@ load = Gonimo.toAff initSettings $ authToAction =<< LoadedC.getAuthData
             , onlineDevices : Map.empty
             , deviceInfos   : Map.empty
             , userError     : NoError
+            , isBabyStation  : false
             }
 
 makeCallback :: forall eff. Channel Action ->  (LoadedC.Action -> SubscriberEff (channel :: CHANNEL | eff) Unit)

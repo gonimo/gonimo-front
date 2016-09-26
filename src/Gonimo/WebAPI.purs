@@ -47,10 +47,11 @@ postAccounts = do
   affResp <- liftAff $ affjax affReq
   getResult affReq decodeJson affResp
   
-postInvitations :: forall eff m.
-                   (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-                   => Key Family -> m (Tuple (Key Invitation) Invitation)
-postInvitations reqBody = do
+postInvitationsByFamilyId :: forall eff m.
+                             (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
+                             => Key Family
+                             -> m (Tuple (Key Invitation) Invitation)
+postInvitationsByFamilyId familyId = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
@@ -58,6 +59,7 @@ postInvitations reqBody = do
   let baseURL = spParams_.baseURL
   let httpMethod = "POST"
   let reqUrl = baseURL <> "invitations"
+        <> "/" <> encodeURLPiece spOpts_' familyId
   let reqHeaders =
         [{ field : "Authorization" , value : encodeHeader spOpts_' authorization
          }]
@@ -65,7 +67,6 @@ postInvitations reqBody = do
                  { method = httpMethod
                  , url = reqUrl
                  , headers = defaultRequest.headers <> reqHeaders
-                 , content = toNullable <<< Just <<< printJson <<< encodeJson $ reqBody
                  }
   affResp <- liftAff $ affjax affReq
   getResult affReq decodeJson affResp
@@ -94,17 +95,17 @@ deleteInvitationsByInvitationSecret reqBody invitationSecret = do
   affResp <- liftAff $ affjax affReq
   getResult affReq decodeJson affResp
   
-postInvitationOutbox :: forall eff m.
-                        (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-                        => SendInvitation -> m Unit
-postInvitationOutbox reqBody = do
+postInvitationsOutbox :: forall eff m.
+                         (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
+                         => SendInvitation -> m Unit
+postInvitationsOutbox reqBody = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
   let authorization = spParams_.authorization
   let baseURL = spParams_.baseURL
   let httpMethod = "POST"
-  let reqUrl = baseURL <> "invitationOutbox"
+  let reqUrl = baseURL <> "invitations" <> "/" <> "outbox"
   let reqHeaders =
         [{ field : "Authorization" , value : encodeHeader spOpts_' authorization
          }]
@@ -117,42 +118,18 @@ postInvitationOutbox reqBody = do
   affResp <- liftAff $ affjax affReq
   getResult affReq decodeJson affResp
   
-putInvitationInfoByInvitationSecret :: forall eff m.
-                                       (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-                                       => Secret -> m InvitationInfo
-putInvitationInfoByInvitationSecret invitationSecret = do
+putInvitationsInfoByInvitationSecret :: forall eff m.
+                                        (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
+                                        => Secret -> m InvitationInfo
+putInvitationsInfoByInvitationSecret invitationSecret = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
   let authorization = spParams_.authorization
   let baseURL = spParams_.baseURL
   let httpMethod = "PUT"
-  let reqUrl = baseURL <> "invitationInfo"
+  let reqUrl = baseURL <> "invitations" <> "/" <> "info"
         <> "/" <> encodeURLPiece spOpts_' invitationSecret
-  let reqHeaders =
-        [{ field : "Authorization" , value : encodeHeader spOpts_' authorization
-         }]
-  let affReq = defaultRequest
-                 { method = httpMethod
-                 , url = reqUrl
-                 , headers = defaultRequest.headers <> reqHeaders
-                 }
-  affResp <- liftAff $ affjax affReq
-  getResult affReq decodeJson affResp
-  
-getDeviceInfosByFamilyId :: forall eff m.
-                            (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-                            => Key Family
-                            -> m (Array (Tuple (Key Device) DeviceInfo))
-getDeviceInfosByFamilyId familyId = do
-  spOpts_' <- ask
-  let spOpts_ = case spOpts_' of SPSettings_ o -> o
-  let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
-  let authorization = spParams_.authorization
-  let baseURL = spParams_.baseURL
-  let httpMethod = "GET"
-  let reqUrl = baseURL <> "deviceInfos"
-        <> "/" <> encodeURLPiece spOpts_' familyId
   let reqHeaders =
         [{ field : "Authorization" , value : encodeHeader spOpts_' authorization
          }]
@@ -207,6 +184,53 @@ postFamilies reqBody = do
                  , url = reqUrl
                  , headers = defaultRequest.headers <> reqHeaders
                  , content = toNullable <<< Just <<< printJson <<< encodeJson $ reqBody
+                 }
+  affResp <- liftAff $ affjax affReq
+  getResult affReq decodeJson affResp
+  
+getFamiliesByFamilyIdLastBabyNames :: forall eff m.
+                                      (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
+                                      => Key Family -> m (Array String)
+getFamiliesByFamilyIdLastBabyNames familyId = do
+  spOpts_' <- ask
+  let spOpts_ = case spOpts_' of SPSettings_ o -> o
+  let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
+  let authorization = spParams_.authorization
+  let baseURL = spParams_.baseURL
+  let httpMethod = "GET"
+  let reqUrl = baseURL <> "families" <> "/" <> encodeURLPiece spOpts_' familyId
+        <> "/" <> "lastBabyNames"
+  let reqHeaders =
+        [{ field : "Authorization" , value : encodeHeader spOpts_' authorization
+         }]
+  let affReq = defaultRequest
+                 { method = httpMethod
+                 , url = reqUrl
+                 , headers = defaultRequest.headers <> reqHeaders
+                 }
+  affResp <- liftAff $ affjax affReq
+  getResult affReq decodeJson affResp
+  
+getFamiliesByFamilyIdDeviceInfos :: forall eff m.
+                                    (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
+                                    => Key Family
+                                    -> m (Array (Tuple (Key Device) DeviceInfo))
+getFamiliesByFamilyIdDeviceInfos familyId = do
+  spOpts_' <- ask
+  let spOpts_ = case spOpts_' of SPSettings_ o -> o
+  let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
+  let authorization = spParams_.authorization
+  let baseURL = spParams_.baseURL
+  let httpMethod = "GET"
+  let reqUrl = baseURL <> "families" <> "/" <> encodeURLPiece spOpts_' familyId
+        <> "/" <> "deviceInfos"
+  let reqHeaders =
+        [{ field : "Authorization" , value : encodeHeader spOpts_' authorization
+         }]
+  let affReq = defaultRequest
+                 { method = httpMethod
+                 , url = reqUrl
+                 , headers = defaultRequest.headers <> reqHeaders
                  }
   affResp <- liftAff $ affjax affReq
   getResult affReq decodeJson affResp

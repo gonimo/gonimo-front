@@ -30,19 +30,28 @@ import Servant.Subscriber.Util (TypedToUser, subGenFlagQuery, subGenListQuery, s
 
 import Gonimo.WebAPI.MakeRequests as MakeRequests
 
-getDeviceInfosByFamilyId :: forall m a. MonadReader (SPSettings_ SPParams_) m =>
-                            TypedToUser (Array (Tuple (Key Device) DeviceInfo)) a
-                            -> Key Family -> m (Subscriptions a)
-getDeviceInfosByFamilyId spToUser_ familyId = do
-  spReq <- MakeRequests.getDeviceInfosByFamilyId familyId
-  pure $ makeSubscriptions spReq (toUserType spToUser_)
-
 getAccountsByAccountIdFamilies :: forall m a.
                                   MonadReader (SPSettings_ SPParams_) m =>
                                   TypedToUser (Array (Tuple (Key Family) Family)) a
                                   -> Key Account -> m (Subscriptions a)
 getAccountsByAccountIdFamilies spToUser_ accountId = do
   spReq <- MakeRequests.getAccountsByAccountIdFamilies accountId
+  pure $ makeSubscriptions spReq (toUserType spToUser_)
+
+getFamiliesByFamilyIdLastBabyNames :: forall m a.
+                                      MonadReader (SPSettings_ SPParams_) m =>
+                                      TypedToUser (Array String) a -> Key Family
+                                      -> m (Subscriptions a)
+getFamiliesByFamilyIdLastBabyNames spToUser_ familyId = do
+  spReq <- MakeRequests.getFamiliesByFamilyIdLastBabyNames familyId
+  pure $ makeSubscriptions spReq (toUserType spToUser_)
+
+getFamiliesByFamilyIdDeviceInfos :: forall m a.
+                                    MonadReader (SPSettings_ SPParams_) m =>
+                                    TypedToUser (Array (Tuple (Key Device) DeviceInfo)) a
+                                    -> Key Family -> m (Subscriptions a)
+getFamiliesByFamilyIdDeviceInfos spToUser_ familyId = do
+  spReq <- MakeRequests.getFamiliesByFamilyIdDeviceInfos familyId
   pure $ makeSubscriptions spReq (toUserType spToUser_)
 
 receiveSocketByFamilyIdByToDevice :: forall m a.

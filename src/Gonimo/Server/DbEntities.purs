@@ -4,7 +4,7 @@ module Gonimo.Server.DbEntities where
 import Data.Maybe (Maybe)
 import Gonimo.Server.Types (AuthToken, InvitationDelivery)
 import Gonimo.Types (Date, Key, Secret)
-import Prim (String)
+import Prim (Array, String)
 
 import Data.Generic (class Generic)
 
@@ -44,6 +44,7 @@ data Family =
       familyName :: String
     , familyCreated :: Date
     , familyLastAccessed :: Date
+    , familyLastUsedBabyNames :: Array String
     }
 
 derive instance genericFamily :: Generic Family

@@ -25,7 +25,7 @@ import Gonimo.Pux (noEffects, justEffect, onlyEffects, EffModel(EffModel), justG
 import Gonimo.Server.DbEntities (Family(Family))
 import Gonimo.Server.Types (InvitationDelivery(EmailInvitation), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (Key(Key), Secret(Secret))
-import Gonimo.WebAPI (postInvitationOutbox, postInvitations, postFamilies, SPParams_(SPParams_), postAccounts, postFunnyName)
+import Gonimo.WebAPI (postInvitationsOutbox, postInvitationsByFamilyId, postFamilies, SPParams_(SPParams_), postAccounts, postFunnyName)
 import Gonimo.WebAPI.Types (AuthData(AuthData))
 import Partial.Unsafe (unsafeCrashWith)
 import Pux (renderToDOM, fromSimple, start)
@@ -83,8 +83,8 @@ handleSendInvitation state = do
   fid <- case state.familyId of
     Nothing   -> postFamilies state.familyName
     Just fid' -> pure fid'
-  (Tuple invId invitation) <- postInvitations fid
-  postInvitationOutbox $ WebAPI.SendInvitation invId (EmailInvitation state.email)
+  (Tuple invId invitation) <- postInvitationsByFamilyId fid
+  postInvitationsOutbox $ WebAPI.SendInvitation invId (EmailInvitation state.email)
   pure InvitationSent
 
 --------------------------------------------------------------------------------

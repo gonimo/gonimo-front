@@ -88,6 +88,7 @@ update _ (HandleSubscriber msg)              = handleSubscriber msg
 update _ ResetDevice                         = handleResetDevice
 update _ ClearError                          = handleClearError
 update _ (SetAuthData auth)                  = handleSetAuthData auth
+update _ StartBabyStation                    = handleStartBabyStation
 update _ Nop                                 = noEffects
 update _ _                                   = noEffects
 
@@ -145,6 +146,9 @@ handleClearError state = let
    noEffects (state { userError = NoError
                     , _central = newCentral
                     })
+
+handleStartBabyStation :: forall eff. State -> EffModel eff State Action
+handleStartBabyStation state = noEffects $ state { isBabyStation = true }
 --------------------------------------------------------------------------------
 
 view :: State -> Html Action
@@ -234,6 +238,21 @@ viewCentral state = case state._central of
   CentralAccept -> map AcceptA $ AcceptC.view state._acceptS
   CentralHome   -> div [] [] ---map HomeA   $ HomeC.view   state._homeS
 
+viewHome :: State -> Html Action
+viewHome _ =
+  div [ A.className "jumbotron" ]
+  [ div [ A.className "container" ]
+    [ button [ A.className "btn btn-block btn-info"
+             , A.style [Tuple "margin-left" "0px"]
+             , A.type_ "button"
+             , E.onClick $ const $ StartBabyStation
+             ]
+             [ text "Start Baby Station"
+             , span [A.className "glyphicon glyphicon-transfer"] []
+             ]
+    ]
+  ]
+
 viewOnlineDevices :: State -> Html Action
 viewOnlineDevices state = table [ A.className "table table-stripped"]
                           [ head
@@ -271,7 +290,7 @@ getSubscriptions state =
       , fromFoldable $
         Sub.getOnlineStatusByFamilyId (maybe Nop SetOnlineDevices) <$> familyId
       , fromFoldable $
-        Sub.getDeviceInfosByFamilyId (maybe Nop SetDeviceInfos) <$> familyId
+        Sub.getFamiliesByFamilyIdDeviceInfos (maybe Nop SetDeviceInfos) <$> familyId
       ]
   in
    case state.userError of

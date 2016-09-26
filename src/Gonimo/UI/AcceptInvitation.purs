@@ -25,7 +25,7 @@ import Gonimo.Pux (noEffects, onlyEffect, onlyGonimo, justEffect, onlyEffects, E
 import Gonimo.Server.DbEntities (Invitation(Invitation))
 import Gonimo.Server.Types (InvitationDelivery(EmailInvitation), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (Key(Key), Secret(Secret))
-import Gonimo.WebAPI (deleteInvitationsByInvitationSecret, putInvitationInfoByInvitationSecret, postInvitations, postFamilies, SPParams_(SPParams_), postAccounts)
+import Gonimo.WebAPI (deleteInvitationsByInvitationSecret, putInvitationsInfoByInvitationSecret, postFamilies, SPParams_(SPParams_), postAccounts)
 import Gonimo.WebAPI.Types (InvitationReply(InvitationReject, InvitationAccept), InvitationReply(InvitationReject, InvitationAccept), InvitationInfo(InvitationInfo), AuthData(AuthData))
 import Partial.Unsafe (unsafeCrashWith)
 import Pux (renderToDOM, fromSimple, start)
@@ -82,7 +82,7 @@ updateJust props action = case action of
 
 
 loadInvitation :: forall eff. Secret -> Gonimo eff Action
-loadInvitation secret = Init <<< Tuple secret <$> putInvitationInfoByInvitationSecret secret
+loadInvitation secret = Init <<< Tuple secret <$> putInvitationsInfoByInvitationSecret secret
 
 answerInvitation :: forall eff ps. Props ps -> InvitationReply -> StateImpl -> EffModel eff StateImpl Action
 answerInvitation props reply state = onlyGonimo props state $ do
