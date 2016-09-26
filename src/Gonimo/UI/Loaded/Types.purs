@@ -2,11 +2,12 @@ module Gonimo.UI.Loaded.Types where
 
 import Prelude
 import Gonimo.UI.AcceptInvitation as AcceptC
-import Gonimo.UI.Invite as InviteC
 import Gonimo.UI.Home as HomeC
+import Gonimo.UI.Invite as InviteC
 import Data.Generic (class Generic)
 import Data.Lens (lens, LensP)
 import Data.Map (Map)
+import Data.Maybe (Maybe)
 import Data.Tuple (Tuple(Tuple))
 import Gonimo.Client.Types (Settings, class ReportErrorAction, GonimoError)
 import Gonimo.Server.DbEntities (Device(Device), Family(Family))
@@ -22,7 +23,9 @@ type State = { authData :: AuthData
              , _acceptS  :: AcceptC.State
              , _homeS    :: HomeC.State
              , _central  :: Central
-             , families :: Array (Tuple (Key Family) Family)
+             , familyIds :: Array (Key Family)
+             , families  :: Map (Key Family) Family
+             , currentFamily :: Maybe (Key Family)
              , onlineDevices :: Map (Key Device) DeviceType
              , deviceInfos :: Map (Key Device) DeviceInfo
              , userError :: UserError
@@ -38,10 +41,12 @@ data Action = ReportError GonimoError
             | InviteA InviteC.Action
             | AcceptA AcceptC.Action
             | HomeA HomeC.Action
-            | SetFamilies (Array (Tuple (Key Family) Family))
+            | SetFamilyIds (Array (Key Family))
+            | UpdateFamily (Key Family) Family
             | SetCentral Central
             | SetOnlineDevices (Array (Tuple (Key Device) DeviceType))
             | SetDeviceInfos (Array (Tuple (Key Device) DeviceInfo))
+            | SwitchFamily (Key Family)
             | SetURL String
             | HandleSubscriber Notification
             | ResetDevice -- Reinitialize basically everything.

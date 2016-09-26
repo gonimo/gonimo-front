@@ -143,8 +143,7 @@ putInvitationsInfoByInvitationSecret invitationSecret = do
   
 getAccountsByAccountIdFamilies :: forall eff m.
                                   (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-                                  => Key Account
-                                  -> m (Array (Tuple (Key Family) Family))
+                                  => Key Account -> m (Array (Key Family))
 getAccountsByAccountIdFamilies accountId = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
@@ -188,10 +187,10 @@ postFamilies reqBody = do
   affResp <- liftAff $ affjax affReq
   getResult affReq decodeJson affResp
   
-getFamiliesByFamilyIdLastBabyNames :: forall eff m.
-                                      (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-                                      => Key Family -> m (Array String)
-getFamiliesByFamilyIdLastBabyNames familyId = do
+getFamiliesByFamilyId :: forall eff m.
+                         (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
+                         => Key Family -> m Family
+getFamiliesByFamilyId familyId = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
@@ -199,7 +198,6 @@ getFamiliesByFamilyIdLastBabyNames familyId = do
   let baseURL = spParams_.baseURL
   let httpMethod = "GET"
   let reqUrl = baseURL <> "families" <> "/" <> encodeURLPiece spOpts_' familyId
-        <> "/" <> "lastBabyNames"
   let reqHeaders =
         [{ field : "Authorization" , value : encodeHeader spOpts_' authorization
          }]

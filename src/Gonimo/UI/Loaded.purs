@@ -11,10 +11,11 @@ import Gonimo.Client.Router as Router
 import Gonimo.Client.Types as Gonimo
 import Gonimo.UI.AcceptInvitation as AcceptC
 import Gonimo.UI.Error as Error
-import Gonimo.UI.Invite as InviteC
 import Gonimo.UI.Home as HomeC
+import Gonimo.UI.Invite as InviteC
 import Gonimo.WebAPI.MakeRequests as Reqs
 import Gonimo.WebAPI.Subscriber as Sub
+import Pux.Html as H
 import Pux.Html.Attributes as A
 import Pux.Html.Attributes.Bootstrap as A
 import Pux.Html.Events as E
@@ -26,6 +27,7 @@ import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Except.Trans (runExceptT)
 import Control.Monad.Reader (runReader)
+import Control.Monad.Reader.Class (class MonadReader)
 import Control.Monad.Reader.Trans (runReaderT)
 import Data.Argonaut.Generic.Aeson (decodeJson)
 import Data.Array (fromFoldable, concat, catMaybes, head)
@@ -79,7 +81,8 @@ update _ (InviteA (InviteC.ReportError err)) = handleError err
 update _ (InviteA action)                    = updateInvite action
 update _ (AcceptA (AcceptC.ReportError err)) = handleError err
 update _ (AcceptA action)                    = updateAccept action
-update _ (SetFamilies families')             = \state -> noEffects (state { families = families'})
+update _ (SetFamilyIds ids)                  = \state -> noEffects (state { familyIds = ids})
+update _ (UpdateFamily familyId' family')    = \state -> noEffects (state { families = Map.insert familyId' family' state.families })
 update _ (SetCentral c)                      = \state -> noEffects (state { _central = c })
 update _ (SetOnlineDevices devices)          = \state -> noEffects (state {onlineDevices = Map.fromFoldable devices})
 update _ (SetDeviceInfos devices)            = \state -> noEffects (state {deviceInfos = Map.fromFoldable devices})
@@ -262,20 +265,31 @@ viewOnlineDevices state = table [ A.className "table table-stripped"]
                [ td [] [ text name ]
                , td [] [ text lastAccessed ]
                ]
+
+-- viewFamilyChooser :: State -> Html Action
+-- viewFamilyChooser state = H.select []
+--                           [ H.option [ A.value]
+--                           ]
 --------------------------------------------------------------------------------
 getSubscriptions :: State -> Subscriptions Action
 getSubscriptions state =
   let
-    familyId = fst <$> head state.families -- Currently we just pick the first family
+    familyId = head state.familyIds -- Currently we just pick the first family
+
+    --subscribeGetFamily :: forall m. MonadReader Settings m => Key Family -> m (Subscriptions Action)
+    subscribeGetFamily familyId' =
+      Sub.getFamiliesByFamilyId (maybe Nop (UpdateFamily familyId')) familyId'
+
     subArray :: Array (Subscriptions Action)
     subArray = map (flip runReader (mkSettings state.authData)) <<< concat $
-      [ [ Sub.getAccountsByAccountIdFamilies (maybe Nop SetFamilies)
+      [ [ Sub.getAccountsByAccountIdFamilies (maybe Nop SetFamilyIds)
                                           (runAuthData state.authData).accountId
         ]
       , fromFoldable $
         Sub.getOnlineStatusByFamilyId (maybe Nop SetOnlineDevices) <$> familyId
       , fromFoldable $
         Sub.getFamiliesByFamilyIdDeviceInfos (maybe Nop SetDeviceInfos) <$> familyId
+      , map subscribeGetFamily state.familyIds
       ]
   in
    case state.userError of
@@ -287,7 +301,7 @@ getPongRequest state =
   let
     deviceId = (runAuthData state.authData).deviceId
     deviceData = Tuple deviceId NoBaby
-    familyId = fst <$> head state.families -- Currently we just pick the first family
+    familyId = head state.familyIds -- Currently we just pick the first family
   in
    case state.userError of
      NoError -> flip runReader (mkSettings state.authData) <<< Reqs.postOnlineStatusByFamilyId deviceData <$> familyId
@@ -297,7 +311,7 @@ getCloseRequest :: State -> Maybe HttpRequest
 getCloseRequest state =
   let
     deviceId = (runAuthData state.authData).deviceId
-    familyId = fst <$> head state.families -- Currently we just pick the first family
+    familyId = head state.familyIds -- Currently we just pick the first family
   in
    case state.userError of
      NoError -> flip runReader (mkSettings state.authData) <<< flip Reqs.deleteOnlineStatusByFamilyIdByDeviceId deviceId <$> familyId

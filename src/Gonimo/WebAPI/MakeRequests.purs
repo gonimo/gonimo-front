@@ -193,18 +193,16 @@ postFamilies reqBody = do
                 }
   pure spReq
 
-getFamiliesByFamilyIdLastBabyNames :: forall m.
-                                      MonadReader (SPSettings_ SPParams_) m =>
-                                      Key Family -> m HttpRequest
-getFamiliesByFamilyIdLastBabyNames familyId = do
+getFamiliesByFamilyId :: forall m. MonadReader (SPSettings_ SPParams_) m =>
+                         Key Family -> m HttpRequest
+getFamiliesByFamilyId familyId = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
   let authorization = spParams_.authorization
   let baseURL = spParams_.baseURL
   let httpMethod = "GET"
-  let reqPath = Path ["families" , gDefaultToURLPiece familyId
-        , "lastBabyNames"]
+  let reqPath = Path ["families" , gDefaultToURLPiece familyId]
   let reqHeaders =
         [Tuple "Authorization" (gDefaultToURLPiece authorization)]
   let reqQuery =

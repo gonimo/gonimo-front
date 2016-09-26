@@ -32,18 +32,17 @@ import Gonimo.WebAPI.MakeRequests as MakeRequests
 
 getAccountsByAccountIdFamilies :: forall m a.
                                   MonadReader (SPSettings_ SPParams_) m =>
-                                  TypedToUser (Array (Tuple (Key Family) Family)) a
+                                  TypedToUser (Array (Key Family)) a
                                   -> Key Account -> m (Subscriptions a)
 getAccountsByAccountIdFamilies spToUser_ accountId = do
   spReq <- MakeRequests.getAccountsByAccountIdFamilies accountId
   pure $ makeSubscriptions spReq (toUserType spToUser_)
 
-getFamiliesByFamilyIdLastBabyNames :: forall m a.
-                                      MonadReader (SPSettings_ SPParams_) m =>
-                                      TypedToUser (Array String) a -> Key Family
-                                      -> m (Subscriptions a)
-getFamiliesByFamilyIdLastBabyNames spToUser_ familyId = do
-  spReq <- MakeRequests.getFamiliesByFamilyIdLastBabyNames familyId
+getFamiliesByFamilyId :: forall m a. MonadReader (SPSettings_ SPParams_) m =>
+                         TypedToUser Family a -> Key Family
+                         -> m (Subscriptions a)
+getFamiliesByFamilyId spToUser_ familyId = do
+  spReq <- MakeRequests.getFamiliesByFamilyId familyId
   pure $ makeSubscriptions spReq (toUserType spToUser_)
 
 getFamiliesByFamilyIdDeviceInfos :: forall m a.

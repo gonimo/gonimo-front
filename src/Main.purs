@@ -198,7 +198,9 @@ load = Gonimo.toAff initSettings $ authToAction =<< LoadedC.getAuthData
             , _acceptS       : AcceptC.init
             , _central       : LoadedC.CentralInvite
             , _homeS         : HomeC.init
-            , families      : []
+            , familyIds      : []
+            , currentFamily  : Nothing
+            , families      : Map.empty
             , url           : ""
             , onlineDevices : Map.empty
             , deviceInfos   : Map.empty
