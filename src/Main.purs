@@ -9,6 +9,7 @@ import Gonimo.Client.Types as Gonimo
 import Gonimo.UI.AcceptInvitation as AcceptC
 import Gonimo.UI.Invite as InviteC
 import Gonimo.UI.Loaded as LoadedC
+import Gonimo.UI.Home as HomeC
 import Gonimo.UI.Loaded.Types as LoadedC
 import Gonimo.WebAPI.MakeRequests as Reqs
 import Pux.Html.Attributes as A
@@ -196,6 +197,7 @@ load = Gonimo.toAff initSettings $ authToAction =<< LoadedC.getAuthData
             , _inviteS       : inviteState
             , _acceptS       : AcceptC.init
             , _central       : LoadedC.CentralInvite
+            , _homeS         : HomeC.init
             , families      : []
             , url           : ""
             , onlineDevices : Map.empty

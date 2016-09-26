@@ -88,7 +88,6 @@ update _ (HandleSubscriber msg)              = handleSubscriber msg
 update _ ResetDevice                         = handleResetDevice
 update _ ClearError                          = handleClearError
 update _ (SetAuthData auth)                  = handleSetAuthData auth
-update _ StartBabyStation                    = handleStartBabyStation
 update _ Nop                                 = noEffects
 update _ _                                   = noEffects
 
@@ -238,20 +237,6 @@ viewCentral state = case state._central of
   CentralAccept -> map AcceptA $ AcceptC.view state._acceptS
   CentralHome   -> div [] [] ---map HomeA   $ HomeC.view   state._homeS
 
-viewHome :: State -> Html Action
-viewHome _ =
-  div [ A.className "jumbotron" ]
-  [ div [ A.className "container" ]
-    [ button [ A.className "btn btn-block btn-info"
-             , A.style [Tuple "margin-left" "0px"]
-             , A.type_ "button"
-             , E.onClick $ const $ StartBabyStation
-             ]
-             [ text "Start Baby Station"
-             , span [A.className "glyphicon glyphicon-transfer"] []
-             ]
-    ]
-  ]
 
 viewOnlineDevices :: State -> Html Action
 viewOnlineDevices state = table [ A.className "table table-stripped"]
