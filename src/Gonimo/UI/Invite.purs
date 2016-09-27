@@ -2,7 +2,7 @@ module Gonimo.UI.Invite where
 
 
 
-import Prelude
+import Prelude hiding (div)
 import Gonimo.UI.Html
 import Gonimo.Client.Effects as Gonimo
 import Gonimo.Client.LocalStorage as Key
@@ -34,12 +34,14 @@ import Servant.PureScript.Affjax (AjaxError)
 import Servant.PureScript.Settings (defaultSettings, SPSettings_(SPSettings_))
 import Signal (constant, Signal)
 
-type Props ps = { settings :: Settings | ps }
+type Props ps = { settings :: Settings
+                , currentFamily :: (Maybe (Key Family))
+                | ps
+                }
 
 type State =
   { familyName     :: String
   , email          :: String
-  , familyId       :: Maybe (Key Family)
   , invitationSent :: Boolean
   , errorOccurred  :: Maybe GonimoError
   }
@@ -48,7 +50,6 @@ init :: forall eff. Gonimo eff State
 init = let
     initWithFamily family = { familyName :     family
                             , email :          ""
-                            , familyId :       Nothing
                             , invitationSent : false
                             , errorOccurred :  Nothing
                             }
@@ -70,17 +71,17 @@ update props action = case action of
   (SetFamilyName name ) -> \state -> noEffects state { familyName = name }
   (SetEmail email )     -> \state -> noEffects state { email = email }
   InvitationSent        -> \state -> noEffects state { invitationSent = true }
-  SendInvitation        -> \state -> justGonimo props (handleSendInvitation state) state
+  SendInvitation        -> \state -> justGonimo props (handleSendInvitation props state) state
   Nop                   -> noEffects
   ReportError err       -> \state -> noEffects $ state { errorOccurred = Just err }
 
 
-handleSendInvitation :: forall eff. State -> Gonimo eff Action
-handleSendInvitation state = do
+handleSendInvitation :: forall ps eff. Props ps -> State -> Gonimo eff Action
+handleSendInvitation props state = do
   (SPSettings_ settings) <- ask
   let params = case settings.params of (SPParams_ params) -> params
   Gonimo.log $ "Using AuthToken: " <> gShow params.authorization
-  fid <- case state.familyId of
+  fid <- case props.currentFamily of
     Nothing   -> postFamilies state.familyName
     Just fid' -> pure fid'
   (Tuple invId invitation) <- postInvitationsByFamilyId fid
@@ -89,13 +90,13 @@ handleSendInvitation state = do
 
 --------------------------------------------------------------------------------
 
-view :: State -> Html Action
-view state = if state.invitationSent
+view :: forall ps. Props ps -> State -> Html Action
+view props state = if state.invitationSent
   then viewSent state
-  else viewSend state
+  else viewSend props state
 
-viewSend :: State -> Html Action
-viewSend state =
+viewSend :: forall ps. Props ps -> State -> Html Action
+viewSend props state =
   div [A.className "jumbotron"]
   [ div [A.className "container"]
     [ h1 [] [ text "Welcome to Gonimo!"]
@@ -106,11 +107,11 @@ viewSend state =
                 , text state.familyName ]
             ]
     , div [ E.onKeyUp handleEnter ]
-      [ p [] [text "Choose a name for your family."]
-      , div [A.className "input-group"]
-          if isNothing state.familyId -- We can only set the family name here, if we are creating one!
+      [ div [A.className "input-group"]
+          if isNothing props.currentFamily -- We can only set the family name here, if we are creating one!
           then
-          [ span [A.className "input-group-addon glyphicon glyphicon-edit"] []
+          [ p [] [text "Choose a name for your family."]
+          , span [A.className "input-group-addon glyphicon glyphicon-edit"] []
           , input [ A.type_ "text"
                   , A.className "form-control"
                   , E.onInput $ \ev -> SetFamilyName ev.target.value

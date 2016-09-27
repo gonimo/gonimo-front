@@ -22,6 +22,7 @@ import Pux.Html.Events as E
 import Servant.Subscriber as Sub
 import Servant.Subscriber.Connection as Sub
 import Browser.LocalStorage (STORAGE, localStorage)
+import Control.Alt ((<|>))
 import Control.Monad.Aff (Aff)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
@@ -42,7 +43,7 @@ import Data.Monoid (mempty)
 import Data.Semigroup (append)
 import Data.String (takeWhile)
 import Data.Traversable (traverse)
-import Data.Tuple (fst, Tuple(Tuple))
+import Data.Tuple (uncurry, fst, Tuple(Tuple))
 import Debug.Trace (trace)
 import Gonimo.Client.Types (Settings, GonimoError, class ReportErrorAction, Gonimo, GonimoEff, runGonimoT)
 import Gonimo.Pux (updateChild, onlyGonimo, onlyEffects, onlyEffect, justEffect, noEffects, EffModel(EffModel))
@@ -53,13 +54,15 @@ import Gonimo.Server.Types (DeviceType(NoBaby), AuthToken, AuthToken(GonimoSecre
 import Gonimo.Types (dateToString, Key(Key), Secret(Secret))
 import Gonimo.UI.Error (viewError, class ErrorAction, UserError(NoError, DeviceInvalid), handleSubscriber, handleError)
 import Gonimo.UI.Loaded.Types (centralHome, Props, acceptS, inviteS, State, Action(..), Central(..))
-import Gonimo.WebAPI (SPParams_(SPParams_), postAccounts)
+import Gonimo.Util (fromString)
+import Gonimo.WebAPI (deleteOnlineStatusByFamilyIdByDeviceId, SPParams_(SPParams_), postAccounts)
 import Gonimo.WebAPI.Types (DeviceInfo(DeviceInfo), AuthData(AuthData))
 import Gonimo.WebAPI.Types.Helpers (runAuthData)
 import Partial.Unsafe (unsafeCrashWith)
 import Pux (renderToDOM, fromSimple, start)
 import Pux.Html (text, small, script, li, a, nav, h3, h2, td, tbody, th, tr, thead, table, ul, p, button, input, h1, span, Html, img, div)
 import Pux.Html.Attributes (offset)
+import Pux.Html.Events (FormEvent, FocusEvent)
 import Pux.Router (navigateTo)
 import Servant.PureScript.Affjax (AjaxError)
 import Servant.PureScript.Settings (defaultSettings, SPSettings_(SPSettings_))
@@ -81,8 +84,14 @@ update _ (InviteA (InviteC.ReportError err)) = handleError err
 update _ (InviteA action)                    = updateInvite action
 update _ (AcceptA (AcceptC.ReportError err)) = handleError err
 update _ (AcceptA action)                    = updateAccept action
-update _ (SetFamilyIds ids)                  = \state -> noEffects (state { familyIds = ids})
+update _ (SetFamilyIds ids)                  = \state -> noEffects (state { familyIds = ids
+                                                                          , currentFamily = state.currentFamily <|> head ids
+                                                                          })
+update _ (ServerFamilyGoOffline familyId)    = handleServerFamilyGoOffline familyId
 update _ (UpdateFamily familyId' family')    = \state -> noEffects (state { families = Map.insert familyId' family' state.families })
+update _ (SwitchFamily familyId')            = \state -> onlyEffects (state { currentFamily = Just familyId' })
+                                                         $ fromFoldable
+                                                         $ map (pure <<< ServerFamilyGoOffline) state.currentFamily
 update _ (SetCentral c)                      = \state -> noEffects (state { _central = c })
 update _ (SetOnlineDevices devices)          = \state -> noEffects (state {onlineDevices = Map.fromFoldable devices})
 update _ (SetDeviceInfos devices)            = \state -> noEffects (state {deviceInfos = Map.fromFoldable devices})
@@ -149,6 +158,14 @@ handleClearError state = let
                     , _central = newCentral
                     })
 
+handleServerFamilyGoOffline :: forall eff. Key Family -> State -> EffModel eff State Action
+handleServerFamilyGoOffline familyId state =
+    onlyGonimo (mkProps state) state $ do
+      deleteOnlineStatusByFamilyIdByDeviceId familyId deviceId
+      pure Nop
+  where
+    deviceId = (runAuthData state.authData).deviceId
+
 handleStartBabyStation :: forall eff. State -> EffModel eff State Action
 handleStartBabyStation state = noEffects $ state { isBabyStation = true }
 --------------------------------------------------------------------------------
@@ -206,8 +223,7 @@ viewNavbar state =
             [
               ul [ A.className "nav navbar-nav" ]
               [ li []
-                [ a [ A.role "button", E.onClick $ const $ SetCentral centralHome ]
-                  [ text "Home again ;-)" ]
+                [ viewFamilyChooser state
                 ]
               ]
             , ul [ A.className "nav navbar-nav navbar-right" ]
@@ -236,7 +252,7 @@ viewNavbar state =
 
 viewCentral :: State -> Html Action
 viewCentral state = case state._central of
-  CentralInvite -> map InviteA $ InviteC.view state._inviteS
+  CentralInvite -> map InviteA $ InviteC.view (mkProps state) state._inviteS
   CentralAccept -> map AcceptA $ AcceptC.view state._acceptS
   CentralHome   -> div [] [] ---map HomeA   $ HomeC.view   state._homeS
 
@@ -266,15 +282,29 @@ viewOnlineDevices state = table [ A.className "table table-stripped"]
                , td [] [ text lastAccessed ]
                ]
 
--- viewFamilyChooser :: State -> Html Action
--- viewFamilyChooser state = H.select []
---                           [ H.option [ A.value]
---                           ]
+viewFamilyChooser :: State -> Html Action
+viewFamilyChooser state = H.div []
+                          [ H.label [ A.htmlFor "familySelect" ] [ text "Family: " ]
+                          , H.select [ A.id_ "familySelect"
+                                     , A.className "form-control"
+                                     , E.onInput doSwitchFamily
+                                     ]
+                            $ fromFoldable
+                            <<< map (uncurry makeOption)
+                            <<< Map.toList $ state.families
+                          ]
+  where
+    doSwitchFamily :: FormEvent -> Action
+    doSwitchFamily ev = maybe Nop SwitchFamily $ fromString ev.target.value
+
+    makeOption :: Key Family -> Family -> Html Action
+    makeOption familyId (Family family) = H.option [ A.value (show familyId) ]
+                                          [ text family.familyName ]
 --------------------------------------------------------------------------------
 getSubscriptions :: State -> Subscriptions Action
 getSubscriptions state =
   let
-    familyId = head state.familyIds -- Currently we just pick the first family
+    familyId = state.currentFamily 
 
     --subscribeGetFamily :: forall m. MonadReader Settings m => Key Family -> m (Subscriptions Action)
     subscribeGetFamily familyId' =
@@ -301,7 +331,7 @@ getPongRequest state =
   let
     deviceId = (runAuthData state.authData).deviceId
     deviceData = Tuple deviceId NoBaby
-    familyId = head state.familyIds -- Currently we just pick the first family
+    familyId = state.currentFamily
   in
    case state.userError of
      NoError -> flip runReader (mkSettings state.authData) <<< Reqs.postOnlineStatusByFamilyId deviceData <$> familyId
@@ -311,11 +341,12 @@ getCloseRequest :: State -> Maybe HttpRequest
 getCloseRequest state =
   let
     deviceId = (runAuthData state.authData).deviceId
-    familyId = head state.familyIds -- Currently we just pick the first family
+    familyId = state.currentFamily
   in
    case state.userError of
      NoError -> flip runReader (mkSettings state.authData) <<< flip Reqs.deleteOnlineStatusByFamilyIdByDeviceId deviceId <$> familyId
      _ -> Nothing
+
 
 
 -- | Retrieve AuthData from local storage or if not present get new one from server
@@ -333,7 +364,9 @@ getAuthData = do
     Just d  -> pure d
 
 mkProps :: State -> Props
-mkProps state = { settings : mkSettings state.authData }
+mkProps state = { settings : mkSettings state.authData
+                , currentFamily : state.currentFamily
+                }
 
 mkSettings :: AuthData -> Settings
 mkSettings (AuthData auth) = defaultSettings $ SPParams_ {

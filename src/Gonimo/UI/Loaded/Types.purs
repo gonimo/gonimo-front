@@ -33,7 +33,9 @@ type State = { authData :: AuthData
              , isBabyStation :: Boolean
              }
 
-type Props = { settings :: Settings }
+type Props = { settings :: Settings
+             , currentFamily :: Maybe (Key Family)
+             }
 
 data Action = ReportError GonimoError
             | SetState State
@@ -44,6 +46,7 @@ data Action = ReportError GonimoError
             | SetFamilyIds (Array (Key Family))
             | UpdateFamily (Key Family) Family
             | SetCentral Central
+            | ServerFamilyGoOffline (Key Family) -- | A bit of a hack - for reliably switching families
             | SetOnlineDevices (Array (Tuple (Key Device) DeviceType))
             | SetDeviceInfos (Array (Tuple (Key Device) DeviceInfo))
             | SwitchFamily (Key Family)
