@@ -17,11 +17,11 @@ import Data.Either (Either(Left, Right), either)
 import Data.Generic (gShow)
 import Data.Maybe (fromMaybe, maybe, Maybe(Just, Nothing))
 import Gonimo.Client.Types (GonimoError(AjaxError, UnexpectedAction))
-import Gonimo.Pux (onlyEffects, onlyEffect, EffModel)
+import Gonimo.Pux (onlyEffects, onlyEffect, EffModel(..))
 import Gonimo.Server.Error (ServerError)
 import Pux.Html (div, button, p, h1, text, Html)
 import Pux.Html.Attributes (offset)
-import Servant.PureScript.Affjax (requestToString, ErrorDescription, responseToString, unsafeToString, ErrorDescription(DecodingError, ParsingError, UnexpectedHTTPStatus))
+import Servant.PureScript.Affjax (requestToString, ErrorDescription(ConnectionError), responseToString, unsafeToString, ErrorDescription(DecodingError, ParsingError, UnexpectedHTTPStatus))
 import Servant.Subscriber.Connection (Notification(HttpRequestFailed, ParseError, WebSocketClosed, WebSocketError))
 import Servant.Subscriber.Internal (doDecode)
 import Servant.Subscriber.Request (HttpRequest)
@@ -43,6 +43,7 @@ data UserError = NoError
                | NoSuchFamily
                | NoSuchInvitation
                | InvitationAlreadyClaimed
+               | ConnectionFailed
 
 
 handleError :: forall eff r action. ErrorAction action
@@ -56,6 +57,10 @@ handleAjaxError :: forall eff r action. ErrorAction action
 handleAjaxError state (Affjax.AjaxError err) = case err.description of
   ParsingError msg -> logErrorModel state "Parsing error in Ajax request: " msg
   DecodingError msg -> logErrorModel state "Decoding error in Ajax request: " msg
+  ConnectionError msg -> (\(EffModel model)
+                          -> EffModel $ model { state = setError ConnectionFailed model.state }
+                         )
+                         $ logErrorModel state "Ajax request failed: " msg
   UnexpectedHTTPStatus response ->
     handleEncodedServerError state (requestToString err.request) (responseToString response) response.response
 
@@ -119,6 +124,12 @@ viewError state = case state.userError of
                     <>"The link you just used, is now invalid! (Security, you know ... )"
              ]
       ]
+  ConnectionFailed -> errorView (Just clearError) "No Internet Connection?"
+    $ div []
+      [ p [] [ text "We cannot reach our server."]
+      , p [] [ text "Please make sure that you have a working internet connection and try again."
+             ]
+      ]
   NoSuchFamily -> errorView (Just clearError) "Your family no longer exists!"
     $ div []
       [ p [] [ text "It probably got deleted, we are sorry about that."]
@@ -139,7 +150,11 @@ viewError state = case state.userError of
 
 errorView :: forall action. ErrorAction action
              => Maybe action -> String -> Html action -> Html action
-errorView action heading body =
+errorView = errorView' "Proceed"
+
+errorView' :: forall action. ErrorAction action
+             => String -> Maybe action -> String -> Html action -> Html action
+errorView' btnText action heading body =
     div [ A.className "alert alert-danger", A.role "alert" ]
     $ [ h1 [] [ text heading ]
       , body
@@ -151,7 +166,7 @@ errorView action heading body =
       div [ A.className "btn-group", A.role "group" ]
       [ button
         [ A.className "btn btn-danger btn-lg btn-block", E.onClick $ const action ]
-        [ text "Proceed"]
+        [ text btnText ]
       ]
 
 logErrorModel :: forall eff r action. ErrorAction action

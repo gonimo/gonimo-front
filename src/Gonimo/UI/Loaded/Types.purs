@@ -26,8 +26,8 @@ type State = { authData :: AuthData
              , familyIds :: Array (Key Family)
              , families  :: Map (Key Family) Family
              , currentFamily :: Maybe (Key Family)
-             , onlineDevices :: Map (Key Device) DeviceType
-             , deviceInfos :: Map (Key Device) DeviceInfo
+             , onlineDevices :: Array (Tuple (Key Device) DeviceType)
+             , deviceInfos :: Array (Tuple (Key Device) DeviceInfo)
              , userError :: UserError
              , url :: String
              , onlineStatus :: DeviceType
@@ -37,6 +37,8 @@ type Props = { settings :: Settings
              , familyId :: Maybe (Key Family)
              , family :: Maybe Family
              , onlineStatus :: DeviceType
+             , onlineDevices :: Array (Tuple (Key Device) DeviceType)
+             , deviceInfos :: Array (Tuple (Key Device) DeviceInfo)
              }
 
 data Action = ReportError GonimoError

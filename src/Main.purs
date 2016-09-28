@@ -126,7 +126,7 @@ updateLoading' _ action state             = case action of
                         pure Nop
   (ReportError err) -> handleError err state
   ResetDevice       -> handleResetDevice state
-  ClearError        -> noEffects $ state { userError = NoError }
+  ClearError        -> onlyEffect (state { userError = NoError }) (pure Start)
   Nop               -> noEffects state
 
 handleResetDevice :: forall eff. LoadingS' -> EffModel eff LoadingS' Action
@@ -202,8 +202,8 @@ load = Gonimo.toAff initSettings $ authToAction =<< LoadedC.getAuthData
             , currentFamily  : Nothing
             , families      : Map.empty
             , url           : ""
-            , onlineDevices : Map.empty
-            , deviceInfos   : Map.empty
+            , onlineDevices : []
+            , deviceInfos   : []
             , userError     : NoError
             , onlineStatus   : NoBaby
             }

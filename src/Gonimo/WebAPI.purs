@@ -44,7 +44,7 @@ postAccounts = do
                  , url = reqUrl
                  , headers = defaultRequest.headers <> reqHeaders
                  }
-  affResp <- liftAff $ affjax affReq
+  affResp <- affjax affReq
   getResult affReq decodeJson affResp
   
 postInvitationsByFamilyId :: forall eff m.
@@ -68,7 +68,7 @@ postInvitationsByFamilyId familyId = do
                  , url = reqUrl
                  , headers = defaultRequest.headers <> reqHeaders
                  }
-  affResp <- liftAff $ affjax affReq
+  affResp <- affjax affReq
   getResult affReq decodeJson affResp
   
 deleteInvitationsByInvitationSecret :: forall eff m.
@@ -92,7 +92,7 @@ deleteInvitationsByInvitationSecret reqBody invitationSecret = do
                  , headers = defaultRequest.headers <> reqHeaders
                  , content = toNullable <<< Just <<< printJson <<< encodeJson $ reqBody
                  }
-  affResp <- liftAff $ affjax affReq
+  affResp <- affjax affReq
   getResult affReq decodeJson affResp
   
 postInvitationsOutbox :: forall eff m.
@@ -115,7 +115,7 @@ postInvitationsOutbox reqBody = do
                  , headers = defaultRequest.headers <> reqHeaders
                  , content = toNullable <<< Just <<< printJson <<< encodeJson $ reqBody
                  }
-  affResp <- liftAff $ affjax affReq
+  affResp <- affjax affReq
   getResult affReq decodeJson affResp
   
 putInvitationsInfoByInvitationSecret :: forall eff m.
@@ -138,7 +138,7 @@ putInvitationsInfoByInvitationSecret invitationSecret = do
                  , url = reqUrl
                  , headers = defaultRequest.headers <> reqHeaders
                  }
-  affResp <- liftAff $ affjax affReq
+  affResp <- affjax affReq
   getResult affReq decodeJson affResp
   
 getAccountsByAccountIdFamilies :: forall eff m.
@@ -161,7 +161,7 @@ getAccountsByAccountIdFamilies accountId = do
                  , url = reqUrl
                  , headers = defaultRequest.headers <> reqHeaders
                  }
-  affResp <- liftAff $ affjax affReq
+  affResp <- affjax affReq
   getResult affReq decodeJson affResp
   
 postFamilies :: forall eff m.
@@ -184,7 +184,7 @@ postFamilies reqBody = do
                  , headers = defaultRequest.headers <> reqHeaders
                  , content = toNullable <<< Just <<< printJson <<< encodeJson $ reqBody
                  }
-  affResp <- liftAff $ affjax affReq
+  affResp <- affjax affReq
   getResult affReq decodeJson affResp
   
 getFamiliesByFamilyId :: forall eff m.
@@ -206,7 +206,7 @@ getFamiliesByFamilyId familyId = do
                  , url = reqUrl
                  , headers = defaultRequest.headers <> reqHeaders
                  }
-  affResp <- liftAff $ affjax affReq
+  affResp <- affjax affReq
   getResult affReq decodeJson affResp
   
 getFamiliesByFamilyIdDeviceInfos :: forall eff m.
@@ -230,7 +230,7 @@ getFamiliesByFamilyIdDeviceInfos familyId = do
                  , url = reqUrl
                  , headers = defaultRequest.headers <> reqHeaders
                  }
-  affResp <- liftAff $ affjax affReq
+  affResp <- affjax affReq
   getResult affReq decodeJson affResp
   
 postSocketByFamilyIdByToDevice :: forall eff m.
@@ -255,7 +255,7 @@ postSocketByFamilyIdByToDevice reqBody familyId toDevice = do
                  , headers = defaultRequest.headers <> reqHeaders
                  , content = toNullable <<< Just <<< printJson <<< encodeJson $ reqBody
                  }
-  affResp <- liftAff $ affjax affReq
+  affResp <- affjax affReq
   getResult affReq decodeJson affResp
   
 receiveSocketByFamilyIdByToDevice :: forall eff m.
@@ -279,7 +279,7 @@ receiveSocketByFamilyIdByToDevice familyId toDevice = do
                  , url = reqUrl
                  , headers = defaultRequest.headers <> reqHeaders
                  }
-  affResp <- liftAff $ affjax affReq
+  affResp <- affjax affReq
   getResult affReq decodeJson affResp
   
 putSocketByFamilyIdByFromDeviceByToDeviceByChannelId :: forall eff m.
@@ -309,7 +309,7 @@ putSocketByFamilyIdByFromDeviceByToDeviceByChannelId reqBody familyId fromDevice
                  , headers = defaultRequest.headers <> reqHeaders
                  , content = toNullable <<< Just <<< printJson <<< encodeJson $ reqBody
                  }
-  affResp <- liftAff $ affjax affReq
+  affResp <- affjax affReq
   getResult affReq decodeJson affResp
   
 receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId :: forall eff m.
@@ -339,7 +339,7 @@ receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId familyId fromDevice
                  , url = reqUrl
                  , headers = defaultRequest.headers <> reqHeaders
                  }
-  affResp <- liftAff $ affjax affReq
+  affResp <- affjax affReq
   getResult affReq decodeJson affResp
   
 postOnlineStatusByFamilyId :: forall eff m.
@@ -364,7 +364,7 @@ postOnlineStatusByFamilyId reqBody familyId = do
                  , headers = defaultRequest.headers <> reqHeaders
                  , content = toNullable <<< Just <<< printJson <<< encodeJson $ reqBody
                  }
-  affResp <- liftAff $ affjax affReq
+  affResp <- affjax affReq
   getResult affReq decodeJson affResp
   
 putOnlineStatusByFamilyIdByDeviceId :: forall eff m.
@@ -390,7 +390,7 @@ putOnlineStatusByFamilyIdByDeviceId reqBody familyId deviceId = do
                  , headers = defaultRequest.headers <> reqHeaders
                  , content = toNullable <<< Just <<< printJson <<< encodeJson $ reqBody
                  }
-  affResp <- liftAff $ affjax affReq
+  affResp <- affjax affReq
   getResult affReq decodeJson affResp
   
 deleteOnlineStatusByFamilyIdByDeviceId :: forall eff m.
@@ -414,7 +414,7 @@ deleteOnlineStatusByFamilyIdByDeviceId familyId deviceId = do
                  , url = reqUrl
                  , headers = defaultRequest.headers <> reqHeaders
                  }
-  affResp <- liftAff $ affjax affReq
+  affResp <- affjax affReq
   getResult affReq decodeJson affResp
   
 getOnlineStatusByFamilyId :: forall eff m.
@@ -438,7 +438,7 @@ getOnlineStatusByFamilyId familyId = do
                  , url = reqUrl
                  , headers = defaultRequest.headers <> reqHeaders
                  }
-  affResp <- liftAff $ affjax affReq
+  affResp <- affjax affReq
   getResult affReq decodeJson affResp
   
 postFunnyName :: forall eff m.
@@ -458,7 +458,7 @@ postFunnyName = do
                  , url = reqUrl
                  , headers = defaultRequest.headers <> reqHeaders
                  }
-  affResp <- liftAff $ affjax affReq
+  affResp <- affjax affReq
   getResult affReq decodeJson affResp
   
 getCoffee :: forall eff m.
@@ -478,6 +478,6 @@ getCoffee = do
                  , url = reqUrl
                  , headers = defaultRequest.headers <> reqHeaders
                  }
-  affResp <- liftAff $ affjax affReq
+  affResp <- affjax affReq
   getResult affReq decodeJson affResp
   

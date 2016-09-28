@@ -16,7 +16,7 @@
     "purescript-generics": "^1.0.1",
     "purescript-partial": "^1.1.2",
     "purescript-localstorage": "^1.0.0",
-    "purescript-servant-support": "^4.0.0",
+    "purescript-servant-support": "^5.0.0",
     "purescript-subscriber": "^1.1.1",
     "purescript-profunctor-lenses": "^1.0.0",
     "purescript-unfoldable": "git@github.com:eskimor/purescript-unfoldable.git#master"

@@ -32,6 +32,7 @@ import Control.Monad.Reader.Class (class MonadReader)
 import Control.Monad.Reader.Trans (runReaderT)
 import Data.Argonaut.Generic.Aeson (decodeJson)
 import Data.Array (fromFoldable, concat, catMaybes, head)
+import Data.Array as Arr
 import Data.Bifunctor (bimap)
 import Data.Either (either, Either(Right, Left))
 import Data.Foldable (foldl)
@@ -44,6 +45,7 @@ import Data.Semigroup (append)
 import Data.String (takeWhile)
 import Data.Traversable (traverse)
 import Data.Tuple (uncurry, fst, Tuple(Tuple))
+import Data.Tuple as Tuple
 import Debug.Trace (trace)
 import Gonimo.Client.Types (Settings, GonimoError, class ReportErrorAction, Gonimo, GonimoEff, runGonimoT)
 import Gonimo.Pux (updateChild, onlyGonimo, onlyEffects, onlyEffect, justEffect, noEffects, EffModel(EffModel))
@@ -94,8 +96,8 @@ update _ (SwitchFamily familyId')            = \state -> onlyEffects (state { cu
                                                          $ fromFoldable
                                                          $ map (pure <<< ServerFamilyGoOffline) state.currentFamily
 update _ (SetCentral c)                      = \state -> noEffects (state { _central = c })
-update _ (SetOnlineDevices devices)          = \state -> noEffects (state {onlineDevices = Map.fromFoldable devices})
-update _ (SetDeviceInfos devices)            = \state -> noEffects (state {deviceInfos = Map.fromFoldable devices})
+update _ (SetOnlineDevices devices)          = \state -> noEffects (state {onlineDevices = devices})
+update _ (SetDeviceInfos devices)            = \state -> noEffects (state {deviceInfos = devices})
 update _ (SetURL url)                        = handleSetURL url
 update _ (HandleSubscriber msg)              = handleSubscriber msg
 update _ ResetDevice                         = handleResetDevice
@@ -185,7 +187,7 @@ handleServerFamilyGoOffline familyId state =
 view :: State -> Html Action
 view state =
   let
-    numDevices = Map.size state.onlineDevices
+    numDevices = Arr.length state.onlineDevices
   in
     case state.userError of
       NoError ->
@@ -286,11 +288,10 @@ viewOnlineDevices state = table [ A.className "table table-stripped"]
              ]
            ]
     body = tbody []
-           <<< fromFoldable
-           <<< List.mapMaybe viewOnlineDevice
-           $ Map.keys state.onlineDevices
+           <<< Arr.mapMaybe viewOnlineDevice
+           $ map fst state.onlineDevices
     viewOnlineDevice deviceId = do
-        (DeviceInfo info) <- Map.lookup deviceId state.deviceInfos
+        (DeviceInfo info) <- Tuple.lookup deviceId state.deviceInfos
         let name = info.deviceInfoName
         let lastAccessed = dateToString info.deviceInfoLastAccessed
         pure $ tr []
@@ -384,6 +385,8 @@ mkProps state = { settings : mkSettings state.authData
                 , familyId : state.currentFamily
                 , onlineStatus  : state.onlineStatus
                 , family : flip Map.lookup state.families =<< state.currentFamily
+                , onlineDevices : state.onlineDevices
+                , deviceInfos : state.deviceInfos
                 }
 
 mkSettings :: AuthData -> Settings

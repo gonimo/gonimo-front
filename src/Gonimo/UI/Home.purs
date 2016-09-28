@@ -1,26 +1,31 @@
 module  Gonimo.UI.Home where
 
+import Data.Array as Arr
+import Data.Tuple as Tuple
 import Pux.Html.Attributes as A
 import Pux.Html.Elements as H
 import Pux.Html.Events as E
 import Data.Array (concat, fromFoldable)
-import Data.Maybe (Maybe)
-import Data.Tuple (Tuple(..))
+import Data.Maybe (Maybe(Just, Nothing))
+import Data.Tuple (uncurry, snd, fst, Tuple(..))
 import Gonimo.Client.Types (Settings, BabyStationInfo)
 import Gonimo.Pux (noEffects, EffModel(EffModel))
 import Gonimo.Server.DbEntities (Family(Family), Device)
 import Gonimo.Server.DbEntities.Helpers (runFamily)
 import Gonimo.Server.Types (DeviceType(Baby, NoBaby))
 import Gonimo.Types (Key)
-import Gonimo.WebAPI.Types (DeviceInfo)
+import Gonimo.WebAPI.Types (DeviceInfo(..))
+import Prelude (class BooleanAlgebra)
 import Pux.Html (span, text, button, div, Html)
 import Pux.Html.Attributes (letterSpacing)
 import Prelude hiding (div)
 
 
-type Props ps = { settings :: Settings
-                , family :: Maybe Family
-                , onlineStatus :: DeviceType
+type Props ps = { settings      :: Settings
+                , family        :: Maybe Family
+                , onlineStatus  :: DeviceType
+                , onlineDevices :: Array (Tuple (Key Device) DeviceType)
+                , deviceInfos   :: Array (Tuple (Key Device) DeviceInfo)
                 | ps }
 
 type State = { newBabyName :: String }
@@ -43,9 +48,67 @@ update _ (ConnectToBaby _)    = noEffects
 update _ Nop                  = noEffects
 
 view :: forall ps. Props ps -> State -> Html Action
-view props state = case props.onlineStatus of
-  NoBaby -> viewOffline props state
-  Baby name -> viewOnline name
+view props state = div []
+                   [
+                     viewAvailableBabies props state
+                   ,
+                     case props.onlineStatus of
+                       NoBaby -> viewOffline props state
+                       Baby name -> viewOnline name
+                   ]
+
+type OnlineBaby =
+  { babyName :: String
+  , deviceName :: String
+  , deviceId :: Key Device
+  }
+
+viewAvailableBabies :: forall ps. Props ps -> State -> Html Action
+viewAvailableBabies props state =
+    H.div [ A.className "jumbotron" ]
+    [ H.div [ A.className "container" ]
+      $ [ H.h2 [] [ text "Connect to baby: " ] ]
+      <> map viewOnlineBaby onlineBabies
+    ]
+  where
+    makeOnlineBaby :: Key Device -> String -> String -> OnlineBaby
+    makeOnlineBaby deviceId deviceName babyName = { deviceId : deviceId
+                                                  , deviceName : deviceName
+                                                  , babyName : babyName
+                                                  }
+    onlineBabies :: Array OnlineBaby
+    onlineBabies =
+      let
+        isBaby :: DeviceType -> Boolean
+        isBaby t = case t of
+          NoBaby -> false
+          Baby _ -> true
+
+        getBabyName :: DeviceType -> Maybe String
+        getBabyName NoBaby = Nothing
+        getBabyName (Baby n) = Just n
+
+        ids = map fst <<< Arr.filter (isBaby <<< snd) $ props.onlineDevices
+        babyNames = Arr.concatMap (fromFoldable <<< getBabyName <<< snd) props.onlineDevices
+        deviceInfos = Arr.concatMap (fromFoldable <<< flip Tuple.lookup props.deviceInfos) ids
+        deviceNames = map (\(DeviceInfo info) -> info.deviceInfoName) deviceInfos
+
+      in
+       Arr.zipWith (uncurry makeOnlineBaby) (Arr.zip ids deviceNames) babyNames
+
+viewOnlineBaby :: OnlineBaby -> Html Action
+viewOnlineBaby baby =
+  button [ A.className "btn btn-block btn-info"
+         , A.style [Tuple "margin-left" "0px"]
+         , A.type_ "button"
+         , E.onClick $ const $ ConnectToBaby baby.deviceId
+         ]
+  [ text $ baby.babyName <> " "
+  , span [A.className "glyphicon glyphicon-transfer"] []
+  , H.p []
+    [ H.small [] [ text $ "on device: " <> baby.deviceName ]
+    ]
+  ]
 
 viewOnline :: String -> Html Action
 viewOnline name =
