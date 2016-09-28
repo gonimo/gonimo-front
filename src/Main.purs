@@ -196,8 +196,8 @@ load = Gonimo.toAff initSettings $ authToAction =<< LoadedC.getAuthData
             , subscriberUrl : "ws://localhost:8081/subscriber"
             , _inviteS       : inviteState
             , _acceptS       : AcceptC.init
-            , _central       : LoadedC.CentralInvite
             , _homeS         : HomeC.init
+            , _central       : LoadedC.CentralInvite
             , familyIds      : []
             , currentFamily  : Nothing
             , families      : Map.empty
@@ -205,7 +205,7 @@ load = Gonimo.toAff initSettings $ authToAction =<< LoadedC.getAuthData
             , onlineDevices : Map.empty
             , deviceInfos   : Map.empty
             , userError     : NoError
-            , isBabyStation  : false
+            , onlineStatus   : NoBaby
             }
 
 makeCallback :: forall eff. Channel Action ->  (LoadedC.Action -> SubscriberEff (channel :: CHANNEL | eff) Unit)

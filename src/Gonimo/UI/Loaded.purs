@@ -50,11 +50,11 @@ import Gonimo.Pux (updateChild, onlyGonimo, onlyEffects, onlyEffect, justEffect,
 import Gonimo.Server.DbEntities (Device(Device), Family(Family))
 import Gonimo.Server.DbEntities.Helpers (runFamily)
 import Gonimo.Server.Error (ServerError(InvalidAuthToken))
-import Gonimo.Server.Types (DeviceType(NoBaby), AuthToken, AuthToken(GonimoSecret))
+import Gonimo.Server.Types (DeviceType(Baby, NoBaby), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (dateToString, Key(Key), Secret(Secret))
 import Gonimo.UI.Error (viewError, class ErrorAction, UserError(NoError, DeviceInvalid), handleSubscriber, handleError)
-import Gonimo.UI.Loaded.Types (centralHome, Props, acceptS, inviteS, State, Action(..), Central(..))
-import Gonimo.Util (fromString)
+import Gonimo.UI.Loaded.Types (homeS, centralHome, Props, acceptS, inviteS, State, Action(..), Central(..))
+import Gonimo.Util (toString, fromString)
 import Gonimo.WebAPI (deleteOnlineStatusByFamilyIdByDeviceId, SPParams_(SPParams_), postAccounts)
 import Gonimo.WebAPI.Types (DeviceInfo(DeviceInfo), AuthData(AuthData))
 import Gonimo.WebAPI.Types.Helpers (runAuthData)
@@ -84,6 +84,7 @@ update _ (InviteA (InviteC.ReportError err)) = handleError err
 update _ (InviteA action)                    = updateInvite action
 update _ (AcceptA (AcceptC.ReportError err)) = handleError err
 update _ (AcceptA action)                    = updateAccept action
+update _ (HomeA action)                      = updateHome action
 update _ (SetFamilyIds ids)                  = \state -> noEffects (state { familyIds = ids
                                                                           , currentFamily = state.currentFamily <|> head ids
                                                                           })
@@ -109,6 +110,19 @@ updateInvite action state = updateChild inviteS InviteA InviteC.update (mkProps 
 
 updateAccept :: forall eff. AcceptC.Action -> State -> EffModel eff State Action
 updateAccept action state = updateChild acceptS AcceptA AcceptC.update (mkProps state) action state
+
+updateHome :: forall eff. HomeC.Action -> State -> EffModel eff State Action
+updateHome action state = case action of
+    HomeC.StartBabyStation baby -> handleStartBabyStation baby
+    HomeC.StopBabyStation -> handleStopBabyStation
+    HomeC.ConnectToBaby baby -> unsafeCrashWith "ConnectToBaby: Not yet implemented!"
+    _ -> updateChild homeS HomeA HomeC.update (mkProps state) action state
+  where
+    handleStartBabyStation :: String -> EffModel eff State Action
+    handleStartBabyStation name = noEffects $ state { onlineStatus = Baby name }
+
+    handleStopBabyStation :: EffModel eff State Action
+    handleStopBabyStation = noEffects $ state { onlineStatus = NoBaby }
 
 inviteEffect :: forall m. Monad m => Secret -> m Action
 inviteEffect = pure <<< AcceptA <<< AcceptC.LoadInvitation
@@ -166,8 +180,6 @@ handleServerFamilyGoOffline familyId state =
   where
     deviceId = (runAuthData state.authData).deviceId
 
-handleStartBabyStation :: forall eff. State -> EffModel eff State Action
-handleStartBabyStation state = noEffects $ state { isBabyStation = true }
 --------------------------------------------------------------------------------
 
 view :: State -> Html Action
@@ -251,10 +263,14 @@ viewNavbar state =
           ]
 
 viewCentral :: State -> Html Action
-viewCentral state = case state._central of
-  CentralInvite -> map InviteA $ InviteC.view (mkProps state) state._inviteS
-  CentralAccept -> map AcceptA $ AcceptC.view state._acceptS
-  CentralHome   -> div [] [] ---map HomeA   $ HomeC.view   state._homeS
+viewCentral state =
+  let
+    props = mkProps state
+  in
+   case state._central of
+    CentralInvite -> map InviteA $ InviteC.view props state._inviteS
+    CentralAccept -> map AcceptA $ AcceptC.view state._acceptS
+    CentralHome   -> map HomeA   $ HomeC.view props state._homeS
 
 
 viewOnlineDevices :: State -> Html Action
@@ -298,13 +314,13 @@ viewFamilyChooser state = H.div []
     doSwitchFamily ev = maybe Nop SwitchFamily $ fromString ev.target.value
 
     makeOption :: Key Family -> Family -> Html Action
-    makeOption familyId (Family family) = H.option [ A.value (show familyId) ]
+    makeOption familyId (Family family) = H.option [ A.value (toString familyId) ]
                                           [ text family.familyName ]
 --------------------------------------------------------------------------------
 getSubscriptions :: State -> Subscriptions Action
 getSubscriptions state =
   let
-    familyId = state.currentFamily 
+    familyId = state.currentFamily
 
     --subscribeGetFamily :: forall m. MonadReader Settings m => Key Family -> m (Subscriptions Action)
     subscribeGetFamily familyId' =
@@ -330,7 +346,7 @@ getPongRequest :: State -> Maybe HttpRequest
 getPongRequest state =
   let
     deviceId = (runAuthData state.authData).deviceId
-    deviceData = Tuple deviceId NoBaby
+    deviceData = Tuple deviceId state.onlineStatus
     familyId = state.currentFamily
   in
    case state.userError of
@@ -365,7 +381,9 @@ getAuthData = do
 
 mkProps :: State -> Props
 mkProps state = { settings : mkSettings state.authData
-                , currentFamily : state.currentFamily
+                , familyId : state.currentFamily
+                , onlineStatus  : state.onlineStatus
+                , family : flip Map.lookup state.families =<< state.currentFamily
                 }
 
 mkSettings :: AuthData -> Settings

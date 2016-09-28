@@ -30,11 +30,13 @@ type State = { authData :: AuthData
              , deviceInfos :: Map (Key Device) DeviceInfo
              , userError :: UserError
              , url :: String
-             , isBabyStation :: Boolean
+             , onlineStatus :: DeviceType
              }
 
 type Props = { settings :: Settings
-             , currentFamily :: Maybe (Key Family)
+             , familyId :: Maybe (Key Family)
+             , family :: Maybe Family
+             , onlineStatus :: DeviceType
              }
 
 data Action = ReportError GonimoError
@@ -78,6 +80,9 @@ inviteS = lens _._inviteS (_ { _inviteS = _ })
 
 acceptS :: LensP State AcceptC.State
 acceptS = lens _._acceptS (_ { _acceptS = _ })
+
+homeS :: LensP State HomeC.State
+homeS = lens _._homeS (_ { _homeS = _ })
 
 central :: LensP State Central
 central = lens _._central (_ { _central = _})

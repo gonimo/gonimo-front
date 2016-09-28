@@ -35,7 +35,7 @@ import Servant.PureScript.Settings (defaultSettings, SPSettings_(SPSettings_))
 import Signal (constant, Signal)
 
 type Props ps = { settings :: Settings
-                , currentFamily :: (Maybe (Key Family))
+                , familyId :: (Maybe (Key Family))
                 | ps
                 }
 
@@ -81,7 +81,7 @@ handleSendInvitation props state = do
   (SPSettings_ settings) <- ask
   let params = case settings.params of (SPParams_ params) -> params
   Gonimo.log $ "Using AuthToken: " <> gShow params.authorization
-  fid <- case props.currentFamily of
+  fid <- case props.familyId of
     Nothing   -> postFamilies state.familyName
     Just fid' -> pure fid'
   (Tuple invId invitation) <- postInvitationsByFamilyId fid
@@ -108,7 +108,7 @@ viewSend props state =
             ]
     , div [ E.onKeyUp handleEnter ]
       [ div [A.className "input-group"]
-          if isNothing props.currentFamily -- We can only set the family name here, if we are creating one!
+          if isNothing props.familyId -- We can only set the family name here, if we are creating one!
           then
           [ p [] [text "Choose a name for your family."]
           , span [A.className "input-group-addon glyphicon glyphicon-edit"] []
