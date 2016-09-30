@@ -13,6 +13,7 @@ data ServerError =
   | AlreadyFamilyMember 
   | NoSuchFamily (Key Family)
   | NoSuchInvitation 
+  | NoSuchSocket 
   | Forbidden 
   | NotFound 
   | TransactionTimeout 
