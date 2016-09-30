@@ -2,8 +2,10 @@
 module Gonimo.UI.Loaded where
 
 import Gonimo.UI.Html
+import Data.Array as Arr
 import Data.List as List
 import Data.Map as Map
+import Data.Tuple as Tuple
 import Gonimo.Client.Effects as Gonimo
 import Gonimo.Client.LocalStorage as Key
 import Gonimo.Client.LocalStorage as Key
@@ -32,7 +34,6 @@ import Control.Monad.Reader.Class (class MonadReader)
 import Control.Monad.Reader.Trans (runReaderT)
 import Data.Argonaut.Generic.Aeson (decodeJson)
 import Data.Array (fromFoldable, concat, catMaybes, head)
-import Data.Array as Arr
 import Data.Bifunctor (bimap)
 import Data.Either (either, Either(Right, Left))
 import Data.Foldable (foldl)
@@ -45,7 +46,6 @@ import Data.Semigroup (append)
 import Data.String (takeWhile)
 import Data.Traversable (traverse)
 import Data.Tuple (uncurry, fst, Tuple(Tuple))
-import Data.Tuple as Tuple
 import Debug.Trace (trace)
 import Gonimo.Client.Types (Settings, GonimoError, class ReportErrorAction, Gonimo, GonimoEff, runGonimoT)
 import Gonimo.Pux (updateChild, onlyGonimo, onlyEffects, onlyEffect, justEffect, noEffects, EffModel(EffModel))
@@ -210,6 +210,7 @@ viewHeader state =
         , small [] [ text "Good Night Monitor!" ]
         ]
       ]
+
 viewNavbar :: State -> Html Action
 viewNavbar state =
        nav [ A.className ".navbar .navbar-default" ]
@@ -382,6 +383,7 @@ getAuthData = do
 
 mkProps :: State -> Props
 mkProps state = { settings : mkSettings state.authData
+                , deviceId : (runAuthData state.authData).deviceId
                 , familyId : state.currentFamily
                 , onlineStatus  : state.onlineStatus
                 , family : flip Map.lookup state.families =<< state.currentFamily

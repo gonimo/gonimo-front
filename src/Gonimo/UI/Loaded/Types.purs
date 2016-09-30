@@ -34,6 +34,7 @@ type State = { authData :: AuthData
              }
 
 type Props = { settings :: Settings
+             , deviceId :: Key Device
              , familyId :: Maybe (Key Family)
              , family :: Maybe Family
              , onlineStatus :: DeviceType
