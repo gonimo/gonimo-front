@@ -10,7 +10,7 @@
     "output"
   ],
   "dependencies": {
-      "purescript-pux": "https://github.com/eskimor/purescript-pux.git#dropRepeats",
+    "purescript-pux": "https://github.com/eskimor/purescript-pux.git#dropRepeats",
     "purescript-affjax": "^1.1.0",
     "purescript-argonaut-generic-codecs": "^3.0.0",
     "purescript-generics": "^1.0.1",
@@ -19,7 +19,8 @@
     "purescript-servant-support": "^5.0.0",
     "purescript-subscriber": "^1.1.1",
     "purescript-profunctor-lenses": "^1.0.0",
-    "purescript-unfoldable": "git@github.com:eskimor/purescript-unfoldable.git#master"
+    "purescript-unfoldable": "git@github.com:eskimor/purescript-unfoldable.git#master",
+    "purescript-webrtc": "#master"
   },
   "devDependencies": {
     "purescript-debug": "^1.0.0"

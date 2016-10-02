@@ -59,6 +59,7 @@ import Signal (foldp, map2, runSignal, constant, Signal)
 import Signal.Channel (CHANNEL, Channel, send, subscribe, channel)
 import Unsafe.Coerce (unsafeCoerce)
 import Prelude hiding (div)
+import Gonimo.Util (coerceEffects)
 
 data State = LoadingS LoadingS'
            | LoadedS LoadedC.State
@@ -283,9 +284,6 @@ main = do
   runSignal $ Console.log <$> urlSignal
   runSignal $ (Console.log <<< ("Central widget: " <> _ ) <<< showCentral) <$> app.state
   renderToDOM "#app" app.html
-
-coerceEffects :: forall eff1 eff2 a. Eff eff1 a -> Eff eff2 a
-coerceEffects = unsafeCoerce
 
 toGonimoEffects :: forall eff a. Eff eff a -> Eff (GonimoEff eff) a
 toGonimoEffects = unsafeCoerce

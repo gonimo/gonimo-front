@@ -14,6 +14,7 @@ import Pux.Html.Attributes as A
 import Pux.Html.Events as E
 import Servant.PureScript.Affjax as Affjax
 import Data.Either (Either(Left, Right), either)
+import Data.Array as Arr
 import Data.Generic (gShow)
 import Data.Maybe (fromMaybe, maybe, Maybe(Just, Nothing))
 import Gonimo.Client.Types (GonimoError(AjaxError, UnexpectedAction))
@@ -159,7 +160,7 @@ errorView' btnText action heading body =
     $ [ h1 [] [ text heading ]
       , body
       ]
-      <> Unfoldable.fromMaybe (map renderButton action)
+      <> Arr.fromFoldable (map renderButton action)
   where
     renderButton :: action -> Html action
     renderButton action =
