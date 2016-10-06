@@ -23,8 +23,10 @@ import Data.Traversable (traverse)
 import Data.Tuple (Tuple(Tuple))
 import Gonimo.Client.Types (GonimoEff, Gonimo, Settings, class ReportErrorAction)
 import Partial.Unsafe (unsafeCrashWith)
+import Gonimo.Util (runIOToSomeAff)
 
 -- First this was a record but records containing prisms is something psc does not seem to like.
+-- | A helper data structure for transforming child components to parent components:
 data ChildData parentState childState childProps =
   ChildData (PrismP parentState childState) childProps
 
@@ -41,13 +43,18 @@ childDataProps :: forall parentState childState childProps.
                          -> childProps
 childDataProps (ChildData _ props) = props
 
+
+-- | Create ChildData from a parent component:
 type ToChild parentProps parentState childProps childState m =
   (MonadReader parentProps m, MonadState parentState m)
   => m (ChildData parentState childState childProps)
 
-
+-- | A component is just a Reader monad with react style props and a State monad
+-- | with well our component state.
 newtype Component props state a = Component (ReaderT props (State state) a)
-type Update props state action = Component props state (IO action)
+
+-- | A component which updates the state somehow and returns zero or more `IO action`.
+type Update props state action = Component props state (Array (IO action))
 
 runComponent :: forall props state a. Component props state a -> ReaderT props (State state) a
 runComponent (Component m) = m
@@ -55,6 +62,10 @@ runComponent (Component m) = m
 runComponentFull :: forall props state a. props -> state -> Component props state a -> Tuple a state
 runComponentFull props state = runIdentity <<< flip runStateT state <<< flip runReaderT props <<< runComponent
 
+
+-- | Run a child component and transform it to a parent component, updating the
+-- | state only if it actually changed.
+-- | We return Nothing if the child is currently not present in the parent.
 liftChild :: forall childProps childState parentProps parentState m a.
             ( MonadReader parentProps m
             , MonadState parentState m
@@ -77,6 +88,17 @@ liftChild toChild child = do
             $ fromToParent .= newChild
           pure a
   traverse runComponentCheck (oldParent ^? fromToParent)
+
+-- | Convert a component to an EffModel usable with Pux.
+-- | The restriction to of props to Unit for this root component is currently not justified
+-- | and can be dropped if necessary. I just have some vague idea for future enhancements where
+-- | properties for the root level component could be in the way.
+toEffModel :: forall state action eff. state -> Update Unit state action -> EffModelImpl state action eff
+toEffModel initState c =
+  case runComponentFull unit initState c of
+    Tuple effects state -> { state : state
+                           , effects : runIOToSomeAff <$> effects
+                           }
 
 instance functorComponent :: Functor (Component props state) where
   map f (Component m) = Component $ map f m
