@@ -7,41 +7,76 @@ import Gonimo.Client.Types as Gonimo
 import Control.Alternative (empty, class Alternative)
 import Control.Monad.Aff (Aff)
 import Control.Monad.IO (IO)
+import Control.Monad.IO.Class (class MonadIO, liftIO)
 import Control.Monad.Maybe.Trans (runMaybeT, MaybeT(MaybeT))
 import Control.Monad.Reader.Class (local, ask, class MonadReader)
 import Control.Monad.Reader.Trans (runReaderT, ReaderT(ReaderT))
-import Control.Monad.State.Class (put, get, state, class MonadState)
+import Control.Monad.State (State)
+import Control.Monad.State.Class (modify, put, get, state, class MonadState)
 import Control.Monad.State.Trans (runStateT, StateT(StateT))
+import Control.Monad.Trans (lift, class MonadTrans)
 import Data.Bifunctor (bimap, class Bifunctor)
-import Data.Lens (prism, (^?), PrismP, (.~), (^.), LensP)
+import Data.Identity (runIdentity)
+import Data.Lens (SetterP, APrismP, (.=), prism, (^?), PrismP, (.~), (^.), LensP)
 import Data.Maybe (Maybe(Just, Nothing))
+import Data.Traversable (traverse)
 import Data.Tuple (Tuple(Tuple))
 import Gonimo.Client.Types (GonimoEff, Gonimo, Settings, class ReportErrorAction)
+import Partial.Unsafe (unsafeCrashWith)
 
-class HasChild parent child where
-  toParent   :: parent -> child -> parent
-  toChild    :: forall f. Alternative f => parent -> f child
+-- First this was a record but records containing prisms is something psc does not seem to like.
+data ChildData parentState childState childProps =
+  ChildData (PrismP parentState childState) childProps
+
+makeChildData :: forall parentState childState childProps. PrismP parentState childState -> childProps -> (ChildData parentState childState childProps)
+makeChildData fromToParent props = ChildData fromToParent props
+
+childDataFromToParent :: forall parentState childState childProps.
+                         ChildData parentState childState childProps
+                         -> PrismP parentState childState
+childDataFromToParent (ChildData fromToParent _) = fromToParent
+
+childDataProps :: forall parentState childState childProps.
+                         ChildData parentState childState childProps
+                         -> childProps
+childDataProps (ChildData _ props) = props
+
+type ToChild parentProps parentState childProps childState m =
+  (MonadReader parentProps m, MonadState parentState m)
+  => m (ChildData parentState childState childProps)
 
 
-newtype Component props state action = Component (MaybeT (ReaderT props (StateT state IO)) action)
+newtype Component props state a = Component (ReaderT props (State state) a)
+type Update props state action = Component props state (IO action)
 
-runComponent :: forall props state action. Component props state action -> (MaybeT (ReaderT props (StateT state IO))) action
+runComponent :: forall props state a. Component props state a -> ReaderT props (State state) a
 runComponent (Component m) = m
 
-liftChild :: forall childProps childState parentProps parentState action.
-            (HasChild parentState childState)
-            => childProps
-            -> Component childProps childState action
-            -> Component parentProps parentState action
-liftChild props child = do
+runComponentFull :: forall props state a. props -> state -> Component props state a -> Tuple a state
+runComponentFull props state = runIdentity <<< flip runStateT state <<< flip runReaderT props <<< runComponent
+
+liftChild :: forall childProps childState parentProps parentState m a.
+            ( MonadReader parentProps m
+            , MonadState parentState m
+            )
+            => ToChild parentProps parentState childProps childState m
+            -> Component childProps childState a
+            -> m (Maybe a)
+liftChild toChild child = do
+  childData <- toChild
   oldParent <- get
-  oldChild <- toChild oldParent
-  let mr = runComponent child props oldChild
-  case mr of
-    Nothing -> empty
-    Just (Tuple action newChild) -> if differentObject newChild oldChild
-                                    then put $ toParent oldParent newChild
-                                    else pure action
+  let
+    fromToParent = childDataFromToParent childData
+    childProps   = childDataProps childData
+
+    runComponentCheck :: childState -> m a
+    runComponentCheck oldChild = do
+      case runComponentFull childProps oldChild child of
+        Tuple a newChild -> do
+          when (differentObject newChild oldChild)
+            $ fromToParent .= newChild
+          pure a
+  traverse runComponentCheck (oldParent ^? fromToParent)
 
 instance functorComponent :: Functor (Component props state) where
   map f (Component m) = Component $ map f m
@@ -66,7 +101,6 @@ instance monadStateStateComponent :: MonadState state (Component props state) wh
   -- get = Component <<< MaybeT <<< runMaybeT <<< ReaderT <<< flip runReaderT
   --       <<< StateT $ \ s -> runStateT (pure s) s
   state f = Component $ state f
-
 
 type EffModelImpl state action eff =
   { state :: state
