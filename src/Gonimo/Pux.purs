@@ -53,8 +53,8 @@ type ToChild parentProps parentState childProps childState m =
 -- | with well our component state.
 newtype Component props state a = Component (ReaderT props (State state) a)
 
--- | A component which updates the state somehow and returns zero or more `IO action`.
-type Update props state action = Component props state (Array (IO action))
+-- | Stateful Update function which can be converted to a Pux eff model ...
+type Update props state action = action -> Component props state (Array (IO action))
 
 runComponent :: forall props state a. Component props state a -> ReaderT props (State state) a
 runComponent (Component m) = m
@@ -93,12 +93,16 @@ liftChild toChild child = do
 -- | The restriction to of props to Unit for this root component is currently not justified
 -- | and can be dropped if necessary. I just have some vague idea for future enhancements where
 -- | properties for the root level component could be in the way.
-toEffModel :: forall state action eff. state -> Update Unit state action -> EffModelImpl state action eff
+toEffModel :: forall state action eff. state -> Component Unit state (Array (IO action)) -> EffModelImpl state action eff
 toEffModel initState c =
   case runComponentFull unit initState c of
     Tuple effects state -> { state : state
                            , effects : runIOToSomeAff <$> effects
                            }
+
+-- | We are still using Pux - so let's a get a Pux like Update function which provides an EffModel ...
+toPuxUpdate :: forall state action eff. Update Unit state action -> action -> state -> EffModelImpl state action eff
+toPuxUpdate update action state = toEffModel state $ update action
 
 instance functorComponent :: Functor (Component props state) where
   map f (Component m) = Component $ map f m
