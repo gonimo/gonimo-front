@@ -32,6 +32,7 @@ import Control.Monad.Except.Trans (runExceptT)
 import Control.Monad.Reader (runReader)
 import Control.Monad.Reader.Class (class MonadReader)
 import Control.Monad.Reader.Trans (runReaderT)
+import Control.Monad.State.Class (get, modify, put)
 import Data.Argonaut.Generic.Aeson (decodeJson)
 import Data.Array (fromFoldable, concat, catMaybes, head)
 import Data.Bifunctor (bimap)
@@ -47,8 +48,8 @@ import Data.String (takeWhile)
 import Data.Traversable (traverse)
 import Data.Tuple (uncurry, fst, Tuple(Tuple))
 import Debug.Trace (trace)
-import Gonimo.Client.Types (Settings, GonimoError, class ReportErrorAction, Gonimo, GonimoEff, runGonimoT)
-import Gonimo.Pux (updateChild, onlyGonimo, onlyEffects, onlyEffect, justEffect, noEffects, EffModel(EffModel))
+import Gonimo.Client.Types (toIO, Settings, GonimoError, class ReportErrorAction, Gonimo, GonimoEff, runGonimoT)
+import Gonimo.Pux (Component(Component), toParent, runGonimo, liftChild, ComponentType, makeChildData, ToChild, noEffects, onlyModify, Update, wrapAction)
 import Gonimo.Server.DbEntities (Device(Device), Family(Family))
 import Gonimo.Server.DbEntities.Helpers (runFamily)
 import Gonimo.Server.Error (ServerError(InvalidAuthToken))
@@ -63,7 +64,7 @@ import Gonimo.WebAPI.Types.Helpers (runAuthData)
 import Partial.Unsafe (unsafeCrashWith)
 import Pux (renderToDOM, fromSimple, start)
 import Pux.Html (text, small, script, li, a, nav, h3, h2, td, tbody, th, tr, thead, table, ul, p, button, input, h1, span, Html, img, div)
-import Pux.Html.Attributes (offset)
+import Pux.Html.Attributes (letterSpacing, offset)
 import Pux.Html.Events (FormEvent, FocusEvent)
 import Pux.Router (navigateTo)
 import Servant.PureScript.Affjax (AjaxError)
@@ -79,108 +80,131 @@ import Signal (constant, Signal)
 import Prelude hiding (div)
 
 
-update :: forall eff. Unit -> Action -> State -> EffModel eff State Action
-update _ (SetState state)                    = const $ noEffects state
-update _ (ReportError err)                   = handleError err
-update _ (InviteA (InviteC.ReportError err)) = handleError err
-update _ (InviteA action)                    = updateInvite action
-update _ (AcceptA (AcceptC.ReportError err)) = handleError err
-update _ (AcceptA action)                    = updateAccept action
-update _ (HomeA action)                      = updateHome action
-update _ (SetFamilyIds ids)                  = \state -> noEffects (state { familyIds = ids
-                                                                          , currentFamily = state.currentFamily <|> head ids
-                                                                          })
-update _ (ServerFamilyGoOffline familyId)    = handleServerFamilyGoOffline familyId
-update _ (UpdateFamily familyId' family')    = \state -> noEffects (state { families = Map.insert familyId' family' state.families })
-update _ (SwitchFamily familyId')            = \state -> onlyEffects (state { currentFamily = Just familyId' })
-                                                         $ fromFoldable
-                                                         $ map (pure <<< ServerFamilyGoOffline) state.currentFamily
-update _ (SetCentral c)                      = \state -> noEffects (state { _central = c })
-update _ (SetOnlineDevices devices)          = \state -> noEffects (state {onlineDevices = devices})
-update _ (SetDeviceInfos devices)            = \state -> noEffects (state {deviceInfos = devices})
-update _ (SetURL url)                        = handleSetURL url
-update _ (HandleSubscriber msg)              = handleSubscriber msg
-update _ ResetDevice                         = handleResetDevice
-update _ ClearError                          = handleClearError
-update _ (SetAuthData auth)                  = handleSetAuthData auth
-update _ Nop                                 = noEffects
-update _ _                                   = noEffects
+update :: Update Unit State Action
+update (SetState state)                    = put state *> pure []
+update (ReportError err)                   = handleError err
+update (InviteA (InviteC.ReportError err)) = handleError err
+update (InviteA action)                    = updateInvite action
+update (AcceptA (AcceptC.ReportError err)) = handleError err
+update (AcceptA action)                    = updateAccept action
+update (HomeA action)                      = updateHome action
+update (SetFamilyIds ids)                  = onlyModify
+                                             $ \state -> state { familyIds = ids
+                                                               , currentFamily = state.currentFamily <|> head ids
+                                                               }
+update (ServerFamilyGoOffline familyId)    = handleServerFamilyGoOffline familyId
+update (UpdateFamily familyId' family')    = onlyModify $ \state ->  state { families = Map.insert familyId' family' state.families }
+update (SwitchFamily familyId')            = do
+  oldFamily <- _.currentFamily <$> (get :: Component Unit State State)
+  modify $ _ { currentFamily = Just familyId' }
+  pure
+    $ fromFoldable
+    $ map (pure <<< ServerFamilyGoOffline) oldFamily
+update (SetCentral c)                      = onlyModify $ _ { central = c }
+update (SetOnlineDevices devices)          = onlyModify $ _ { onlineDevices = devices }
+update (SetDeviceInfos devices)            = onlyModify $ _ { deviceInfos = devices }
+update (SetURL url)                        = handleSetURL url
+update (HandleSubscriber msg)              = handleSubscriber msg
+update ResetDevice                         = handleResetDevice
+update ClearError                          = handleClearError
+update (SetAuthData auth)                  = handleSetAuthData auth
+update Nop                                 = noEffects
+update _                                   = noEffects
 
 
-updateInvite :: forall eff. InviteC.Action -> State -> EffModel eff State Action
-updateInvite action state = updateChild inviteS InviteA InviteC.update (mkProps state) action state
+toInvite :: ToChild Unit State Props InviteC.State
+toInvite = do
+  props <- mkProps <$> get
+  pure $ makeChildData inviteS props
 
-updateAccept :: forall eff. AcceptC.Action -> State -> EffModel eff State Action
-updateAccept action state = updateChild acceptS AcceptA AcceptC.update (mkProps state) action state
+toAccept :: ToChild Unit State Props AcceptC.State
+toAccept = do
+  props <- mkProps <$> get
+  pure $ makeChildData acceptS props
 
-updateHome :: forall eff. HomeC.Action -> State -> EffModel eff State Action
-updateHome action state = case action of
+toHome :: ToChild Unit State Props HomeC.State
+toHome = do
+  props <- mkProps <$> get
+  pure $ makeChildData homeS props
+
+updateInvite :: InviteC.Action -> ComponentType Unit State Action
+updateInvite = toParent Nop InviteA <<< liftChild toInvite <<< InviteC.update
+
+updateAccept :: AcceptC.Action -> ComponentType Unit State Action
+updateAccept = toParent Nop AcceptA <<< liftChild toAccept <<< AcceptC.update
+
+updateHome :: HomeC.Action -> ComponentType Unit State Action
+updateHome action = case action of
     HomeC.StartBabyStation baby -> handleStartBabyStation baby
-    HomeC.StopBabyStation -> handleStopBabyStation
-    HomeC.ConnectToBaby baby -> unsafeCrashWith "ConnectToBaby: Not yet implemented!"
-    _ -> updateChild homeS HomeA HomeC.update (mkProps state) action state
+    HomeC.StopBabyStation       -> handleStopBabyStation
+    HomeC.ConnectToBaby baby    -> unsafeCrashWith "ConnectToBaby: Not yet implemented!"
+    _                           -> toParent Nop HomeA <<< liftChild toHome $ HomeC.update action
   where
-    handleStartBabyStation :: String -> EffModel eff State Action
-    handleStartBabyStation name = noEffects $ state { onlineStatus = Baby name }
+    handleStartBabyStation :: String -> ComponentType Unit State Action
+    handleStartBabyStation name = onlyModify $ _ { onlineStatus = Baby name }
 
-    handleStopBabyStation :: EffModel eff State Action
-    handleStopBabyStation = noEffects $ state { onlineStatus = NoBaby }
+    handleStopBabyStation :: ComponentType Unit State Action
+    handleStopBabyStation = onlyModify $ _ { onlineStatus = NoBaby }
 
 inviteEffect :: forall m. Monad m => Secret -> m Action
 inviteEffect = pure <<< AcceptA <<< AcceptC.LoadInvitation
 
-handleResetDevice :: forall eff. State -> EffModel eff State Action
-handleResetDevice state = onlyGonimo (mkProps state) state $ do
-  liftEff $ localStorage.removeItem Key.authData
-  SetAuthData <$> getAuthData
+handleResetDevice :: ComponentType Unit State Action
+handleResetDevice = do
+  props <- mkProps <$> get
+  pure $ [ toIO props.settings $ do
+              liftEff $ localStorage.removeItem Key.authData
+              SetAuthData <$> getAuthData
+         ]
 
-handleSetAuthData :: forall eff. AuthData -> State -> EffModel eff State Action
-handleSetAuthData auth state = noEffects $ state
+handleSetAuthData :: AuthData -> ComponentType Unit State Action
+handleSetAuthData auth = onlyModify $ \state -> state
                                   { authData = auth
                                   , userError = case state.userError of
                                                   DeviceInvalid -> NoError
                                                   _ -> state.userError
                                   }
 
-handleSetURL :: forall eff. String -> State -> EffModel eff State Action
-handleSetURL url state = let
+handleSetURL :: String -> ComponentType Unit State Action
+handleSetURL url = do
+  let
     route = Router.match url
     withoutQuery = takeWhile (_ /= '?') url
-    navigateTo' :: String -> Eff (GonimoEff eff) Unit
-    navigateTo' = coerceEffects <<< navigateTo
-  in
-    case route of
-      Router.Home -> noEffects $ state { url = url }
-      Router.AcceptInvitation s ->
-        EffModel
-          { state : state { url = withoutQuery
-                          , _central = CentralAccept
-                          }
-          , effects : [ do
-                          liftEff $ navigateTo' withoutQuery
-                          inviteEffect s
-                      ]
-          }
+  case route of
+    Router.Home -> onlyModify $ _ { url = url }
+    Router.AcceptInvitation s -> do
+      modify $ _ { url = withoutQuery
+                 , central = CentralAccept
+                 }
+      pure [ do
+              liftEff $ navigateTo withoutQuery
+              inviteEffect s
+            ]
 
-handleClearError :: forall eff. State -> EffModel eff State Action
-handleClearError state = let
-  newCentral = case state._central of
-    CentralAccept -> case state._acceptS of
-      Nothing -> centralHome
-      Just _ -> state._central
-    _ -> state._central
-  in
-   noEffects (state { userError = NoError
-                    , _central = newCentral
-                    })
+handleClearError :: ComponentType Unit State Action
+handleClearError = do
+  state <- (get :: Component Unit State State)
+  let
+    newCentral = case state.central of
+      CentralAccept -> case state.acceptS of
+        Nothing  -> centralHome
+        Just _ -> state.central
+      _ -> state.central
 
-handleServerFamilyGoOffline :: forall eff. Key Family -> State -> EffModel eff State Action
-handleServerFamilyGoOffline familyId state =
-    onlyGonimo (mkProps state) state $ do
-      deleteOnlineStatusByFamilyIdByDeviceId familyId deviceId
-      pure Nop
-  where
-    deviceId = (runAuthData state.authData).deviceId
+  onlyModify $ _ { userError = NoError
+                 , central = newCentral
+                 }
+
+handleServerFamilyGoOffline :: Key Family -> ComponentType Unit State Action
+handleServerFamilyGoOffline familyId = do
+    state <- get
+    let
+      deviceId = (runAuthData state.authData).deviceId
+      props = mkProps state
+    pure $ [ Gonimo.toIO props.settings $ do
+                deleteOnlineStatusByFamilyIdByDeviceId familyId deviceId
+                pure Nop
+           ]
 
 --------------------------------------------------------------------------------
 
@@ -270,10 +294,10 @@ viewCentral state =
   let
     props = mkProps state
   in
-   case state._central of
-    CentralInvite -> map InviteA $ InviteC.view props state._inviteS
-    CentralAccept -> map AcceptA $ AcceptC.view state._acceptS
-    CentralHome   -> map HomeA   $ HomeC.view props state._homeS
+   case state.central of
+    CentralInvite -> map InviteA $ InviteC.view props state.inviteS
+    CentralAccept -> map AcceptA $ AcceptC.view state.acceptS
+    CentralHome   -> map HomeA   $ HomeC.view props state.homeS
 
 
 viewOnlineDevices :: State -> Html Action

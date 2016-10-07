@@ -2,6 +2,8 @@ module Gonimo.Util where
 
 import Prelude
 import Data.Argonaut.Generic.Aeson as Aeson
+import Control.Monad.Aff (Aff)
+import Control.Monad.IO (IO)
 import Data.Argonaut.Parser (jsonParser)
 import Data.Either (Either(Right, Left))
 import Data.Generic (class Generic)
@@ -20,3 +22,13 @@ hush (Right v) = Just v
 
 coerceEffects :: forall m eff1 eff2 a. m eff1 a -> m eff2 a
 coerceEffects = unsafeCoerce
+
+runIOToSomeAff :: forall eff a. IO a -> Aff eff a
+runIOToSomeAff = unsafeCoerce
+
+fromMaybeM :: forall a m. Monad m => m a -> m (Maybe a) -> m a
+fromMaybeM fallback m = do
+  r <- m
+  case r of
+    Nothing -> fallback
+    Just v -> pure v

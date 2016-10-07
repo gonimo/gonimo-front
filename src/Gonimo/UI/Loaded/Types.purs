@@ -19,10 +19,10 @@ import Servant.Subscriber.Connection (Notification)
 
 type State = { authData :: AuthData
              , subscriberUrl :: String
-             , _inviteS  :: InviteC.State
-             , _acceptS  :: AcceptC.State
-             , _homeS    :: HomeC.State
-             , _central  :: Central
+             , inviteS  :: InviteC.State
+             , acceptS  :: AcceptC.State
+             , homeS    :: HomeC.State
+             , central  :: Central
              , familyIds :: Array (Key Family)
              , families  :: Map (Key Family) Family
              , currentFamily :: Maybe (Key Family)
@@ -79,14 +79,14 @@ instance errorActionAction :: ErrorAction Action where
   nop = Nop
 
 inviteS :: LensP State InviteC.State
-inviteS = lens _._inviteS (_ { _inviteS = _ })
+inviteS = lens _.inviteS (_ { inviteS = _ })
 
 acceptS :: LensP State AcceptC.State
-acceptS = lens _._acceptS (_ { _acceptS = _ })
+acceptS = lens _.acceptS (_ { acceptS = _ })
 
 homeS :: LensP State HomeC.State
-homeS = lens _._homeS (_ { _homeS = _ })
+homeS = lens _.homeS (_ { homeS = _ })
 
 central :: LensP State Central
-central = lens _._central (_ { _central = _})
+central = lens _.central (_ { central = _})
 

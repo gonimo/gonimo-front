@@ -2,7 +2,6 @@ module Gonimo.UI.Invite where
 
 
 
-import Prelude hiding (div)
 import Gonimo.UI.Html
 import Gonimo.Client.Effects as Gonimo
 import Gonimo.Client.LocalStorage as Key
@@ -11,17 +10,20 @@ import Gonimo.WebAPI.Types as WebAPI
 import Pux.Html.Attributes as A
 import Pux.Html.Events as E
 import Browser.LocalStorage (STORAGE, localStorage)
+import Control.Apply ((*>))
 import Control.Monad.Aff (Aff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Except.Trans (runExceptT)
+import Control.Monad.IO (IO)
 import Control.Monad.Reader.Class (ask)
 import Control.Monad.Reader.Trans (runReaderT)
+import Control.Monad.State.Class (get, modify)
 import Data.Either (Either(Right, Left))
 import Data.Generic (gShow)
 import Data.Maybe (isJust, isNothing, Maybe(..))
 import Data.Tuple (Tuple(Tuple))
 import Gonimo.Client.Types (Settings, GonimoError, Gonimo, runGonimoT, class ReportErrorAction)
-import Gonimo.Pux (noEffects, justEffect, onlyEffects, EffModel(EffModel), justGonimo)
+import Gonimo.Pux (onlyModify, Update, runGonimo, class MonadComponent)
 import Gonimo.Server.DbEntities (Family(Family))
 import Gonimo.Server.Types (InvitationDelivery(EmailInvitation), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (Key(Key), Secret(Secret))
@@ -33,6 +35,7 @@ import Pux.Html (button, i, input, p, h1, h2, h3, text, span, Html, img, div)
 import Servant.PureScript.Affjax (AjaxError)
 import Servant.PureScript.Settings (defaultSettings, SPSettings_(SPSettings_))
 import Signal (constant, Signal)
+import Prelude hiding (div)
 
 type Props ps = { settings :: Settings
                 , familyId :: (Maybe (Key Family))
@@ -66,27 +69,30 @@ data Action = SetFamilyName String
 instance reportErrorActionAction :: ReportErrorAction Action where
   reportError = ReportError
 
-update :: forall eff ps. Props ps -> Action -> State -> EffModel eff State Action
-update props action = case action of
-  (SetFamilyName name ) -> \state -> noEffects state { familyName = name }
-  (SetEmail email )     -> \state -> noEffects state { email = email }
-  InvitationSent        -> \state -> noEffects state { invitationSent = true }
-  SendInvitation        -> \state -> justGonimo props (handleSendInvitation props state) state
-  Nop                   -> noEffects
-  ReportError err       -> \state -> noEffects $ state { errorOccurred = Just err }
+update :: forall ps. Update (Props ps) State Action
+update action = case action of
+  (SetFamilyName name ) -> onlyModify $ _ { familyName = name }
+  (SetEmail email )     -> onlyModify $ _ { email = email }
+  InvitationSent        -> onlyModify $ _ { invitationSent = true }
+  SendInvitation        -> handleSendInvitation
+  Nop                   -> pure []
+  ReportError err       -> onlyModify $ _ { errorOccurred = Just err }
 
 
-handleSendInvitation :: forall ps eff. Props ps -> State -> Gonimo eff Action
-handleSendInvitation props state = do
-  (SPSettings_ settings) <- ask
-  let params = case settings.params of (SPParams_ params) -> params
-  Gonimo.log $ "Using AuthToken: " <> gShow params.authorization
-  fid <- case props.familyId of
-    Nothing   -> postFamilies state.familyName
-    Just fid' -> pure fid'
-  (Tuple invId invitation) <- postInvitationsByFamilyId fid
-  postInvitationsOutbox $ WebAPI.SendInvitation invId (EmailInvitation state.email)
-  pure InvitationSent
+handleSendInvitation :: forall m ps. (MonadComponent (Props ps) State m) => m (Array (IO Action))
+handleSendInvitation = do
+  props <- ask
+  state <- get
+  runGonimo $ do
+    (SPSettings_ settings) <- ask
+    let params = case settings.params of (SPParams_ params) -> params
+    Gonimo.log $ "Using AuthToken: " <> gShow params.authorization
+    fid <- case props.familyId of
+      Nothing   -> postFamilies state.familyName
+      Just fid' -> pure fid'
+    (Tuple invId invitation) <- postInvitationsByFamilyId fid
+    postInvitationsOutbox $ WebAPI.SendInvitation invId (EmailInvitation state.email)
+    pure InvitationSent
 
 --------------------------------------------------------------------------------
 

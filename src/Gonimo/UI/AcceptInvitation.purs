@@ -13,23 +13,28 @@ import Browser.LocalStorage (STORAGE, localStorage)
 import Control.Monad.Aff (Aff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Except.Trans (runExceptT)
+import Control.Monad.IO (IO)
 import Control.Monad.Reader.Class (ask)
 import Control.Monad.Reader.Trans (runReaderT)
+import Control.Monad.State.Class (get, put)
 import Data.Bifunctor (lmap)
 import Data.Either (Either(Right, Left))
 import Data.Generic (gShow)
-import Data.Maybe (isJust, isNothing, Maybe(..))
+import Data.Lens (_Just)
+import Data.Maybe (fromMaybe, isJust, isNothing, Maybe(..))
 import Data.Tuple (Tuple(Tuple))
 import Gonimo.Client.Types (GonimoError(UnexpectedAction), Gonimo, Settings, runGonimoT, class ReportErrorAction)
-import Gonimo.Pux (noEffects, onlyEffect, onlyGonimo, justEffect, onlyEffects, EffModel(EffModel), justGonimo)
+import Gonimo.Pux (Component(Component), makeChildData, liftChild, noEffects, onlyModify, Update, ToChild, runGonimo, ComponentType, class MonadComponent)
 import Gonimo.Server.DbEntities (Invitation(Invitation))
 import Gonimo.Server.Types (InvitationDelivery(EmailInvitation), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (Key(Key), Secret(Secret))
+import Gonimo.Util (fromMaybeM)
 import Gonimo.WebAPI (deleteInvitationsByInvitationSecret, putInvitationsInfoByInvitationSecret, postFamilies, SPParams_(SPParams_), postAccounts)
 import Gonimo.WebAPI.Types (InvitationReply(InvitationReject, InvitationAccept), InvitationReply(InvitationReject, InvitationAccept), InvitationInfo(InvitationInfo), AuthData(AuthData))
 import Partial.Unsafe (unsafeCrashWith)
 import Pux (renderToDOM, fromSimple, start)
 import Pux.Html (em, button, input, p, h1, text, span, Html, img, div)
+import Pux.Html.Attributes (offset)
 import Servant.PureScript.Affjax (AjaxError)
 import Servant.PureScript.Settings (defaultSettings, SPSettings_(SPSettings_))
 import Signal (constant, Signal)
@@ -59,24 +64,35 @@ data Action = LoadInvitation Secret
 instance reportErrorActionAction :: ReportErrorAction Action where
   reportError = ReportError
 
-update :: forall eff ps. Props ps -> Action -> State -> EffModel eff State Action
-update props action Nothing = case action of
-  LoadInvitation secret -> onlyGonimo props Nothing $ loadInvitation secret
-  Init (Tuple secret inv) -> noEffects $ Just { invitationInfo : inv, invitationSecret : secret, accepted : Nothing }
-  Nop                   -> noEffects Nothing
-  ReportError err       -> noEffects Nothing
-  _                     -> onlyEffect Nothing <<< pure <<< ReportError
-                            $ UnexpectedAction "Received some Action but State is Nothing!"
-update props action (Just state) = lmap Just $ updateJust props action state
+update :: forall ps m. Action -> Component (Props ps) State (Array (IO Action))
+update action = do
+   r <- liftChild toJust (updateJust action)
+   case r of
+     Nothing -> updateNothing action
+     Just v -> pure v
+   -- myFromMaybeM (updateNothing action)
+   -- $ liftChild toJust (updateJust action)
 
+toJust :: forall ps. ToChild (Props ps) State (Props ps) StateImpl
+toJust = do
+  props <- ask
+  pure $ makeChildData _Just props
 
-updateJust :: forall eff ps. Props ps -> Action -> StateImpl -> EffModel eff StateImpl Action
-updateJust props action = case action of
-  LoadInvitation secret   -> justGonimo props $ loadInvitation secret
-  Init (Tuple secret inv) -> noEffects <<< _ { invitationInfo = inv, invitationSecret = secret, accepted = Nothing }
-  Accept                  -> answerInvitation props InvitationAccept
-  Decline                 -> answerInvitation props InvitationReject
-  SetAccepted accepted'   -> noEffects <<<  _ { accepted = Just accepted' }
+updateNothing :: forall ps. Update (Props ps) State Action
+updateNothing action = case action of
+  LoadInvitation secret   -> runGonimo $ loadInvitation secret
+  Init (Tuple secret inv) -> put ( Just { invitationInfo : inv, invitationSecret : secret, accepted : (Nothing :: Maybe Boolean) } ) *> pure []
+  Nop                     -> noEffects
+  ReportError err         -> noEffects
+  _                       -> pure [ pure (ReportError $ UnexpectedAction "Received some Action but State is Nothing!") ]
+
+updateJust :: forall ps. Update (Props ps) StateImpl Action
+updateJust action = case action of
+  LoadInvitation secret   -> runGonimo $ loadInvitation secret
+  Init (Tuple secret inv) -> onlyModify $ _ { invitationInfo = inv, invitationSecret = secret, accepted = (Nothing :: Maybe Boolean)}
+  Accept                  -> answerInvitation InvitationAccept
+  Decline                 -> answerInvitation InvitationReject
+  SetAccepted accepted'   -> onlyModify $ _ { accepted = Just accepted' }
   Nop                     -> noEffects
   ReportError err         -> noEffects
 
@@ -84,8 +100,10 @@ updateJust props action = case action of
 loadInvitation :: forall eff. Secret -> Gonimo eff Action
 loadInvitation secret = Init <<< Tuple secret <$> putInvitationsInfoByInvitationSecret secret
 
-answerInvitation :: forall eff ps. Props ps -> InvitationReply -> StateImpl -> EffModel eff StateImpl Action
-answerInvitation props reply state = onlyGonimo props state $ do
+answerInvitation :: forall ps. InvitationReply -> ComponentType (Props ps) StateImpl Action
+answerInvitation reply = do
+  state <- get
+  runGonimo $ do
     deleteInvitationsByInvitationSecret reply state.invitationSecret
     pure $ SetAccepted $ case reply of
       InvitationAccept  -> true
