@@ -11,17 +11,18 @@ import Control.Monad.Eff.Exception (Error, EXCEPTION)
 import Control.Monad.Eff.Ref (REF)
 import Control.Monad.Error.Class (catchError, throwError)
 import Control.Monad.Except.Trans (runExceptT, class MonadError, ExceptT)
+import Control.Monad.IO (IO)
 import Control.Monad.Reader.Class (local, ask, class MonadReader)
 import Control.Monad.Reader.Trans (runReaderT, ReaderT)
 import Data.Either (Either(Right, Left), either)
 import Data.Generic (class Generic)
 import Gonimo.WebAPI (SPParams_)
+import Gonimo.WebAPI.Types (DeviceInfo)
 import Network.HTTP.Affjax (AJAX)
 import Servant.PureScript.Affjax (AjaxError)
 import Servant.PureScript.Settings (SPSettings_)
 import Signal.Channel (CHANNEL)
 import WebSocket (WEBSOCKET)
-import Gonimo.WebAPI.Types (DeviceInfo)
 
 
 type Settings = SPSettings_ SPParams_
@@ -60,6 +61,10 @@ toAff :: forall eff action. ReportErrorAction action
          => Settings -> Gonimo eff action -> Aff (GonimoEff eff) action
 toAff settings m = do
   map (either reportError id) <<< runExceptT <<< flip runReaderT settings <<< runGonimoT $ m
+
+toIO :: forall eff action. ReportErrorAction action
+        => Settings -> Gonimo eff action -> IO action
+toIO settings m = liftAff $ toAff settings m
 
 instance functorGonimoT :: Functor (GonimoT eff) where
   map f (GonimoT m) = GonimoT $ map f m
