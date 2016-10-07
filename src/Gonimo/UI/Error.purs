@@ -7,18 +7,19 @@ module Gonimo.UI.Error ( class ErrorAction
                        , handleSubscriber
                        , viewError ) where
 
+import Data.Array as Arr
 import Data.Unfoldable as Unfoldable
 import Gonimo.Client.Effects as Gonimo
 import Gonimo.Server.Error as Server
 import Pux.Html.Attributes as A
 import Pux.Html.Events as E
 import Servant.PureScript.Affjax as Affjax
+import Control.Monad.IO (IO)
+import Control.Monad.State.Class (modify, class MonadState)
 import Data.Either (Either(Left, Right), either)
-import Data.Array as Arr
 import Data.Generic (gShow)
 import Data.Maybe (fromMaybe, maybe, Maybe(Just, Nothing))
 import Gonimo.Client.Types (GonimoError(AjaxError, UnexpectedAction))
-import Gonimo.Pux (onlyEffects, onlyEffect, EffModel(..))
 import Gonimo.Server.Error (ServerError)
 import Pux.Html (div, button, p, h1, text, Html)
 import Pux.Html.Attributes (offset)
@@ -47,55 +48,57 @@ data UserError = NoError
                | ConnectionFailed
 
 
-handleError :: forall eff r action. ErrorAction action
-               => GonimoError -> State r -> EffModel eff (State r) action
-handleError err state = case err of
-  UnexpectedAction msg -> logErrorModel state "An unexpected action occurred: " msg
-  AjaxError err -> handleAjaxError state err
+handleError :: forall eff r m action. ( ErrorAction action, MonadState (State r) m )
+               => GonimoError -> m (Array (IO action))
+handleError err = case err of
+  UnexpectedAction msg -> logError "An unexpected action occurred: " msg
+  AjaxError err -> handleAjaxError err
 
-handleAjaxError :: forall eff r action. ErrorAction action
-                   => State r -> Affjax.AjaxError -> EffModel eff (State r) action
-handleAjaxError state (Affjax.AjaxError err) = case err.description of
-  ParsingError msg -> logErrorModel state "Parsing error in Ajax request: " msg
-  DecodingError msg -> logErrorModel state "Decoding error in Ajax request: " msg
-  ConnectionError msg -> (\(EffModel model)
-                          -> EffModel $ model { state = setError ConnectionFailed model.state }
-                         )
-                         $ logErrorModel state "Ajax request failed: " msg
+handleAjaxError :: forall r m action. ( ErrorAction action, MonadState (State r) m )
+                   => Affjax.AjaxError -> m (Array (IO action))
+handleAjaxError (Affjax.AjaxError err) = case err.description of
+  ParsingError msg -> logError "Parsing error in Ajax request: " msg
+  DecodingError msg -> logError "Decoding error in Ajax request: " msg
+  ConnectionError msg -> do
+    modify $ setError ConnectionFailed
+    logError "Ajax request failed: " msg
   UnexpectedHTTPStatus response ->
-    handleEncodedServerError state (requestToString err.request) (responseToString response) response.response
+    handleEncodedServerError (requestToString err.request) (responseToString response) response.response
 
 
-handleSubscriber :: forall eff r action. ErrorAction action
-                    => Notification -> State r -> EffModel eff (State r) action
-handleSubscriber notification state =
+handleSubscriber :: forall r m action. ( ErrorAction action, MonadState (State r) m )
+                    => Notification -> m (Array (IO action))
+handleSubscriber notification =
   case notification of
-    WebSocketError msg           -> logErrorModel state "A websocket error occurred: " msg
-    WebSocketClosed msg          -> logErrorModel state "The websocket connection got closed: " msg
-    ParseError msg               -> logErrorModel state "A parsing error occurred: " msg
-    HttpRequestFailed req' resp' -> handleFailedHttpRequest state req' resp'
+    WebSocketError msg           -> logError "A websocket error occurred: " msg
+    WebSocketClosed msg          -> logError "The websocket connection got closed: " msg
+    ParseError msg               -> logError "A parsing error occurred: " msg
+    HttpRequestFailed req' resp' -> handleFailedHttpRequest req' resp'
 
-handleFailedHttpRequest :: forall eff r action. ErrorAction action
-                           => State r -> HttpRequest -> HttpResponse -> EffModel eff (State r) action
-handleFailedHttpRequest state req' fResp@(HttpResponse resp') = handleEncodedServerError state (gShow req') (gShow fResp) resp'.httpBody
+handleFailedHttpRequest :: forall r m action. ( ErrorAction action, MonadState (State r) m )
+                           => HttpRequest -> HttpResponse -> m (Array (IO action))
+handleFailedHttpRequest req' fResp@(HttpResponse resp') =
+  handleEncodedServerError (gShow req') (gShow fResp) resp'.httpBody
 
-handleEncodedServerError :: forall eff r action. ErrorAction action
-                            => State r -> String -> String -> String -> EffModel eff (State r) action
-handleEncodedServerError state req' resp' value = onlyEffects newState $ case decodingResult of
-    Right _ -> [ do
-                    Gonimo.log "Got server error!"
-                    Gonimo.log $ "For request: " <> req'
-                    Gonimo.log $ "Response was: " <> resp'
-                    pure nop
-               ]
-    Left err -> [ do
-                     Gonimo.log $ "Decoding error while handling failed http request: " <> err
-                     Gonimo.log $ "For request: " <> req'
-                     Gonimo.log $ "Response was: " <> resp'
-                     pure nop
-                ]
+handleEncodedServerError :: forall r m action. ( ErrorAction action, MonadState (State r) m )
+                            => String -> String -> String -> m (Array (IO action))
+handleEncodedServerError req' resp' value = do
+  modify updateState
+  pure [ case decodingResult of
+            Right _ ->  do
+              Gonimo.log "Got server error!"
+              Gonimo.log $ "For request: " <> req'
+              Gonimo.log $ "Response was: " <> resp'
+              pure nop
+
+            Left err ->  do
+              Gonimo.log $ "Decoding error while handling failed http request: " <> err
+              Gonimo.log $ "For request: " <> req'
+              Gonimo.log $ "Response was: " <> resp'
+              pure nop
+       ]
   where
-    newState = case error of
+    updateState state = case error of
         NoError -> state
         _       -> setError error state
     fromServer = fromMaybe NoError <<< ( fromServerError =<< _ )
@@ -170,11 +173,12 @@ errorView' btnText action heading body =
         [ text btnText ]
       ]
 
-logErrorModel :: forall eff r action. ErrorAction action
-                 => State r -> String -> String -> EffModel eff (State r) action
-logErrorModel state prefix msg = onlyEffect state $ do
-      Gonimo.log $ prefix <> msg
-      pure nop
+logError :: forall action m. (ErrorAction action, Applicative m)
+                 => String -> String -> m (Array (IO action))
+logError prefix msg = pure [ do
+                              Gonimo.log $ prefix <> msg
+                              pure nop
+                           ]
 
 fromServerError :: ServerError -> Maybe UserError
 fromServerError err = case err of

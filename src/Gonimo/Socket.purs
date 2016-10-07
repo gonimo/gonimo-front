@@ -1,42 +1,48 @@
 module Gonimo.Socket where
 
 import Prelude
-import Gonimo.Socket.Types
+import Data.Array as Arr
+import Data.Map as Map
 import Gonimo.Socket.Connection as ConnectionC
+import Control.Monad.IO (IO)
 import Control.Monad.Reader (runReader)
-import Control.Monad.Reader.Class (class MonadReader)
+import Control.Monad.Reader.Class (class MonadReader, ask)
+import Control.Monad.State.Class (class MonadState)
 import Data.Foldable (foldl)
+import Data.Map (Map)
 import Data.Maybe (maybe, fromMaybe, Maybe)
 import Data.Monoid (mempty)
 import Data.Tuple (uncurry, snd, Tuple(Tuple))
 import Gonimo.Client.Types (Settings)
-import Gonimo.Pux (justEffect, noEffects, EffModel(EffModel))
+import Gonimo.Pux (Update, noEffects, class MonadComponent)
 import Gonimo.Server.DbEntities (Family(Family), Device(Device))
 import Gonimo.Socket.Message (decodeFromString)
+import Gonimo.Socket.Types (Props, State, Action(..), Connection)
 import Gonimo.Types (Secret(Secret), Key(Key))
 import Gonimo.WebAPI.Subscriber (receiveSocketByFamilyIdByToDevice, receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
 import Servant.Subscriber (Subscriptions)
 import WebRTC.MediaStream (getUserMedia, MediaStream)
 import WebRTC.RTC (RTCPeerConnection)
-import Data.Map as Map
-import Data.Map (Map)
-import Data.Array as Arr
 
-update :: forall eff ps. Props ps -> Action -> State -> EffModel eff State Action
-update props action = case action of
-  AcceptConnection theirId channelId -> handleAcceptConnection props theirId channelId
+update :: forall ps. Update (Props ps) State Action
+update action = case action of
+  AcceptConnection theirId channelId -> handleAcceptConnection theirId channelId
   ConnectionA fromId channel action' -> noEffects
   AddConnection conn                 -> noEffects
   Nop                                -> noEffects
 
 
-handleAcceptConnection :: forall eff ps. Props ps -> Key Device -> Secret -> State -> EffModel eff State Action
-handleAcceptConnection props theirId channel = justEffect $ do
+handleAcceptConnection :: forall ps m. ( MonadReader (Props ps) m
+                                       , MonadState State m )
+                          => Key Device -> Secret
+                          -> m (Array (IO Action))
+handleAcceptConnection theirId channel = do
+  props <- (ask :: m (Props ps))
   let config = { ourId : props.deviceId
                , theirId : theirId
                , channel : channel
                }
-  AddConnection <$> ConnectionC.init
+  pure [ AddConnection <$> ConnectionC.init ]
 
 
 getSubscriptions :: forall ps. Props ps -> State -> Subscriptions Action

@@ -7,9 +7,9 @@ import Gonimo.Client.Effects as Gonimo
 import Gonimo.Client.LocalStorage as Key
 import Gonimo.Client.Types as Gonimo
 import Gonimo.UI.AcceptInvitation as AcceptC
+import Gonimo.UI.Home as HomeC
 import Gonimo.UI.Invite as InviteC
 import Gonimo.UI.Loaded as LoadedC
-import Gonimo.UI.Home as HomeC
 import Gonimo.UI.Loaded.Types as LoadedC
 import Gonimo.WebAPI.MakeRequests as Reqs
 import Pux.Html.Attributes as A
@@ -23,8 +23,10 @@ import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Ref (newRef, writeRef, readRef, REF, Ref)
 import Control.Monad.Except.Trans (runExceptT)
+import Control.Monad.IO (IO)
 import Control.Monad.Reader (runReader)
 import Control.Monad.Reader.Trans (runReaderT)
+import Control.Monad.State.Class (modify, put, get)
 import Data.Array (head)
 import Data.Bifunctor (lmap, bimap)
 import Data.Either (Either(Right, Left))
@@ -37,13 +39,14 @@ import Data.Traversable (traverse)
 import Data.Tuple (fst, Tuple(Tuple))
 import Debug.Trace (trace)
 import Gonimo.Client.Router (match, Route(AcceptInvitation, Home))
-import Gonimo.Client.Types (GonimoError, GonimoEff, Gonimo, class ReportErrorAction)
+import Gonimo.Client.Types (toIO, GonimoError, GonimoEff, Gonimo, class ReportErrorAction)
 import Gonimo.Client.Types (runGonimoT, Settings)
-import Gonimo.Pux (updatePrismChild, onlyGonimo, onlyEffect, justEffect, onlyEffects, noEffects, EffModel(EffModel), toPux)
+import Gonimo.Pux (toPux, noEffects, wrapAction, onlyModify, Update, ComponentType, makeChildData, ToChild, liftChild, Component(Component))
 import Gonimo.Server.Types (DeviceType(NoBaby), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (Secret(Secret))
 import Gonimo.UI.Error (viewError, handleError, class ErrorAction, UserError(NoError))
 import Gonimo.UI.Html (viewLogo)
+import Gonimo.Util (fromMaybeM, coerceEffects)
 import Gonimo.WebAPI (postFunnyName, SPParams_(SPParams_), postAccounts)
 import Gonimo.WebAPI.Types (AuthData(AuthData))
 import Gonimo.WebAPI.Types.Helpers (runAuthData)
@@ -59,7 +62,6 @@ import Signal (foldp, map2, runSignal, constant, Signal)
 import Signal.Channel (CHANNEL, Channel, send, subscribe, channel)
 import Unsafe.Coerce (unsafeCoerce)
 import Prelude hiding (div)
-import Gonimo.Util (coerceEffects)
 
 data State = LoadingS LoadingS'
            | LoadedS LoadedC.State
@@ -109,57 +111,72 @@ type MySubscriber = Subscriber () LoadedC.Action
 --------------------------------------------------------------------------------
 
 
-update :: forall eff. Action -> State -> EffModel eff State Action
-update Nop state                        = noEffects state
-update (Init ls) (LoadingS state)       = handleInit ls state
-update action state          = fromMaybe (noEffects state) $
-                                   updateLoading action state
-                               <|> updateLoaded action state
+update :: Update Unit State Action
+update action = do
+  state <- ( get :: Component Unit State State)
+  case action of
+    Nop -> noEffects
+    Init ls -> fromMaybe [] <$> handleInit ls
+    _ -> fromMaybeM (fromMaybe [] <$> updateLoaded action) (updateLoading action)
 
-updateLoading' :: forall eff. Unit -> Action -> LoadingS' -> EffModel eff LoadingS' Action
-updateLoading' _ action state             = case action of
-  Start             -> onlyEffect state load
-  (LoadedA action)  -> trace "Queuing action! " $ \_ -> noEffects $ state {
+
+toLoading :: ToChild Unit State Unit LoadingS'
+toLoading = pure $ makeChildData _LoadingS unit
+
+toLoaded :: ToChild Unit State Unit LoadedC.State
+toLoaded = pure $ makeChildData _LoadedS unit
+
+updateLoading' ::  Update Unit LoadingS' Action
+updateLoading' action = case action of
+  Start           -> pure [ load ]
+  LoadedA action  -> onlyModify $ \state -> state {
                          actionQueue = Cons action state.actionQueue
                        }
-  (Init ls)         -> onlyEffect state $ do
-                        Gonimo.log "Init command should be handled in toplevel update!"
-                        pure Nop
-  (ReportError err) -> handleError err state
-  ResetDevice       -> handleResetDevice state
-  ClearError        -> onlyEffect (state { userError = NoError }) (pure Start)
-  Nop               -> noEffects state
+  Init ls         -> pure [ do
+                                 Gonimo.log "Init command should be handled in toplevel update!"
+                                 pure Nop
+                            ]
+  ReportError err -> handleError err
+  ResetDevice     -> handleResetDevice
+  ClearError      -> do
+    modify $ _ { userError = NoError }
+    pure $ wrapAction Start
+  Nop             -> noEffects
 
-handleResetDevice :: forall eff. LoadingS' -> EffModel eff LoadingS' Action
-handleResetDevice state = onlyEffect state $ do
+handleResetDevice :: ComponentType Unit LoadingS' Action
+handleResetDevice = pure $ [ do
   liftEff $ localStorage.removeItem Key.authData
   pure Start
+ ]
+updateLoading :: Action -> Component Unit State (Maybe (Array (IO Action)))
+updateLoading = liftChild toLoading <<< updateLoading'
 
-updateLoading :: forall eff. Action -> State -> Maybe (EffModel eff State Action)
-updateLoading action state  = updatePrismChild _LoadingS id updateLoading' unit action state
+updateLoaded :: Action -> Component Unit State (Maybe (Array (IO Action)))
+updateLoaded action = case action of
+  LoadedA act -> updateLoaded' act
+  (ReportError err) -> updateLoaded' (LoadedC.ReportError err)
+  _ -> do
+       state <- get
+       case state of
+        LoadedS _ -> pure <<< Just $
+                     [ do Gonimo.log "Only LoadedA actions are supported when loaded"
+                          pure Nop
+                     ]
+        _ -> pure Nothing
 
-updateLoaded :: forall eff. Action -> State -> Maybe (EffModel eff State Action)
-updateLoaded action state = case action of
-  LoadedA act -> updateLoaded' act state
-  (ReportError err) -> updateLoaded' (LoadedC.ReportError err) state
-  _ -> case state of
-        LoadedS _ -> Just $ onlyEffects state
-                    [ do Gonimo.log "Only LoadedA actions are supported when loaded"
-                         pure Nop
-                    ]
-        _ -> Nothing
-
-updateLoaded' :: forall eff. LoadedC.Action -> State -> Maybe (EffModel eff State Action)
-updateLoaded' action state  = updatePrismChild _LoadedS LoadedA LoadedC.update unit action state
+updateLoaded' :: LoadedC.Action -> Component Unit State (Maybe (Array (IO Action)))
+updateLoaded' = map (map (map (map LoadedA))) <<< liftChild toLoaded <<< LoadedC.update
 
 
-handleInit :: forall eff. LoadedC.State -> LoadingS' -> EffModel eff State Action
-handleInit ls state = EffModel {
-                         state : LoadedS ls
-                       , effects : toUnfoldable queueEffects
-                       }
-  where
-    queueEffects = map (pure <<< LoadedA) <<< reverse $ state.actionQueue
+handleInit :: LoadedC.State -> Component Unit State (Maybe (Array (IO Action)))
+handleInit ls = do
+    state <- get
+    case state ^? _LoadingS of
+      Nothing -> pure Nothing
+      Just loadingS -> do
+        let queueEffects = map (pure <<< LoadedA) <<< reverse $ loadingS.actionQueue
+        put $ LoadedS ls
+        pure <<< Just $ toUnfoldable queueEffects
 
 
 --------------------------------------------------------------------------------
@@ -178,8 +195,8 @@ viewLoading state = case state.userError of
 --------------------------------------------------------------------------------
 
 
-load :: forall eff. Aff (GonimoEff eff) Action
-load = Gonimo.toAff initSettings $ authToAction =<< LoadedC.getAuthData
+load :: IO Action
+load = Gonimo.toIO initSettings $ authToAction =<< LoadedC.getAuthData
   where
     initSettings = mkSettings $ GonimoSecret (Secret "blabala")
 
@@ -189,16 +206,16 @@ load = Gonimo.toAff initSettings $ authToAction =<< LoadedC.getAuthData
         , baseURL       : "http://localhost:8081/"
         }
 
-    authToAction :: AuthData -> Gonimo eff Action
+    authToAction :: forall eff. AuthData -> Gonimo eff Action
     authToAction (authData@(AuthData auth)) = do
       inviteState <- InviteC.init
       pure $ Init
             { authData      : authData
             , subscriberUrl : "ws://localhost:8081/subscriber"
-            , _inviteS       : inviteState
-            , _acceptS       : AcceptC.init
-            , _homeS         : HomeC.init
-            , _central       : LoadedC.CentralInvite
+            , inviteS       : inviteState
+            , acceptS       : AcceptC.init
+            , homeS         : HomeC.init
+            , central       : LoadedC.CentralInvite
             , familyIds      : []
             , currentFamily  : Nothing
             , families      : Map.empty
@@ -293,4 +310,4 @@ coerceSubscriberEffects = unsafeCoerce
 
 showCentral :: State -> String
 showCentral (LoadingS _) = ""
-showCentral (LoadedS s) = gShow s._central
+showCentral (LoadedS s) = gShow s.central

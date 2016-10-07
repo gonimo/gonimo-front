@@ -9,7 +9,7 @@ import Data.Array (concat, fromFoldable)
 import Data.Maybe (Maybe(Just, Nothing))
 import Data.Tuple (uncurry, snd, fst, Tuple(..))
 import Gonimo.Client.Types (Settings, BabyStationInfo)
-import Gonimo.Pux (noEffects, EffModel(EffModel))
+import Gonimo.Pux (noEffects, onlyModify, Update)
 import Gonimo.Server.DbEntities (Family(Family), Device)
 import Gonimo.Server.DbEntities.Helpers (runFamily)
 import Gonimo.Server.Types (DeviceType(Baby, NoBaby))
@@ -40,12 +40,12 @@ data Action = StartBabyStation String -- To be handled by parent
             | Nop
 
 
-update :: forall eff ps. Props ps -> Action -> State -> EffModel eff State Action
-update _ (SetBabyName val)    = noEffects <<< _ { newBabyName = val }
-update _ (StartBabyStation _) = noEffects
-update _ StopBabyStation      = noEffects
-update _ (ConnectToBaby _)    = noEffects
-update _ Nop                  = noEffects
+update :: forall ps. Update (Props ps) State Action
+update (SetBabyName val)    = onlyModify $ _ { newBabyName = val }
+update (StartBabyStation _) = noEffects
+update StopBabyStation      = noEffects
+update (ConnectToBaby _)    = noEffects
+update Nop                  = noEffects
 
 view :: forall ps. Props ps -> State -> Html Action
 view props state = div []
