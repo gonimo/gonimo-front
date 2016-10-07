@@ -1,6 +1,23 @@
 -- | Gonimo specific Pux helpers and replacements for defaults.
 
-module Gonimo.Pux where
+module Gonimo.Pux ( Props
+                  , makeChildData
+                  , ChildData
+                  , ToChild
+                  , Component
+                  , Update
+                  , ComponentType
+                  , liftChild
+                  , toPux
+                  , runGonimos
+                  , runGonimo
+                  , onlyModify
+                  , noEffects
+                  , wrapAction
+                  , toParent
+                  , toParentM
+                  , class MonadComponent
+                  ) where
 
 import Prelude
 import Data.Array as Arr
