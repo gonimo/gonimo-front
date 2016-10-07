@@ -25,3 +25,10 @@ coerceEffects = unsafeCoerce
 
 runIOToSomeAff :: forall eff a. IO a -> Aff eff a
 runIOToSomeAff = unsafeCoerce
+
+fromMaybeM :: forall a m. Monad m => m a -> m (Maybe a) -> m a
+fromMaybeM fallback m = do
+  r <- m
+  case r of
+    Nothing -> fallback
+    Just v -> pure v
