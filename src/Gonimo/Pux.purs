@@ -3,13 +3,14 @@
 module Gonimo.Pux where
 
 import Prelude
+import Data.Array as Arr
 import Gonimo.Client.Types as Gonimo
 import Control.Alternative (empty, class Alternative)
 import Control.Monad.Aff (Aff)
 import Control.Monad.IO (IO)
 import Control.Monad.IO.Class (class MonadIO, liftIO)
 import Control.Monad.Maybe.Trans (runMaybeT, MaybeT(MaybeT))
-import Control.Monad.Reader.Class (local, ask, class MonadReader)
+import Control.Monad.Reader.Class (ask, local, class MonadReader)
 import Control.Monad.Reader.Trans (runReaderT, ReaderT(ReaderT))
 import Control.Monad.State (State)
 import Control.Monad.State.Class (modify, put, get, state, class MonadState)
@@ -17,25 +18,29 @@ import Control.Monad.State.Trans (runStateT, StateT(StateT))
 import Control.Monad.Trans (lift, class MonadTrans)
 import Data.Bifunctor (bimap, class Bifunctor)
 import Data.Identity (runIdentity)
-import Data.Lens (SetterP, APrismP, (.=), prism, (^?), PrismP, (.~), (^.), LensP)
-import Data.Maybe (Maybe(Just, Nothing))
+import Data.Lens (SetterP, (.=), prism, (^?), TraversalP, (.~), (^.), LensP)
+import Data.Maybe (maybe, Maybe(Just, Nothing))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(Tuple))
 import Gonimo.Client.Types (GonimoEff, Gonimo, Settings, class ReportErrorAction)
+import Gonimo.Util (fromMaybeM, runIOToSomeAff)
 import Partial.Unsafe (unsafeCrashWith)
-import Gonimo.Util (runIOToSomeAff)
+import Pux (noEffects, EffModel)
+
+
+type Props ps = { settings :: Settings | ps }
 
 -- First this was a record but records containing prisms is something psc does not seem to like.
 -- | A helper data structure for transforming child components to parent components:
 data ChildData parentState childState childProps =
-  ChildData (PrismP parentState childState) childProps
+  ChildData (TraversalP parentState childState) childProps
 
-makeChildData :: forall parentState childState childProps. PrismP parentState childState -> childProps -> (ChildData parentState childState childProps)
+makeChildData :: forall parentState childState childProps. TraversalP parentState childState -> childProps -> (ChildData parentState childState childProps)
 makeChildData fromToParent props = ChildData fromToParent props
 
 childDataFromToParent :: forall parentState childState childProps.
                          ChildData parentState childState childProps
-                         -> PrismP parentState childState
+                         -> TraversalP parentState childState
 childDataFromToParent (ChildData fromToParent _) = fromToParent
 
 childDataProps :: forall parentState childState childProps.
@@ -45,16 +50,26 @@ childDataProps (ChildData _ props) = props
 
 
 -- | Create ChildData from a parent component:
-type ToChild parentProps parentState childProps childState m =
-  (MonadReader parentProps m, MonadState parentState m)
-  => m (ChildData parentState childState childProps)
+type ToChild parentProps parentState childProps childState =
+  Component parentProps parentState (ChildData parentState childState childProps)
 
 -- | A component is just a Reader monad with react style props and a State monad
 -- | with well our component state.
 newtype Component props state a = Component (ReaderT props (State state) a)
 
+-- | Generic type which depends on MonadComponent instead on a concrete Component.
+-- | Also it assumes a monadic value of type `Array (IO Action)`
+-- type ComponentType props state action = forall m. MonadComponent props state m => m (Array (IO action))
+type ComponentType props state action = Component props state (Array (IO action))
+
 -- | Stateful Update function which can be converted to a Pux eff model ...
-type Update props state action = action -> Component props state (Array (IO action))
+-- I think we need fundeps for this to work properly in client code:
+-- type Update props state action = forall m. (MonadComponent props state m)
+--                                  => action -> m (Array (IO action))
+type Update props state action = action -> ComponentType props state action
+
+-- | Concrete instance for Update
+type UpdateComponent props state action = action -> Component props state (Array (IO action))
 
 runComponent :: forall props state a. Component props state a -> ReaderT props (State state) a
 runComponent (Component m) = m
@@ -66,13 +81,10 @@ runComponentFull props state = runIdentity <<< flip runStateT state <<< flip run
 -- | Run a child component and transform it to a parent component, updating the
 -- | state only if it actually changed.
 -- | We return Nothing if the child is currently not present in the parent.
-liftChild :: forall childProps childState parentProps parentState m a.
-            ( MonadReader parentProps m
-            , MonadState parentState m
-            )
-            => ToChild parentProps parentState childProps childState m
+liftChild :: forall childProps childState parentProps parentState a.
+             ToChild parentProps parentState childProps childState
             -> Component childProps childState a
-            -> m (Maybe a)
+            -> Component parentProps parentState (Maybe a)
 liftChild toChild child = do
   childData <- toChild
   oldParent <- get
@@ -80,7 +92,6 @@ liftChild toChild child = do
     fromToParent = childDataFromToParent childData
     childProps   = childDataProps childData
 
-    runComponentCheck :: childState -> m a
     runComponentCheck oldChild = do
       case runComponentFull childProps oldChild child of
         Tuple a newChild -> do
@@ -93,7 +104,7 @@ liftChild toChild child = do
 -- | The restriction to of props to Unit for this root component is currently not justified
 -- | and can be dropped if necessary. I just have some vague idea for future enhancements where
 -- | properties for the root level component could be in the way.
-toEffModel :: forall state action eff. state -> Component Unit state (Array (IO action)) -> EffModelImpl state action eff
+toEffModel :: forall state action eff. state -> Component Unit state (Array (IO action)) -> EffModel state action eff
 toEffModel initState c =
   case runComponentFull unit initState c of
     Tuple effects state -> { state : state
@@ -101,8 +112,57 @@ toEffModel initState c =
                            }
 
 -- | We are still using Pux - so let's a get a Pux like Update function which provides an EffModel ...
-toPuxUpdate :: forall state action eff. Update Unit state action -> action -> state -> EffModelImpl state action eff
-toPuxUpdate update action state = toEffModel state $ update action
+toPux :: forall state action eff. Update Unit state action -> action -> state -> EffModel state action eff
+toPux update action state = toEffModel state $ update action
+
+
+
+runGonimos :: forall action eff ps m
+               . ( ReportErrorAction action
+                 , MonadReader (Props ps) m
+                 )
+               => Array (Gonimo eff action) -> m (Array (IO action))
+runGonimos effects = do
+  props <- ask
+  pure (Gonimo.toIO props.settings <$> effects)
+
+runGonimo :: forall action eff ps m
+               . ( ReportErrorAction action
+                 , MonadReader (Props ps) m
+                 )
+               => Gonimo eff action -> m (Array (IO action))
+runGonimo effect = do
+  props <- ask
+  pure $ [ Gonimo.toIO props.settings effect ]
+
+-- | Only modify state, but trigger no effects:
+onlyModify :: forall state action m . ( MonadState state m)
+             => (state -> state) -> m (Array (IO action))
+onlyModify  f = modify f *> pure []
+
+noEffects :: forall m a. (Applicative m) => m (Array a)
+noEffects = pure []
+
+wrapAction :: forall action. action -> Array (IO action)
+wrapAction = Arr.singleton <<< pure
+
+toParent :: forall childAction parentAction parentProps parentState.
+                  parentAction
+                  -> (childAction -> parentAction)
+                  -> Component parentProps parentState (Maybe (Array (IO childAction)))
+                  -> Component parentProps parentState (Array (IO parentAction))
+toParent onNothing mkAction child = maybe (wrapAction onNothing) (map (map mkAction)) <$> child
+
+toParentM :: forall childAction parentAction parentProps parentState.
+                  Component parentProps parentState (Array (IO parentAction))
+                  -> (childAction -> parentAction)
+                  -> Component parentProps parentState (Maybe (Array (IO childAction)))
+                  -> Component parentProps parentState (Array (IO parentAction))
+toParentM onNothing mkAction child = fromMaybeM onNothing <<< map (map (map (map mkAction))) $ child
+
+class (MonadReader props m, MonadState state m) <= MonadComponent props state m
+
+instance monadComponentComponent :: MonadComponent props state (Component props state)
 
 instance functorComponent :: Functor (Component props state) where
   map f (Component m) = Component $ map f m
@@ -128,120 +188,5 @@ instance monadStateStateComponent :: MonadState state (Component props state) wh
   --       <<< StateT $ \ s -> runStateT (pure s) s
   state f = Component $ state f
 
-type EffModelImpl state action eff =
-  { state :: state
-  , effects :: Array (Aff (GonimoEff eff) action)
-  }
-
-newtype EffModel eff state action = EffModel (EffModelImpl state action eff)
-
-runEffModel :: forall state action eff. EffModel eff state action -> EffModelImpl state action eff
-runEffModel (EffModel model) = model
-
-
-instance bifunctorEffModelEff :: Bifunctor (EffModel eff) where
-  bimap f g (EffModel model) = EffModel
-    { state : f model.state
-    , effects : map (map g) model.effects
-    }
-
-updateChild :: forall eff parentState childState parentAction childAction props.
-            LensP parentState childState
-            -> (childAction -> parentAction)
-            -> (props -> childAction -> childState -> EffModel eff childState childAction)
-            -> props -> childAction -> parentState -> EffModel eff parentState parentAction
-updateChild lens mkAction childUpdate props action state =
-    bimap smartUpdate mkAction $ childUpdate props action (state ^. lens)
-  where
-    smartUpdate :: childState -> parentState
-    smartUpdate newChild =if differentObject newChild (state ^. lens)
-                          then state # lens .~ newChild
-                          else  state
-
-updatePrismChild :: forall eff parentState childState parentAction childAction props.
-            PrismP parentState childState
-            -> (childAction -> parentAction)
-            -> (props -> childAction -> childState -> EffModel eff childState childAction)
-            -> props -> childAction -> parentState -> Maybe (EffModel eff parentState parentAction)
-updatePrismChild prism mkAction childUpdate props action state =
-    bimap smartUpdate mkAction <<< childUpdate props action <$> state ^? prism
-  where
-    smartUpdate :: childState -> parentState
-    smartUpdate newChild = case state ^? prism of
-                                Nothing -> state
-                                Just oldChild -> if differentObject newChild oldChild
-                                                    then state # prism .~ newChild
-                                                    else state
-
--- toParent :: forall eff parentState childState parentAction childAction.
---             LensP parentState childState
---             -> (childAction -> parentAction)
---             -> parentState -> EffModel eff childState childAction
---             -> EffModel eff parentState parentAction
--- toParent lens mkAction state = bimap smartUpdate mkAction
---   where
---     smartUpdate :: childState -> parentState
---     smartUpdate newChild = if differentObject newChild (state ^. lens)
---                            then lens .~ newChild $ state
---                            else state
-
-onlyEffects :: forall state action eff
-               .  state -> Array (Aff (GonimoEff eff) action)
-               -> EffModel eff state action
-onlyEffects state effects = EffModel { state : state
-                                     , effects : effects
-                                     }
-
--- | Like `onlyEffects` but for a single effect
-onlyEffect :: forall state action eff
-               . state -> Aff (GonimoEff eff) action
-               -> EffModel eff state action
-onlyEffect state eff = onlyEffects state [eff]
-
--- | Like onlyEffects but with arguments flipped
-justEffects :: forall state action eff
-               .  Array (Aff (GonimoEff eff) action)
-               -> state -> EffModel eff state action
-justEffects = flip onlyEffects
-
--- | Like `justEffects` but for a single effect
-justEffect :: forall state action eff
-               .  Aff (GonimoEff eff) action
-               -> state -> EffModel eff state action
-justEffect eff = justEffects [eff]
-
-
-noEffects :: forall state action eff. state -> EffModel eff state action
-noEffects state = EffModel { state : state, effects : [] }
-
-type Props ps = { settings :: Settings | ps }
-
-onlyGonimos :: forall state action eff ps
-               . ReportErrorAction action => Props ps -> state -> Array (Gonimo eff action)
-               -> EffModel eff state action
-onlyGonimos props state = onlyEffects state <<< map (Gonimo.toAff props.settings)
-
--- | Like `onlyGonimos` but for a single effect
-onlyGonimo :: forall state action eff ps
-               . ReportErrorAction action => Props ps -> state -> Gonimo eff action
-               -> EffModel eff state action
-onlyGonimo props state eff = onlyGonimos props state [eff]
-
--- | Like onlyGonimos but with arguments flipped
-justGonimos :: forall state action eff ps
-               . ReportErrorAction action => Props ps -> Array (Gonimo eff action)
-               -> state -> EffModel eff state action
-justGonimos props = flip $ onlyGonimos props
-
--- | Like `justGonimos` but for a single effect
-justGonimo :: forall state action eff ps
-               . ReportErrorAction action => Props ps -> Gonimo eff action
-               -> state -> EffModel eff state action
-justGonimo props eff = justGonimos props [eff]
-
--- | Convert an our EffModel using update function to one usable for Pux.Config
-toPux :: forall state action eff. (action -> state -> EffModel eff state action)
-         -> action -> state -> EffModelImpl state action eff
-toPux ours action state = runEffModel $ ours action state
 
 foreign import differentObject :: forall a b. a -> b -> Boolean
