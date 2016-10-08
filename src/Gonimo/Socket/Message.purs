@@ -12,6 +12,11 @@ data Message =
 --    SessionDescription SessionDescription
     SessionDescription { sdp :: String, "type" :: String }
   | IceCandidate IceCandidate
+-- Indicate the other party that we want to close the connection.
+-- After sending this message we will close the connection, the other party may do
+-- the same. In any case, after receiving this message the other party knows that the connection
+-- is lost on purpose.
+  | CloseConnection
 
 derive instance genericMessage :: Generic Message
 

@@ -1,4 +1,4 @@
-module Gonimo.Socket.Connection where
+module Gonimo.Socket.Channel where
 
 import Prelude
 import Control.Monad.Aff (Aff)
@@ -9,7 +9,7 @@ import Control.Monad.IO (IO)
 import Control.Monad.Reader.Class (class MonadReader)
 import Data.Maybe (maybe, Maybe(Nothing, Just))
 import Gonimo.Client.Types (Settings, GonimoEff)
-import Gonimo.Pux (Update, noEffects, onlyModify, ComponentType)
+import Gonimo.Pux (noEffects, Update, onlyModify, ComponentType)
 import Gonimo.Server.DbEntities (Family(Family), Device(Device))
 import Gonimo.Socket.Message (decodeFromString, Message)
 import Gonimo.Types (Secret(Secret), Key(Key))
@@ -27,14 +27,15 @@ type State =
 type Props ps =
   { ourId :: Key Device
   , theirId :: Key Device
-  , channel :: Secret
-  , familyId :: Key Family
+  , cSecret :: Secret
+  , ourFamilyId :: Key Family
   }
 
 data Action = AcceptMessage Message
             | StartStreaming MediaStreamConstraints
             | StopStreaming
             | SetMediaStream MediaStream
+            | CloseConnection
             | Nop
 
 
@@ -53,6 +54,7 @@ update action = case action of
   AcceptMessage  message             -> noEffects
   SetMediaStream stream              -> onlyModify $ _ { mediaStream = Just stream }
   StopStreaming                      -> noEffects
+  CloseConnection                    -> noEffects
   Nop                                -> noEffects
 
 handleStartStreaming :: forall ps.
@@ -68,4 +70,4 @@ getSubscriptions props =
     receiveMessage = receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId
   in
     receiveMessage ((maybe Nop AcceptMessage) <<< (decodeFromString =<< _))
-                   props.familyId props.theirId props.ourId props.channel
+                   props.ourFamilyId props.theirId props.ourId props.cSecret
