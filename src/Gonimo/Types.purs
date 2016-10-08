@@ -16,6 +16,12 @@ newtype Secret = Secret String
 
 derive instance genericSecret :: Generic Secret
 
+instance eqSecret :: Eq Secret where
+  eq (Secret str1) (Secret str2) = eq str1 str2
+
+instance ordSecret :: Ord Secret where
+  compare (Secret str1) (Secret str2) = compare str1 str2
+
 newtype Key a = Key Int
 
 derive instance genericKey :: Generic (Key a)
