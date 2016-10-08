@@ -128,17 +128,17 @@ toHome = do
   pure $ makeChildData homeS props
 
 updateInvite :: InviteC.Action -> ComponentType Unit State Action
-updateInvite = toParent Nop InviteA <<< liftChild toInvite <<< InviteC.update
+updateInvite = toParent [] InviteA <<< liftChild toInvite <<< InviteC.update
 
 updateAccept :: AcceptC.Action -> ComponentType Unit State Action
-updateAccept = toParent Nop AcceptA <<< liftChild toAccept <<< AcceptC.update
+updateAccept = toParent [] AcceptA <<< liftChild toAccept <<< AcceptC.update
 
 updateHome :: HomeC.Action -> ComponentType Unit State Action
 updateHome action = case action of
     HomeC.StartBabyStation baby -> handleStartBabyStation baby
     HomeC.StopBabyStation       -> handleStopBabyStation
     HomeC.ConnectToBaby baby    -> unsafeCrashWith "ConnectToBaby: Not yet implemented!"
-    _                           -> toParent Nop HomeA <<< liftChild toHome $ HomeC.update action
+    _                           -> toParent [] HomeA <<< liftChild toHome $ HomeC.update action
   where
     handleStartBabyStation :: String -> ComponentType Unit State Action
     handleStartBabyStation name = onlyModify $ _ { onlineStatus = Baby name }

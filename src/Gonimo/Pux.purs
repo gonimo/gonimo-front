@@ -164,11 +164,11 @@ wrapAction :: forall action. action -> Array (IO action)
 wrapAction = Arr.singleton <<< pure
 
 toParent :: forall childAction parentAction parentProps parentState.
-                  parentAction
+                  Array (IO parentAction)
                   -> (childAction -> parentAction)
                   -> Component parentProps parentState (Maybe (Array (IO childAction)))
                   -> Component parentProps parentState (Array (IO parentAction))
-toParent onNothing mkAction child = maybe (wrapAction onNothing) (map (map mkAction)) <$> child
+toParent onNothing mkAction child = maybe onNothing (map (map mkAction)) <$> child
 
 toParentM :: forall childAction parentAction parentProps parentState.
                   Component parentProps parentState (Array (IO parentAction))
