@@ -23,7 +23,7 @@ import Data.Generic (gShow)
 import Data.Maybe (isJust, isNothing, Maybe(..))
 import Data.Tuple (Tuple(Tuple))
 import Gonimo.Client.Types (Settings, GonimoError, Gonimo, runGonimoT, class ReportErrorAction)
-import Gonimo.Pux (onlyModify, Update, runGonimo, class MonadComponent)
+import Gonimo.Pux (noEffects, onlyModify, Update, runGonimo, class MonadComponent)
 import Gonimo.Server.DbEntities (Family(Family))
 import Gonimo.Server.Types (InvitationDelivery(EmailInvitation), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (Key(Key), Secret(Secret))
@@ -46,7 +46,6 @@ type State =
   { familyName     :: String
   , email          :: String
   , invitationSent :: Boolean
-  , errorOccurred  :: Maybe GonimoError
   }
 
 init :: forall eff. Gonimo eff State
@@ -54,7 +53,6 @@ init = let
     initWithFamily family = { familyName :     family
                             , email :          ""
                             , invitationSent : false
-                            , errorOccurred :  Nothing
                             }
   in
      initWithFamily <$> postFunnyName
@@ -75,8 +73,8 @@ update action = case action of
   (SetEmail email )     -> onlyModify $ _ { email = email }
   InvitationSent        -> onlyModify $ _ { invitationSent = true }
   SendInvitation        -> handleSendInvitation
-  Nop                   -> pure []
-  ReportError err       -> onlyModify $ _ { errorOccurred = Just err }
+  ReportError err       -> noEffects
+  Nop                   -> noEffects
 
 
 handleSendInvitation :: forall m ps. (MonadComponent (Props ps) State m) => m (Array (IO Action))
@@ -85,8 +83,8 @@ handleSendInvitation = do
   state <- get
   runGonimo $ do
     (SPSettings_ settings) <- ask
-    let params = case settings.params of (SPParams_ params) -> params
-    Gonimo.log $ "Using AuthToken: " <> gShow params.authorization
+    let params' = case settings.params of (SPParams_ params) -> params
+    Gonimo.log $ "Using AuthToken: " <> gShow params'.authorization
     fid <- case props.familyId of
       Nothing   -> postFamilies state.familyName
       Just fid' -> pure fid'
@@ -146,10 +144,6 @@ viewSend props state =
              [ text " Send Invitation! "
              , span [A.className "glyphicon glyphicon-send"] []
              ]
-    , p []
-        if isJust state.errorOccurred
-        then [ text $ "Error occurred!"]
-        else []
     ]
   ]
   where

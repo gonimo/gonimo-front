@@ -2,6 +2,7 @@ module  Gonimo.UI.Home where
 
 import Data.Array as Arr
 import Data.Tuple as Tuple
+import Gonimo.UI.Socket.Types as SocketC
 import Pux.Html.Attributes as A
 import Pux.Html.Elements as H
 import Pux.Html.Events as E
@@ -18,6 +19,7 @@ import Gonimo.WebAPI.Types (DeviceInfo(..))
 import Prelude (class BooleanAlgebra)
 import Pux.Html (span, text, button, div, Html)
 import Pux.Html.Attributes (letterSpacing)
+import WebRTC.MediaStream (MediaStreamConstraints(MediaStreamConstraints))
 import Prelude hiding (div)
 
 
@@ -33,19 +35,24 @@ type State = { newBabyName :: String }
 init :: State
 init = { newBabyName : "baby" }
 
-data Action = StartBabyStation String -- To be handled by parent
-            | StopBabyStation  -- To be handled by parent
-            | ConnectToBaby (Key Device) -- To be handled by parent
+data Action = SocketA SocketC.Action
             | SetBabyName String -- Internal: keep track of user edit
             | Nop
 
 
+connectToBaby :: Key Device -> Action
+connectToBaby = SocketA <<< SocketC.ConnectToBaby
+
+startBabyStation :: String -> MediaStreamConstraints -> Action
+startBabyStation name constraints = SocketA $ SocketC.StartBabyStation name constraints
+
+stopBabyStation :: Action
+stopBabyStation = SocketA SocketC.StopBabyStation
+
 update :: forall ps. Update (Props ps) State Action
-update (SetBabyName val)    = onlyModify $ _ { newBabyName = val }
-update (StartBabyStation _) = noEffects
-update StopBabyStation      = noEffects
-update (ConnectToBaby _)    = noEffects
-update Nop                  = noEffects
+update (SetBabyName val) = onlyModify $ _ { newBabyName = val }
+update (SocketA _)       = noEffects
+update Nop               = noEffects
 
 view :: forall ps. Props ps -> State -> Html Action
 view props state = div []
@@ -101,7 +108,7 @@ viewOnlineBaby baby =
   button [ A.className "btn btn-block btn-info"
          , A.style [Tuple "margin-left" "0px"]
          , A.type_ "button"
-         , E.onClick $ const $ ConnectToBaby baby.deviceId
+         , E.onClick $ const $ connectToBaby baby.deviceId
          ]
   [ text $ baby.babyName <> " "
   , span [A.className "glyphicon glyphicon-transfer"] []
@@ -118,7 +125,7 @@ viewOnline name =
       , button [ A.className "btn btn-block btn-danger"
                , A.style [Tuple "margin-left" "0px"]
                , A.type_ "button"
-               , E.onClick $ const $ StopBabyStation
+               , E.onClick $ const $ stopBabyStation
                ]
         [ text "Stop Baby Monitor "
         , span [A.className "glyphicon glyphicon-off"] []
@@ -147,7 +154,8 @@ viewStartButton baby =
   button [ A.className "btn btn-block btn-info"
          , A.style [Tuple "margin-left" "0px"]
          , A.type_ "button"
-         , E.onClick $ const $ StartBabyStation baby
+         , E.onClick $ const $ startBabyStation baby
+                                 (MediaStreamConstraints { video : true, audio : true })
          ]
   [ text $ baby <> " "
   , span [A.className "glyphicon glyphicon-transfer"] []
@@ -175,7 +183,7 @@ wrappingBox inner name = H.div [ E.onKeyUp handleEnter
                          [ inner name ]
   where
     handleEnter :: E.KeyboardEvent -> Action
-    handleEnter ev = if ev.keyCode == 13 then StartBabyStation name else Nop
+    handleEnter ev = if ev.keyCode == 13 then startBabyStation name (MediaStreamConstraints { audio : true, video : true }) else Nop
 
 -- getSubscriptions :: forall ps. Props ps -> State -> Subscriptions Action
 -- getSubscriptions props _ =

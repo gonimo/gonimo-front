@@ -11,6 +11,7 @@ import Gonimo.UI.Home as HomeC
 import Gonimo.UI.Invite as InviteC
 import Gonimo.UI.Loaded as LoadedC
 import Gonimo.UI.Loaded.Types as LoadedC
+import Gonimo.UI.Socket as SocketC
 import Gonimo.WebAPI.MakeRequests as Reqs
 import Pux.Html.Attributes as A
 import Servant.Subscriber as Sub
@@ -210,20 +211,18 @@ load = Gonimo.toIO initSettings $ authToAction =<< LoadedC.getAuthData
     authToAction (authData@(AuthData auth)) = do
       inviteState <- InviteC.init
       pure $ Init
-            { authData      : authData
-            , subscriberUrl : "ws://localhost:8081/subscriber"
+            { subscriberUrl : "ws://localhost:8081/subscriber"
             , inviteS       : inviteState
             , acceptS       : AcceptC.init
             , homeS         : HomeC.init
+            , socketS        : SocketC.init authData
             , central       : LoadedC.CentralInvite
             , familyIds      : []
-            , currentFamily  : Nothing
             , families      : Map.empty
             , url           : ""
             , onlineDevices : []
             , deviceInfos   : []
             , userError     : NoError
-            , onlineStatus   : NoBaby
             }
 
 makeCallback :: forall eff. Channel Action ->  (LoadedC.Action -> SubscriberEff (channel :: CHANNEL | eff) Unit)

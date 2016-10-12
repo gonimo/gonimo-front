@@ -4,8 +4,10 @@ import Prelude
 import Gonimo.UI.AcceptInvitation as AcceptC
 import Gonimo.UI.Home as HomeC
 import Gonimo.UI.Invite as InviteC
+import Gonimo.UI.Socket.Lenses as SocketC
+import Gonimo.UI.Socket.Types as SocketC
 import Data.Generic (class Generic)
-import Data.Lens (lens, LensP)
+import Data.Lens (to, _Just, TraversalP, lens, LensP)
 import Data.Map (Map)
 import Data.Maybe (Maybe)
 import Data.Tuple (Tuple(Tuple))
@@ -17,20 +19,18 @@ import Gonimo.UI.Error (class ErrorAction, UserError)
 import Gonimo.WebAPI.Types (DeviceInfo(DeviceInfo), AuthData(AuthData))
 import Servant.Subscriber.Connection (Notification)
 
-type State = { authData :: AuthData
-             , subscriberUrl :: String
+type State = { subscriberUrl :: String
              , inviteS  :: InviteC.State
              , acceptS  :: AcceptC.State
              , homeS    :: HomeC.State
+             , socketS   :: SocketC.State
              , central  :: Central
              , familyIds :: Array (Key Family)
              , families  :: Map (Key Family) Family
-             , currentFamily :: Maybe (Key Family)
              , onlineDevices :: Array (Tuple (Key Device) DeviceType)
              , deviceInfos :: Array (Tuple (Key Device) DeviceInfo)
              , userError :: UserError
              , url :: String
-             , onlineStatus :: DeviceType
              }
 
 type Props = { settings :: Settings
@@ -44,17 +44,15 @@ type Props = { settings :: Settings
 
 data Action = ReportError GonimoError
             | SetState State
-            | SetAuthData AuthData
             | InviteA InviteC.Action
             | AcceptA AcceptC.Action
             | HomeA HomeC.Action
+            | SocketA SocketC.Action
             | SetFamilyIds (Array (Key Family))
             | UpdateFamily (Key Family) Family
             | SetCentral Central
-            | ServerFamilyGoOffline (Key Family) -- | A bit of a hack - for reliably switching families
             | SetOnlineDevices (Array (Tuple (Key Device) DeviceType))
             | SetDeviceInfos (Array (Tuple (Key Device) DeviceInfo))
-            | SwitchFamily (Key Family)
             | SetURL String
             | HandleSubscriber Notification
             | ResetDevice -- Reinitialize basically everything.
@@ -90,3 +88,14 @@ homeS = lens _.homeS (_ { homeS = _ })
 central :: LensP State Central
 central = lens _.central (_ { central = _})
 
+socketS :: LensP State SocketC.State
+socketS = lens _.socketS (_ { socketS = _ })
+
+authData :: LensP State AuthData
+authData = socketS <<< SocketC.authData
+
+currentFamily :: TraversalP State (Key Family)
+currentFamily = socketS <<< SocketC.currentFamily <<< _Just
+
+familyIds :: LensP State (Array (Key Family))
+familyIds = lens _.familyIds (_ { familyIds = _ })

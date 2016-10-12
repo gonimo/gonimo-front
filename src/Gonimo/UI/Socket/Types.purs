@@ -1,39 +1,46 @@
-module Gonimo.Socket.Types where
+module Gonimo.UI.Socket.Types where
 
 
 import Prelude
 import Data.Map as Map
-import Gonimo.Socket.Channel as ChannelC
+import Gonimo.UI.Socket.Channel.Types as ChannelC
 import Control.Monad.Reader (runReader)
 import Control.Monad.Reader.Class (class MonadReader)
 import Data.Foldable (foldl)
 import Data.Lens (lens, LensP)
 import Data.Lens.At (at)
 import Data.Map (Map)
-import Data.Maybe (maybe, fromMaybe, Maybe)
+import Data.Maybe (maybe, fromMaybe, Maybe(Just, Nothing))
 import Data.Monoid (mempty)
 import Data.Tuple (uncurry, snd, Tuple(Tuple))
-import Gonimo.Client.Types (Settings)
+import Gonimo.Client.Types (GonimoError, class ReportErrorAction, Settings)
 import Gonimo.Pux (noEffects)
 import Gonimo.Server.DbEntities (Family(Family), Device(Device))
-import Gonimo.Socket.Message (Message)
+import Gonimo.Server.Types (DeviceType(Baby, NoBaby))
 import Gonimo.Types (Secret(Secret), Key(Key))
+import Gonimo.UI.Socket.Message (Message)
 import Gonimo.WebAPI.Subscriber (receiveSocketByFamilyIdByToDevice, receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
+import Gonimo.WebAPI.Types (AuthData(AuthData))
 import Servant.Subscriber (Subscriptions)
 import WebRTC.MediaStream (MediaStreamConstraints(MediaStreamConstraints), MediaStream)
 import WebRTC.RTC (newRTCPeerConnection, RTCPeerConnection)
 
-type Props ps = { settings :: Settings
-                , acceptConnections :: Boolean
-                , deviceId :: Key Device
-                , ourFamilyId :: Key Family
-                }
+type Props ps = { settings :: Settings | ps }
 
 type State =
-  { ourId :: Key Device
-  , ourFamilyId :: Key Family
+  { authData :: AuthData
+  , currentFamily :: Maybe (Key Family)
   , channels :: Map ChannelId ChannelC.State
+  , onlineStatus :: Maybe BabyStation
   }
+
+type BabyStation = { babyName  :: String
+                   , mediaStream :: MediaStream
+                   }
+
+toDeviceType :: Maybe BabyStation -> DeviceType
+toDeviceType Nothing = NoBaby
+toDeviceType (Just station) = Baby station.babyName
 
 data ChannelId = ChannelId (Key Device) Secret
 
@@ -62,10 +69,21 @@ instance ordChannelId :: Ord ChannelId where
 
 data Action = AcceptConnection ChannelId
             | AddChannel ChannelId ChannelC.State
+            | ConnectToBaby (Key Device)
             | CloseChannel ChannelId
+            | CloseBabyChannel ChannelId -- Close channel if it is acting as a baby station
               -- Channel actions for a given sender and channel id
             | ChannelA ChannelId ChannelC.Action
+            | SwitchFamily (Key Family)
+            | ServerFamilyGoOffline (Key Family) -- | A bit of a hack - for reliably switching families
+            | SetAuthData AuthData
+            | StartBabyStation String MediaStreamConstraints
+            | StopBabyStation
+            | ReportError GonimoError
             | Nop
+
+instance reportErrorAction :: ReportErrorAction Action where
+  reportError = ReportError
 
 channels :: LensP State (Map ChannelId ChannelC.State)
 channels = lens _.channels (_ { channels = _ })

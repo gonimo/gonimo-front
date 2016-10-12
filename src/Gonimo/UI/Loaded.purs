@@ -15,6 +15,9 @@ import Gonimo.UI.AcceptInvitation as AcceptC
 import Gonimo.UI.Error as Error
 import Gonimo.UI.Home as HomeC
 import Gonimo.UI.Invite as InviteC
+import Gonimo.UI.Socket as SocketC
+import Gonimo.UI.Socket.Lenses as SocketC
+import Gonimo.UI.Socket.Types as SocketC
 import Gonimo.WebAPI.MakeRequests as Reqs
 import Gonimo.WebAPI.Subscriber as Sub
 import Pux.Html as H
@@ -40,8 +43,9 @@ import Data.Either (either, Either(Right, Left))
 import Data.Foldable (foldl)
 import Data.Generic (class Generic)
 import Data.Generic (gShow)
+import Data.Lens ((.=), to, (^.), (^?))
 import Data.Map (Map)
-import Data.Maybe (maybe, Maybe(..))
+import Data.Maybe (isNothing, maybe, Maybe(..))
 import Data.Monoid (mempty)
 import Data.Semigroup (append)
 import Data.String (takeWhile)
@@ -56,7 +60,7 @@ import Gonimo.Server.Error (ServerError(InvalidAuthToken))
 import Gonimo.Server.Types (DeviceType(Baby, NoBaby), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (dateToString, Key(Key), Secret(Secret))
 import Gonimo.UI.Error (viewError, class ErrorAction, UserError(NoError, DeviceInvalid), handleSubscriber, handleError)
-import Gonimo.UI.Loaded.Types (homeS, centralHome, Props, acceptS, inviteS, State, Action(..), Central(..))
+import Gonimo.UI.Loaded.Types (familyIds, authData, currentFamily, socketS, homeS, centralHome, Props, acceptS, inviteS, State, Action(..), Central(..))
 import Gonimo.Util (toString, fromString)
 import Gonimo.WebAPI (deleteOnlineStatusByFamilyIdByDeviceId, SPParams_(SPParams_), postAccounts)
 import Gonimo.WebAPI.Types (DeviceInfo(DeviceInfo), AuthData(AuthData))
@@ -87,19 +91,11 @@ update (InviteA (InviteC.ReportError err)) = handleError err
 update (InviteA action)                    = updateInvite action
 update (AcceptA (AcceptC.ReportError err)) = handleError err
 update (AcceptA action)                    = updateAccept action
+update (SocketA (SocketC.ReportError err)) = handleError err
+update (SocketA action)                    = updateSocket action
 update (HomeA action)                      = updateHome action
-update (SetFamilyIds ids)                  = onlyModify
-                                             $ \state -> state { familyIds = ids
-                                                               , currentFamily = state.currentFamily <|> head ids
-                                                               }
-update (ServerFamilyGoOffline familyId)    = handleServerFamilyGoOffline familyId
+update (SetFamilyIds ids)                  = handleSetFamilyIds ids
 update (UpdateFamily familyId' family')    = onlyModify $ \state ->  state { families = Map.insert familyId' family' state.families }
-update (SwitchFamily familyId')            = do
-  oldFamily <- _.currentFamily <$> (get :: Component Unit State State)
-  modify $ _ { currentFamily = Just familyId' }
-  pure
-    $ fromFoldable
-    $ map (pure <<< ServerFamilyGoOffline) oldFamily
 update (SetCentral c)                      = onlyModify $ _ { central = c }
 update (SetOnlineDevices devices)          = onlyModify $ _ { onlineDevices = devices }
 update (SetDeviceInfos devices)            = onlyModify $ _ { deviceInfos = devices }
@@ -107,7 +103,6 @@ update (SetURL url)                        = handleSetURL url
 update (HandleSubscriber msg)              = handleSubscriber msg
 update ResetDevice                         = handleResetDevice
 update ClearError                          = handleClearError
-update (SetAuthData auth)                  = handleSetAuthData auth
 update Nop                                 = noEffects
 update _                                   = noEffects
 
@@ -127,6 +122,11 @@ toHome = do
   props <- mkProps <$> get
   pure $ makeChildData homeS props
 
+toSocket :: ToChild Unit State Props SocketC.State
+toSocket = do
+  props <- mkProps <$> get
+  pure $ makeChildData socketS props
+
 updateInvite :: InviteC.Action -> ComponentType Unit State Action
 updateInvite = toParent [] InviteA <<< liftChild toInvite <<< InviteC.update
 
@@ -135,35 +135,42 @@ updateAccept = toParent [] AcceptA <<< liftChild toAccept <<< AcceptC.update
 
 updateHome :: HomeC.Action -> ComponentType Unit State Action
 updateHome action = case action of
-    HomeC.StartBabyStation baby -> handleStartBabyStation baby
-    HomeC.StopBabyStation       -> handleStopBabyStation
-    HomeC.ConnectToBaby baby    -> unsafeCrashWith "ConnectToBaby: Not yet implemented!"
-    _                           -> toParent [] HomeA <<< liftChild toHome $ HomeC.update action
-  where
-    handleStartBabyStation :: String -> ComponentType Unit State Action
-    handleStartBabyStation name = onlyModify $ _ { onlineStatus = Baby name }
+    HomeC.SocketA socketA -> updateSocket socketA
+    _                     -> toParent [] HomeA <<< liftChild toHome $ HomeC.update action
 
-    handleStopBabyStation :: ComponentType Unit State Action
-    handleStopBabyStation = onlyModify $ _ { onlineStatus = NoBaby }
+updateSocket :: SocketC.Action -> ComponentType Unit State Action
+updateSocket action = do
+  case action of
+    SocketC.SetAuthData _ -> handleSetAuthData
+    _ -> pure unit
+  toParent [] SocketA <<< liftChild toSocket $ SocketC.update action
 
 inviteEffect :: forall m. Monad m => Secret -> m Action
 inviteEffect = pure <<< AcceptA <<< AcceptC.LoadInvitation
 
 handleResetDevice :: ComponentType Unit State Action
 handleResetDevice = do
-  props <- mkProps <$> get
+  props <- mkProps <$> get :: Component Unit State State
   pure $ [ toIO props.settings $ do
               liftEff $ localStorage.removeItem Key.authData
-              SetAuthData <$> getAuthData
+              SocketA <<< SocketC.SetAuthData <$> getAuthData
          ]
 
-handleSetAuthData :: AuthData -> ComponentType Unit State Action
-handleSetAuthData auth = onlyModify $ \state -> state
-                                  { authData = auth
-                                  , userError = case state.userError of
-                                                  DeviceInvalid -> NoError
-                                                  _ -> state.userError
+handleSetAuthData :: Component Unit State Unit
+handleSetAuthData = modify $ \state -> state
+                                  {
+                                   userError = case state.userError of
+                                      DeviceInvalid -> NoError
+                                      _ -> state.userError
                                   }
+handleSetFamilyIds :: Array (Key Family) -> ComponentType Unit State Action
+handleSetFamilyIds ids = do
+  familyIds .= ids
+  state <- get :: Component Unit State State
+  if isNothing state.socketS.currentFamily
+    then pure $ fromFoldable $ pure <<< SocketA <<< SocketC.SwitchFamily <$> Arr.head ids
+    else noEffects
+
 
 handleSetURL :: String -> ComponentType Unit State Action
 handleSetURL url = do
@@ -194,17 +201,6 @@ handleClearError = do
   onlyModify $ _ { userError = NoError
                  , central = newCentral
                  }
-
-handleServerFamilyGoOffline :: Key Family -> ComponentType Unit State Action
-handleServerFamilyGoOffline familyId = do
-    state <- get
-    let
-      deviceId = (runAuthData state.authData).deviceId
-      props = mkProps state
-    pure $ [ Gonimo.toIO props.settings $ do
-                deleteOnlineStatusByFamilyIdByDeviceId familyId deviceId
-                pure Nop
-           ]
 
 --------------------------------------------------------------------------------
 
@@ -337,7 +333,7 @@ viewFamilyChooser state = H.div []
                           ]
   where
     doSwitchFamily :: FormEvent -> Action
-    doSwitchFamily ev = maybe Nop SwitchFamily $ fromString ev.target.value
+    doSwitchFamily ev = maybe Nop (SocketA <<< SocketC.SwitchFamily) $ fromString ev.target.value
 
     makeOption :: Key Family -> Family -> Html Action
     makeOption familyId (Family family) = H.option [ A.value (toString familyId) ]
@@ -346,16 +342,16 @@ viewFamilyChooser state = H.div []
 getSubscriptions :: State -> Subscriptions Action
 getSubscriptions state =
   let
-    familyId = state.currentFamily
+    familyId = state^?currentFamily
 
     --subscribeGetFamily :: forall m. MonadReader Settings m => Key Family -> m (Subscriptions Action)
     subscribeGetFamily familyId' =
       Sub.getFamiliesByFamilyId (maybe Nop (UpdateFamily familyId')) familyId'
 
     subArray :: Array (Subscriptions Action)
-    subArray = map (flip runReader (mkSettings state.authData)) <<< concat $
+    subArray = map (flip runReader (mkSettings $ state^.authData)) <<< concat $
       [ [ Sub.getAccountsByAccountIdFamilies (maybe Nop SetFamilyIds)
-                                          (runAuthData state.authData).accountId
+                                          (runAuthData $ state^.authData).accountId
         ]
       , fromFoldable $
         Sub.getOnlineStatusByFamilyId (maybe Nop SetOnlineDevices) <$> familyId
@@ -371,22 +367,23 @@ getSubscriptions state =
 getPongRequest :: State -> Maybe HttpRequest
 getPongRequest state =
   let
-    deviceId = (runAuthData state.authData).deviceId
-    deviceData = Tuple deviceId state.onlineStatus
-    familyId = state.currentFamily
+    deviceId = (runAuthData $ state^.authData).deviceId
+    onlineStatus' = state ^. socketS <<< SocketC.onlineStatus <<< to SocketC.toDeviceType
+    deviceData = Tuple deviceId onlineStatus'
+    familyId = state^?currentFamily
   in
    case state.userError of
-     NoError -> flip runReader (mkSettings state.authData) <<< Reqs.postOnlineStatusByFamilyId deviceData <$> familyId
+     NoError -> flip runReader (mkSettings $ state^.authData) <<< Reqs.postOnlineStatusByFamilyId deviceData <$> familyId
      _ -> Nothing
 
 getCloseRequest :: State -> Maybe HttpRequest
 getCloseRequest state =
   let
-    deviceId = (runAuthData state.authData).deviceId
-    familyId = state.currentFamily
+    deviceId = (runAuthData $ state^.authData).deviceId
+    familyId = state^?currentFamily
   in
    case state.userError of
-     NoError -> flip runReader (mkSettings state.authData) <<< flip Reqs.deleteOnlineStatusByFamilyIdByDeviceId deviceId <$> familyId
+     NoError -> flip runReader (mkSettings $ state^.authData) <<< flip Reqs.deleteOnlineStatusByFamilyIdByDeviceId deviceId <$> familyId
      _ -> Nothing
 
 
@@ -406,11 +403,11 @@ getAuthData = do
     Just d  -> pure d
 
 mkProps :: State -> Props
-mkProps state = { settings : mkSettings state.authData
-                , deviceId : (runAuthData state.authData).deviceId
-                , familyId : state.currentFamily
-                , onlineStatus  : state.onlineStatus
-                , family : flip Map.lookup state.families =<< state.currentFamily
+mkProps state = { settings : mkSettings $ state^.authData
+                , deviceId : (runAuthData $ state^.authData).deviceId
+                , familyId : state^?currentFamily
+                , onlineStatus  : state ^. socketS <<< SocketC.onlineStatus <<< to SocketC.toDeviceType
+                , family : flip Map.lookup state.families =<< state^?currentFamily
                 , onlineDevices : state.onlineDevices
                 , deviceInfos : state.deviceInfos
                 }
