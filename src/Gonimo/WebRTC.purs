@@ -4,30 +4,7 @@ import Prelude
 import Data.Generic (class Generic)
 import Data.Maybe (Maybe)
 import Data.Nullable (toMaybe, toNullable, Nullable)
-import WebRTC.RTC (RTCIceCandidate)
 
-newtype IceCandidate = IceCandidate { sdpMLineIndex :: Maybe Int
-                                    , sdpMid :: Maybe String
-                                    , candidate :: String
-                                    }
-
-derive instance genericIceCandidate :: Generic IceCandidate
-
-toJS :: IceCandidate -> RTCIceCandidate
-toJS (IceCandidate icecandidate)= {
-    candidate : icecandidate.candidate
-  , sdpMid  : toNullable icecandidate.sdpMid
-  , sdpMLineIndex : toNullable icecandidate.sdpMLineIndex
-  }
-
-fromJS :: RTCIceCandidate -> IceCandidate
-fromJS icecandidate = IceCandidate
-  { candidate : icecandidate.candidate
-  , sdpMid  : toMaybe icecandidate.sdpMid
-  , sdpMLineIndex : toMaybe icecandidate.sdpMLineIndex
-  }
-
-type SessionDescription = { sdp :: String, "type" :: String }
 
 -- data Signal =
 --     ICECandidate String
