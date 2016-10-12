@@ -43,28 +43,29 @@ init authData' = { authData : authData'
 
 update :: forall ps. Update (Props ps) State Action
 update action = case action of
-  AcceptConnection channelId'      -> handleAcceptConnection channelId'
-  AddChannel channelId' cState     -> channel channelId' .= Just cState
-                                      *> pure []
-  ChannelA channelId' action'      -> updateChannel channelId' action'
-  CloseChannel channelId'           -> pure [ pure $ ChannelA channelId' ChannelC.CloseConnection
-                                            , pure $ RemoveChannel channelId'
-                                            ]
-  CloseBabyChannel channelId'       -> do
+  AcceptConnection channelId'                    -> handleAcceptConnection channelId'
+  AddChannel channelId' cState                   -> channel channelId' .= Just cState
+                                                    *> pure []
+  ChannelA channelId' (ChannelC.ReportError err) -> pure [pure $ ReportError err]
+  ChannelA channelId' action'                    -> updateChannel channelId' action'
+  CloseChannel channelId'                        -> pure [ pure $ ChannelA channelId' ChannelC.CloseConnection
+                                                         , pure $ RemoveChannel channelId'
+                                                         ]
+  CloseBabyChannel channelId'                    -> do
     isBabyStation' <- gets (_^?channel channelId' <<< _Just <<< to _.isBabyStation)
     case isBabyStation' of
-         Just true -> pure $ wrapAction (CloseBabyChannel channelId')
-         _         -> pure []
-  RemoveChannel channelId'          -> channel channelId' .= Nothing
-                                      *> pure []
-  (SwitchFamily familyId')         -> handleFamilySwitch familyId'
-  (ServerFamilyGoOffline familyId) -> handleServerFamilyGoOffline familyId
-  (SetAuthData auth)               -> handleSetAuthData auth
-  (StartBabyStation _ _)           -> noEffects
-  (ConnectToBaby _ )               -> noEffects
-  StopBabyStation                  -> handleStopBabyStation
-  (ReportError _)                  -> noEffects
-  Nop                              -> noEffects
+         Just true                               -> pure $ wrapAction (CloseBabyChannel channelId')
+         _                                       -> pure []
+  RemoveChannel channelId'                       -> channel channelId' .= Nothing
+                                                    *> pure []
+  (SwitchFamily familyId')                       -> handleFamilySwitch familyId'
+  (ServerFamilyGoOffline familyId)               -> handleServerFamilyGoOffline familyId
+  (SetAuthData auth)                             -> handleSetAuthData auth
+  (StartBabyStation _ _)                         -> noEffects
+  (ConnectToBaby _ )                             -> noEffects
+  StopBabyStation                                -> handleStopBabyStation
+  (ReportError _)                                -> noEffects
+  Nop                                            -> noEffects
 
 
 toChannel :: forall ps. ChannelId -> ToChild (Props ps) State (ChannelC.Props {}) ChannelC.State

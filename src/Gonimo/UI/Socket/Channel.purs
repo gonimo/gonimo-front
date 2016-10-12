@@ -8,16 +8,17 @@ import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.IO (IO)
-import Control.Monad.Reader.Class (class MonadReader)
+import Control.Monad.Reader.Class (ask, class MonadReader)
 import Data.Maybe (isJust, maybe, Maybe(Nothing, Just))
 import Gonimo.Client.Types (Settings, GonimoEff)
-import Gonimo.Pux (noEffects, Update, onlyModify, ComponentType)
+import Gonimo.Pux (noEffects, runGonimo, Component, Update, onlyModify, ComponentType)
 import Gonimo.Server.DbEntities (Family(Family), Device(Device))
 import Gonimo.Types (Secret(Secret), Key(Key))
-import Gonimo.UI.Socket.Channel.Types (Action(Nop, AcceptMessage, CloseConnection, StopStreaming, SetMediaStream, StartStreaming), State, Props)
-import Gonimo.UI.Socket.Message (decodeFromString, Message)
+import Gonimo.UI.Socket.Channel.Types (Action(..), State, Props)
+import Gonimo.UI.Socket.Message (encodeToString, decodeFromString, Message)
 import Gonimo.UI.Socket.Types (BabyStation)
 import Gonimo.Util (coerceEffects)
+import Gonimo.WebAPI (putSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
 import Gonimo.WebAPI.Subscriber (receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
 import Servant.Subscriber (Subscriptions)
 import WebRTC.MediaStream (getUserMedia, MediaStreamConstraints(MediaStreamConstraints), MediaStream)
@@ -42,6 +43,7 @@ update action = case action of
   StopStreaming                      -> noEffects
   CloseConnection                    -> noEffects
   AcceptMessage message              -> noEffects
+  ReportError _                      -> noEffects
   Nop                                -> noEffects
 
 handleStartStreaming :: forall ps.
@@ -50,6 +52,18 @@ handleStartStreaming :: forall ps.
 handleStartStreaming constraints =
   pure [ liftAff $ SetMediaStream <$> coerceEffects (getUserMedia constraints) ]
 
+sendMessage :: forall ps. Message -> ComponentType (Props ps) State Action
+sendMessage msg = do
+  let sendString = putSocketByFamilyIdByFromDeviceByToDeviceByChannelId
+  let strMsg = encodeToString msg
+  props <- ask
+  let familyId' = props.familyId
+  let fromDevice' = props.ourId
+  let toDevice' = props.theirId
+  let channelId' = props.cSecret
+  runGonimo $ do
+    sendString strMsg familyId' fromDevice' toDevice' channelId'
+    pure Nop
 
 getSubscriptions :: forall m ps. (MonadReader Settings m) => Props ps -> m (Subscriptions Action)
 getSubscriptions props =

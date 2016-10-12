@@ -1,7 +1,7 @@
 module Gonimo.UI.Socket.Channel.Types where
 
 import Data.Maybe (Maybe(Just, Nothing))
-import Gonimo.Client.Types (Settings)
+import Gonimo.Client.Types (class ReportErrorAction, GonimoError, Settings)
 import Gonimo.Server.DbEntities (Family(Family), Device(Device))
 import Gonimo.Types (Secret(Secret), Key(Key))
 import Gonimo.UI.Socket.Message (Message)
@@ -29,7 +29,11 @@ data Action = AcceptMessage Message
             | StopStreaming
             | SetMediaStream MediaStream
             | CloseConnection -- Say bye and tear down all connections!
+            | ReportError GonimoError
             | Nop
+
+instance reportErrorAction :: ReportErrorAction Action where
+  reportError = ReportError
 
 unsafeMakeFamilyId :: Maybe (Key Family) -> Key Family
 unsafeMakeFamilyId Nothing = unsafeCrashWith "We have to have a valid family id when using a channel, anything else is a but - therefore I am crashing now. Bye!"
