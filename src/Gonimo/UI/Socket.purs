@@ -8,16 +8,16 @@ import Gonimo.UI.Socket.Channel.Types as ChannelC
 import Control.Monad.IO (IO)
 import Control.Monad.Reader (ask, runReader)
 import Control.Monad.Reader.Class (class MonadReader, ask)
-import Control.Monad.State.Class (modify, put, get, class MonadState)
+import Control.Monad.State.Class (gets, modify, put, get, class MonadState)
 import Data.Array (fromFoldable)
 import Data.Foldable (foldl)
-import Data.Lens (to, (^?), (^.), _Just, (.=))
+import Data.Lens (use, to, (^?), (^.), _Just, (.=))
 import Data.Map (Map)
 import Data.Maybe (maybe, fromMaybe, Maybe(Nothing, Just))
 import Data.Monoid (mempty)
 import Data.Tuple (uncurry, snd, Tuple(Tuple))
 import Gonimo.Client.Types (Settings)
-import Gonimo.Pux (noEffects, runGonimo, Component, liftChild, toParent, ComponentType, makeChildData, ToChild, onlyModify, Update, class MonadComponent)
+import Gonimo.Pux (wrapAction, noEffects, runGonimo, Component, liftChild, toParent, ComponentType, makeChildData, ToChild, onlyModify, Update, class MonadComponent)
 import Gonimo.Server.DbEntities (Family(Family), Device(Device))
 import Gonimo.Types (Secret(Secret), Key(Key))
 import Gonimo.UI.Socket.Lenses (currentFamily, onlineStatus, authData)
@@ -47,8 +47,16 @@ update action = case action of
   AddChannel channelId' cState     -> channel channelId' .= Just cState
                                       *> pure []
   ChannelA channelId' action'      -> updateChannel channelId' action'
-  CloseChannel channelId           -> noEffects -- do CloseConnection, then remove from map
-  CloseBabyChannel channelId       -> noEffects -- do CloseConnection, then remove from map
+  CloseChannel channelId'           -> pure [ pure $ ChannelA channelId' ChannelC.CloseConnection
+                                            , pure $ RemoveChannel channelId'
+                                            ]
+  CloseBabyChannel channelId'       -> do
+    isBabyStation' <- gets (_^?channel channelId' <<< _Just <<< to _.isBabyStation)
+    case isBabyStation' of
+         Just true -> pure $ wrapAction (CloseBabyChannel channelId')
+         _         -> pure []
+  RemoveChannel channelId'          -> channel channelId' .= Nothing
+                                      *> pure []
   (SwitchFamily familyId')         -> handleFamilySwitch familyId'
   (ServerFamilyGoOffline familyId) -> handleServerFamilyGoOffline familyId
   (SetAuthData auth)               -> handleSetAuthData auth

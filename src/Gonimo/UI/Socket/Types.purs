@@ -72,6 +72,7 @@ data Action = AcceptConnection ChannelId
             | ConnectToBaby (Key Device)
             | CloseChannel ChannelId
             | CloseBabyChannel ChannelId -- Close channel if it is acting as a baby station
+            | RemoveChannel ChannelId
               -- Channel actions for a given sender and channel id
             | ChannelA ChannelId ChannelC.Action
             | SwitchFamily (Key Family)
