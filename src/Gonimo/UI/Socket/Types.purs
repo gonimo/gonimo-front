@@ -79,6 +79,7 @@ data Action = AcceptConnection ChannelId
             | ServerFamilyGoOffline (Key Family) -- | A bit of a hack - for reliably switching families
             | SetAuthData AuthData
             | StartBabyStation String MediaStreamConstraints
+            | InitBabyStation String MediaStream
             | StopBabyStation
             | ReportError GonimoError
             | Nop

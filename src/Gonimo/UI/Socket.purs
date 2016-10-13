@@ -29,7 +29,7 @@ import Gonimo.WebAPI.Subscriber (receiveSocketByFamilyIdByToDevice, receiveSocke
 import Gonimo.WebAPI.Types (AuthData(AuthData))
 import Gonimo.WebAPI.Types.Helpers (runAuthData)
 import Servant.Subscriber (Subscriptions)
-import WebRTC.MediaStream (getUserMedia, MediaStream)
+import WebRTC.MediaStream (MediaStreamConstraints(MediaStreamConstraints), getUserMedia, MediaStream)
 import WebRTC.RTC (RTCPeerConnection)
 
 
@@ -61,7 +61,9 @@ update action = case action of
   (SwitchFamily familyId')                       -> handleFamilySwitch familyId'
   (ServerFamilyGoOffline familyId)               -> handleServerFamilyGoOffline familyId
   (SetAuthData auth)                             -> handleSetAuthData auth
-  (StartBabyStation _ _)                         -> noEffects
+  (StartBabyStation baby constraints)            -> noEffects
+  (InitBabyStation baby stream)                  -> onlineStatus .= Just { babyName : baby, mediaStream : stream }
+                                                    *> pure []
   (ConnectToBaby _ )                             -> noEffects
   StopBabyStation                                -> handleStopBabyStation
   (ReportError _)                                -> noEffects
@@ -76,6 +78,14 @@ toChannel channelId' = do
     props :: ChannelC.Props {}
     props = mkChannelProps pProps state channelId'
   pure $ makeChildData (channel channelId' <<< _Just) props
+
+handleStartBabyStation :: forall ps.
+                          String
+                       -> MediaStreamConstraints
+                       -> ComponentType (Props ps) State Action
+handleStartBabyStation baby constraints =
+  runGonimo $
+    pure $ InitBabyStation baby <$> liftAff (getUserMedia constraints)
 
 handleAcceptConnection :: forall ps. ChannelId -> ComponentType (Props ps) State  Action
 handleAcceptConnection channelId' = do
