@@ -5,7 +5,9 @@ import Data.Array as Arr
 import Data.Map as Map
 import Gonimo.UI.Socket.Channel as ChannelC
 import Gonimo.UI.Socket.Channel.Types as ChannelC
+import WebRTC.MediaStream.Track as Track
 import Control.Monad.Aff.Class (liftAff)
+import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.IO (IO)
 import Control.Monad.Reader (ask, runReader)
 import Control.Monad.Reader.Class (class MonadReader, ask)
@@ -16,8 +18,9 @@ import Data.Lens (use, to, (^?), (^.), _Just, (.=))
 import Data.Map (Map)
 import Data.Maybe (maybe, fromMaybe, Maybe(Nothing, Just))
 import Data.Monoid (mempty)
+import Data.Traversable (traverse_)
 import Data.Tuple (uncurry, snd, Tuple(Tuple))
-import Gonimo.Client.Types (Settings)
+import Gonimo.Client.Types (toIO, Settings)
 import Gonimo.Pux (wrapAction, noEffects, runGonimo, Component, liftChild, toParent, ComponentType, makeChildData, ToChild, onlyModify, Update, class MonadComponent)
 import Gonimo.Server.DbEntities (Family(Family), Device(Device))
 import Gonimo.Types (Secret(Secret), Key(Key))
@@ -30,8 +33,9 @@ import Gonimo.WebAPI.Subscriber (receiveSocketByFamilyIdByToDevice, receiveSocke
 import Gonimo.WebAPI.Types (AuthData(AuthData))
 import Gonimo.WebAPI.Types.Helpers (runAuthData)
 import Servant.Subscriber (Subscriptions)
-import WebRTC.MediaStream (MediaStreamConstraints(MediaStreamConstraints), getUserMedia, MediaStream)
+import WebRTC.MediaStream (MediaStreamConstraints(MediaStreamConstraints), getUserMedia, MediaStream, getTracks)
 import WebRTC.RTC (RTCPeerConnection)
+import Gonimo.Client.Effects as Console
 
 
 -- We only use props for initialization
@@ -62,7 +66,7 @@ update action = case action of
   (SwitchFamily familyId')                       -> handleFamilySwitch familyId'
   (ServerFamilyGoOffline familyId)               -> handleServerFamilyGoOffline familyId
   (SetAuthData auth)                             -> handleSetAuthData auth
-  (StartBabyStation baby constraints)            -> noEffects
+  (StartBabyStation baby constraints)            -> handleStartBabyStation baby constraints
   (InitBabyStation baby stream)                  -> onlineStatus .= Just { babyName : baby, mediaStream : stream }
                                                     *> pure []
   (ConnectToBaby _ )                             -> noEffects
@@ -112,8 +116,16 @@ handleSetAuthData auth = do
 handleStopBabyStation :: forall ps. ComponentType (Props ps) State Action
 handleStopBabyStation = do
   state <- get :: Component (Props ps) State State
+  props <- ask :: Component (Props ps) State (Props ps)
   onlineStatus .= (Nothing :: Maybe BabyStation)
-  pure $ doCleanup state CloseBabyChannel []
+  let action = case state.onlineStatus of
+        Nothing -> []
+        Just station -> [ toIO props.settings <<< liftEff $ do
+                             tracks <- getTracks station.mediaStream
+                             traverse_ Track.stop tracks
+                             pure Nop
+                        ]
+  pure $ doCleanup state CloseBabyChannel action
 
 handleServerFamilyGoOffline :: forall ps. Key Family -> ComponentType (Props ps) State Action
 handleServerFamilyGoOffline familyId = do
