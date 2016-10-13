@@ -1,7 +1,7 @@
 module Main where
 
-import Control.Monad.Eff.Console as Console
 import Data.Map as Map
+import Gonimo.Client.Effects as Console
 import Gonimo.Client.Effects as Gonimo
 import Gonimo.Client.Effects as Gonimo
 import Gonimo.Client.LocalStorage as Key
@@ -19,12 +19,12 @@ import Servant.Subscriber.Connection as Sub
 import Servant.Subscriber.Subscriptions as Sub
 import Browser.LocalStorage (STORAGE, localStorage)
 import Control.Alt ((<|>))
-import Control.Monad.Aff (Aff)
+import Control.Monad.Aff (launchAff, Aff)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Ref (newRef, writeRef, readRef, REF, Ref)
 import Control.Monad.Except.Trans (runExceptT)
-import Control.Monad.IO (IO)
+import Control.Monad.IO (runIO, IO)
 import Control.Monad.Reader (runReader)
 import Control.Monad.Reader.Trans (runReaderT)
 import Control.Monad.State.Class (modify, put, get)
@@ -40,8 +40,8 @@ import Data.Traversable (traverse)
 import Data.Tuple (fst, Tuple(Tuple))
 import Debug.Trace (trace)
 import Gonimo.Client.Router (match, Route(AcceptInvitation, Home))
-import Gonimo.Client.Types (toIO, GonimoError, GonimoEff, Gonimo, class ReportErrorAction)
-import Gonimo.Client.Types (runGonimoT, Settings)
+import Gonimo.Client.Types (toIO, GonimoError, Gonimo, class ReportErrorAction)
+import Gonimo.Client.Types (Settings)
 import Gonimo.Pux (toPux, noEffects, wrapAction, onlyModify, Update, ComponentType, makeChildData, ToChild, liftChild, Component)
 import Gonimo.Server.Types (DeviceType(NoBaby), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (Secret(Secret))
@@ -207,7 +207,7 @@ load = Gonimo.toIO initSettings $ authToAction =<< LoadedC.getAuthData
         , baseURL       : "http://localhost:8081/"
         }
 
-    authToAction :: forall eff. AuthData -> Gonimo eff Action
+    authToAction :: AuthData -> Gonimo Action
     authToAction (authData@(AuthData auth)) = do
       inviteState <- InviteC.init
       pure $ Init
@@ -232,52 +232,50 @@ makeNotify :: forall eff. Channel Action ->  (Sub.Notification -> SubscriberEff 
 makeNotify c = send c <<< LoadedA <<< LoadedC.HandleSubscriber
 
 
-deploySubscriptions :: forall eff. SubscriberEff eff (Maybe MySubscriber) -> State -> SubscriberEff eff Unit
+deploySubscriptions :: IO (Maybe MySubscriber) -> State -> IO Unit
 deploySubscriptions _ (LoadingS _) = pure unit
 deploySubscriptions getSubscriber (LoadedS s) = do
   let subscriptions = LoadedC.getSubscriptions s
   subscriber <- getSubscriber
   case subscriber of
-    Nothing -> coerceEffects $ Console.log "Not deploying - no subscriber yet!"
+    Nothing -> Console.log "Not deploying - no subscriber yet!"
     Just subscriber' -> do
-      coerceEffects $ Console.log "Setting pong and close requests ..."
-      let mySubscriber = coerceSubscriberEffects subscriber'
-      traverse_ (flip Sub.setPongRequest  (Sub.getConnection mySubscriber)) $ LoadedC.getPongRequest s
-      traverse_ (flip Sub.setCloseRequest (Sub.getConnection mySubscriber)) $ LoadedC.getCloseRequest s
-      coerceEffects $ Console.log $ "Deploying " <> show (Sub.size subscriptions) <> " subscriptions!"
-      Sub.deploy subscriptions mySubscriber
-      coerceEffects $ Console.log $ "Deployed " <> show (Sub.size subscriptions) <> " subscriptions!"
+      Console.log "Setting pong and close requests ..."
+      liftEff $ traverse_ (flip Sub.setPongRequest  (Sub.getConnection subscriber')) $ LoadedC.getPongRequest s
+      liftEff $ traverse_ (flip Sub.setCloseRequest (Sub.getConnection subscriber')) $ LoadedC.getCloseRequest s
+      Console.log $ "Deploying " <> show (Sub.size subscriptions) <> " subscriptions!"
+      liftEff $ Sub.deploy subscriptions subscriber'
+      Console.log $ "Deployed " <> show (Sub.size subscriptions) <> " subscriptions!"
 
 -- | Don't use a foldp instead of Ref - you will build up an endless thunk of actions in memory.
-renewSubscriber :: forall eff. Channel Action -> Ref (Maybe MySubscriber)
-                   -> State -> SubscriberEff (channel :: CHANNEL | eff) (Maybe MySubscriber)
+renewSubscriber :: Channel Action -> Ref (Maybe MySubscriber)
+                   -> State -> IO (Maybe MySubscriber)
 renewSubscriber controlChan subscriberRef state = do
-    oldSub <- readRef subscriberRef
+    oldSub <- liftEff $ readRef subscriberRef
     let oldUrl = Sub.getUrl <<< Sub.getConnection <$> oldSub
     let newUrl = case state of
           LoadedS lState -> Just lState.subscriberUrl
           _ -> Nothing
-    coerceEffects $ Console.log $ "Old url: " <> show oldUrl
-    coerceEffects $ Console.log $ "New url: " <> show newUrl
-    coerceEffects $ Console.log $ "Is different: " <> show (newUrl /= oldUrl)
+    Console.log $ "Old url: " <> show oldUrl
+    Console.log $ "New url: " <> show newUrl
+    Console.log $ "Is different: " <> show (newUrl /= oldUrl)
     if (newUrl /= oldUrl)
       then do
-        coerceEffects $ Console.log $ "Closing old subscriber ..."
-        coerceEffects $ traverse_ (Sub.close <<< Sub.getConnection) oldSub
+        Console.log $ "Closing old subscriber ..."
+        liftEff $ traverse_ (Sub.close <<< Sub.getConnection) oldSub
         newSub <- traverse makeMySubscriber newUrl
-        writeRef subscriberRef newSub
+        liftEff $ writeRef subscriberRef newSub
         pure newSub
        else
         pure oldSub
   where
-    makeMySubscriber :: String -> SubscriberEff (channel :: CHANNEL | eff) MySubscriber
+    makeMySubscriber :: String -> IO MySubscriber
     makeMySubscriber url' = do
-        sub <- Sub.makeSubscriber
+        map coerceSubscriberEffects <<< liftEff $ Sub.makeSubscriber
                   { url : url'
                   , callback : makeCallback controlChan
                   , notify : makeNotify controlChan
                   }
-        pure $ coerceSubscriberEffects sub
 
 main = do
   urlSignal <- sampleUrl
@@ -295,18 +293,15 @@ main = do
   send controlChan Start
   let subscriberSignal = map (renewSubscriber controlChan subscriberRef) app.state
   let subscribeSignal = deploySubscriptions <$> subscriberSignal <*> app.state
-  runSignal $ subscribeSignal
+  runSignal $ coerceEffects <<< map (const unit) <<< launchAff <<< runIO <$> subscribeSignal
   runSignal $ map (\_ -> Console.log "State changed!") app.state
   runSignal $ Console.log <$> urlSignal
   runSignal $ (Console.log <<< ("Central widget: " <> _ ) <<< showCentral) <$> app.state
   renderToDOM "#app" app.html
 
-toGonimoEffects :: forall eff a. Eff eff a -> Eff (GonimoEff eff) a
-toGonimoEffects = unsafeCoerce
-
-coerceSubscriberEffects :: forall eff1 eff2 a. Subscriber eff1 a -> Subscriber eff2 a
-coerceSubscriberEffects = unsafeCoerce
-
 showCentral :: State -> String
 showCentral (LoadingS _) = ""
 showCentral (LoadedS s) = gShow s.central
+
+coerceSubscriberEffects :: forall eff1 eff2 a. Subscriber eff1 a -> Subscriber eff2 a
+coerceSubscriberEffects = unsafeCoerce

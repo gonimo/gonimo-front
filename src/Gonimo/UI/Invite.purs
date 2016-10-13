@@ -22,7 +22,7 @@ import Data.Either (Either(Right, Left))
 import Data.Generic (gShow)
 import Data.Maybe (isJust, isNothing, Maybe(..))
 import Data.Tuple (Tuple(Tuple))
-import Gonimo.Client.Types (Settings, GonimoError, Gonimo, runGonimoT, class ReportErrorAction)
+import Gonimo.Client.Types (Settings, GonimoError, Gonimo, class ReportErrorAction)
 import Gonimo.Pux (noEffects, onlyModify, Update, runGonimo, class MonadComponent)
 import Gonimo.Server.DbEntities (Family(Family))
 import Gonimo.Server.Types (InvitationDelivery(EmailInvitation), AuthToken, AuthToken(GonimoSecret))
@@ -48,7 +48,7 @@ type State =
   , invitationSent :: Boolean
   }
 
-init :: forall eff. Gonimo eff State
+init :: Gonimo State
 init = let
     initWithFamily family = { familyName :     family
                             , email :          ""

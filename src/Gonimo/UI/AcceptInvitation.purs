@@ -23,7 +23,7 @@ import Data.Generic (gShow)
 import Data.Lens (_Just)
 import Data.Maybe (fromMaybe, isJust, isNothing, Maybe(..))
 import Data.Tuple (Tuple(Tuple))
-import Gonimo.Client.Types (GonimoError(UnexpectedAction), Gonimo, Settings, runGonimoT, class ReportErrorAction)
+import Gonimo.Client.Types (GonimoError(UnexpectedAction), Gonimo, Settings, class ReportErrorAction)
 import Gonimo.Pux (Component, makeChildData, liftChild, noEffects, onlyModify, Update, ToChild, runGonimo, ComponentType, class MonadComponent)
 import Gonimo.Server.DbEntities (Invitation(Invitation))
 import Gonimo.Server.Types (InvitationDelivery(EmailInvitation), AuthToken, AuthToken(GonimoSecret))
@@ -97,7 +97,7 @@ updateJust action = case action of
   ReportError err         -> noEffects
 
 
-loadInvitation :: forall eff. Secret -> Gonimo eff Action
+loadInvitation :: Secret -> Gonimo Action
 loadInvitation secret = Init <<< Tuple secret <$> putInvitationsInfoByInvitationSecret secret
 
 answerInvitation :: forall ps. InvitationReply -> ComponentType (Props ps) StateImpl Action

@@ -5,6 +5,7 @@ import Data.Array as Arr
 import Data.Map as Map
 import Gonimo.UI.Socket.Channel as ChannelC
 import Gonimo.UI.Socket.Channel.Types as ChannelC
+import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.IO (IO)
 import Control.Monad.Reader (ask, runReader)
 import Control.Monad.Reader.Class (class MonadReader, ask)
@@ -85,7 +86,7 @@ handleStartBabyStation :: forall ps.
                        -> ComponentType (Props ps) State Action
 handleStartBabyStation baby constraints =
   runGonimo $
-    pure $ InitBabyStation baby <$> liftAff (getUserMedia constraints)
+    InitBabyStation baby <$> liftAff (getUserMedia constraints)
 
 handleAcceptConnection :: forall ps. ChannelId -> ComponentType (Props ps) State  Action
 handleAcceptConnection channelId' = do

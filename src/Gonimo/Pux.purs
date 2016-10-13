@@ -39,7 +39,7 @@ import Data.Lens (SetterP, (.=), prism, (^?), TraversalP, (.~), (^.), LensP)
 import Data.Maybe (maybe, Maybe(Just, Nothing))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(Tuple))
-import Gonimo.Client.Types (GonimoEff, Gonimo, Settings, class ReportErrorAction)
+import Gonimo.Client.Types (Gonimo, Settings, class ReportErrorAction)
 import Gonimo.Util (fromMaybeM, runIOToSomeAff)
 import Partial.Unsafe (unsafeCrashWith)
 import Pux (noEffects, EffModel)
@@ -134,20 +134,20 @@ toPux update action state = toEffModel state $ update action
 
 
 
-runGonimos :: forall action eff ps m
+runGonimos :: forall action ps m
                . ( ReportErrorAction action
                  , MonadReader (Props ps) m
                  )
-               => Array (Gonimo eff action) -> m (Array (IO action))
+               => Array (Gonimo action) -> m (Array (IO action))
 runGonimos effects = do
   props <- ask
   pure (Gonimo.toIO props.settings <$> effects)
 
-runGonimo :: forall action eff ps m
+runGonimo :: forall action ps m
                . ( ReportErrorAction action
                  , MonadReader (Props ps) m
                  )
-               => Gonimo eff action -> m (Array (IO action))
+               => Gonimo action -> m (Array (IO action))
 runGonimo effect = do
   props <- ask
   pure $ [ Gonimo.toIO props.settings effect ]

@@ -52,7 +52,7 @@ import Data.String (takeWhile)
 import Data.Traversable (traverse)
 import Data.Tuple (uncurry, fst, Tuple(Tuple))
 import Debug.Trace (trace)
-import Gonimo.Client.Types (toIO, Settings, GonimoError, class ReportErrorAction, Gonimo, GonimoEff, runGonimoT)
+import Gonimo.Client.Types (toIO, Settings, GonimoError, class ReportErrorAction, Gonimo)
 import Gonimo.Pux (Component, toParent, runGonimo, liftChild, ComponentType, makeChildData, ToChild, noEffects, onlyModify, Update, wrapAction)
 import Gonimo.Server.DbEntities (Device(Device), Family(Family))
 import Gonimo.Server.DbEntities.Helpers (runFamily)
@@ -389,7 +389,7 @@ getCloseRequest state =
 
 
 -- | Retrieve AuthData from local storage or if not present get new one from server
-getAuthData :: forall eff. Gonimo eff AuthData
+getAuthData :: Gonimo AuthData
 getAuthData = do
   md <- liftEff $ localStorage.getItem Key.authData
   Gonimo.log $ "Got authdata from local storage: " <> gShow md

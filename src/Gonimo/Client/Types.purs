@@ -41,66 +41,51 @@ class ReportErrorAction action where
 instance reportErrorActionReportParent :: ReportErrorAction (ReportParent action) where
   reportError = ReportError
 
-type GonimoEff eff = ( ajax :: AJAX
-                      , channel :: CHANNEL
-                      , console :: CONSOLE
-                      , storage :: STORAGE
-                      , ws :: WEBSOCKET
-                      , err :: EXCEPTION
-                      , ref :: REF | eff
-                      )
+newtype Gonimo a = Gonimo (ReaderT Settings (ExceptT GonimoError IO) a)
 
-newtype GonimoT eff a = GonimoT (ReaderT Settings (ExceptT GonimoError (Aff eff)) a)
+-- We have unwrapGonimo in Gonimo.Pux, so call it unwrap
+unwrapGonimo :: forall a. Gonimo a -> (ReaderT Settings (ExceptT GonimoError IO) a)
+unwrapGonimo (Gonimo m) = m
 
-type Gonimo eff = GonimoT (GonimoEff eff)
+toIO :: forall action. ReportErrorAction action
+        => Settings -> Gonimo action -> IO action
+toIO settings m = map (either reportError id) <<< runExceptT <<< flip runReaderT settings <<< unwrapGonimo $ m
 
-runGonimoT :: forall eff a. GonimoT eff a -> (ReaderT Settings (ExceptT GonimoError (Aff eff)) a)
-runGonimoT (GonimoT m) = m
+instance functorGonimo :: Functor (Gonimo) where
+  map f (Gonimo m) = Gonimo $ map f m
 
-toAff :: forall eff action. ReportErrorAction action
-         => Settings -> Gonimo eff action -> Aff (GonimoEff eff) action
-toAff settings m = do
-  map (either reportError id) <<< runExceptT <<< flip runReaderT settings <<< runGonimoT $ m
+instance applyGonimo :: Apply (Gonimo) where
+  apply (Gonimo mf) (Gonimo ma) = Gonimo $ apply mf ma
 
-toIO :: forall eff action. ReportErrorAction action
-        => Settings -> Gonimo eff action -> IO action
-toIO settings m = liftAff $ toAff settings m
+instance applicativeGonimo :: Applicative (Gonimo) where
+  pure = Gonimo <<< pure
 
-instance functorGonimoT :: Functor (GonimoT eff) where
-  map f (GonimoT m) = GonimoT $ map f m
+instance bindGonimo :: Bind (Gonimo) where
+  bind (Gonimo ma) mf = Gonimo $ bind ma (unwrapGonimo <<< mf)
 
-instance applyGonimoT :: Apply (GonimoT eff) where
-  apply (GonimoT mf) (GonimoT ma) = GonimoT $ apply mf ma
+instance monadGonimo :: Monad (Gonimo)
 
-instance applicativeGonimoT :: Applicative (GonimoT eff) where
-  pure = GonimoT <<< pure
-
-instance bindGonimoT :: Bind (GonimoT eff) where
-  bind (GonimoT ma) mf = GonimoT $ bind ma (runGonimoT <<< mf)
-
-instance monadGonimoT :: Monad (GonimoT eff)
-
-instance monadReaderSettingsGonimoT :: MonadReader (SPSettings_ SPParams_) (GonimoT eff) where
-  ask = GonimoT ask
+instance monadReaderSettingsGonimo :: MonadReader (SPSettings_ SPParams_) (Gonimo) where
+  ask = Gonimo ask
   --local :: forall a. (r -> r) -> m a -> m a
-  local f (GonimoT ma) = GonimoT (local f ma)
+  local f (Gonimo ma) = Gonimo (local f ma)
 
-instance monadErrorErrorGonimoT :: MonadError GonimoError (GonimoT eff) where
-  throwError = GonimoT <<< throwError
-  catchError (GonimoT ma) ef = GonimoT $ catchError ma (runGonimoT <<< ef)
+instance monadErrorErrorGonimo :: MonadError GonimoError (Gonimo) where
+  throwError = Gonimo <<< throwError
+  catchError (Gonimo ma) ef = Gonimo $ catchError ma (unwrapGonimo <<< ef)
 
-instance monadErrorAjaxErrorGonimoT :: MonadError AjaxError (GonimoT eff) where
-  throwError = GonimoT <<< throwError <<< AjaxError
-  catchError (GonimoT ma) ef = GonimoT $ catchError ma (runGonimoT <<< handleAjax)
+instance monadErrorAjaxErrorGonimo :: MonadError AjaxError (Gonimo) where
+  throwError = Gonimo <<< throwError <<< AjaxError
+  catchError (Gonimo ma) ef = Gonimo $ catchError ma (unwrapGonimo <<< handleAjax)
     where
       handleAjax (AjaxError err) = ef err
       handleAjax err = throwError err
 
-instance monadEffeffGonimoT :: MonadEff eff (GonimoT eff) where
-  liftEff = GonimoT <<< liftEff
+instance monadEffeffGonimo :: MonadEff eff (Gonimo) where
+  liftEff = Gonimo <<< liftEff
 
-instance monadAffeffGonimoT :: MonadAff eff (GonimoT eff) where
-  liftAff = GonimoT <<< liftAff
+instance monadAffeffGonimo :: MonadAff eff (Gonimo) where
+  liftAff = Gonimo <<< liftAff
 
 
 -- | Info about an online baby station.
