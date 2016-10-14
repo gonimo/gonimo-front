@@ -4,6 +4,7 @@ module Gonimo.UI.Socket.Types where
 import Prelude
 import Data.Map as Map
 import Gonimo.UI.Socket.Channel.Types as ChannelC
+import Control.Monad.IO (IO)
 import Control.Monad.Reader (runReader)
 import Control.Monad.Reader.Class (class MonadReader)
 import Data.Foldable (foldl)
@@ -22,10 +23,13 @@ import Gonimo.UI.Socket.Message (Message)
 import Gonimo.WebAPI.Subscriber (receiveSocketByFamilyIdByToDevice, receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
 import Gonimo.WebAPI.Types (AuthData(AuthData))
 import Servant.Subscriber (Subscriptions)
+import Signal.Channel (Channel)
 import WebRTC.MediaStream (MediaStreamConstraints(MediaStreamConstraints), MediaStream)
 import WebRTC.RTC (newRTCPeerConnection, RTCPeerConnection)
 
-type Props ps = { settings :: Settings | ps }
+type Props ps = { settings :: Settings
+                , sendActionSocket :: Action -> IO Unit
+                | ps }
 
 type State =
   { authData :: AuthData

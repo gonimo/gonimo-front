@@ -1,11 +1,14 @@
 module Gonimo.UI.Socket.Channel.Types where
 
+import Control.Monad.IO (IO)
 import Data.Maybe (Maybe(Just, Nothing))
 import Gonimo.Client.Types (class ReportErrorAction, GonimoError, Settings)
 import Gonimo.Server.DbEntities (Family(Family), Device(Device))
 import Gonimo.Types (Secret(Secret), Key(Key))
 import Gonimo.UI.Socket.Message (Message)
 import Partial.Unsafe (unsafeCrashWith)
+import Prelude (Unit)
+import Signal.Channel (Channel)
 import WebRTC.MediaStream (MediaStream, MediaStreamConstraints(MediaStreamConstraints))
 import WebRTC.RTC (RTCPeerConnection)
 
@@ -22,6 +25,7 @@ type Props ps =
   , cSecret :: Secret
   , ourId :: Key Device
   , familyId :: Key Family
+  , sendAction :: Action -> IO Unit
   }
 
 data Action = AcceptMessage Message

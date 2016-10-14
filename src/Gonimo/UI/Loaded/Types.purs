@@ -6,6 +6,7 @@ import Gonimo.UI.Home as HomeC
 import Gonimo.UI.Invite as InviteC
 import Gonimo.UI.Socket.Lenses as SocketC
 import Gonimo.UI.Socket.Types as SocketC
+import Control.Monad.IO (IO)
 import Data.Generic (class Generic)
 import Data.Lens (to, _Just, TraversalP, lens, LensP)
 import Data.Map (Map)
@@ -31,6 +32,7 @@ type State = { subscriberUrl :: String
              , deviceInfos :: Array (Tuple (Key Device) DeviceInfo)
              , userError :: UserError
              , url :: String
+             , sendAction :: Action -> IO Unit
              }
 
 type Props = { settings :: Settings
@@ -40,6 +42,7 @@ type Props = { settings :: Settings
              , onlineStatus :: DeviceType
              , onlineDevices :: Array (Tuple (Key Device) DeviceType)
              , deviceInfos :: Array (Tuple (Key Device) DeviceInfo)
+             , sendActionSocket :: SocketC.Action -> IO Unit
              }
 
 data Action = ReportError GonimoError

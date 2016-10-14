@@ -29,13 +29,13 @@ import Control.Monad.Reader (runReader)
 import Control.Monad.Reader.Trans (runReaderT)
 import Control.Monad.State.Class (modify, put, get)
 import Data.Array (head)
-import Data.Bifunctor (lmap, bimap)
 import Data.Either (Either(Right, Left))
 import Data.Foldable (traverse_)
 import Data.Generic (gShow)
 import Data.Lens (prism', PrismP, (^?))
 import Data.List (toUnfoldable, reverse, List(Nil, Cons))
 import Data.Maybe (fromMaybe, Maybe(..))
+import Data.Profunctor (lmap)
 import Data.Traversable (traverse)
 import Data.Tuple (fst, Tuple(Tuple))
 import Debug.Trace (trace)
@@ -60,7 +60,7 @@ import Servant.PureScript.Settings (defaultSettings, SPSettings_(SPSettings_))
 import Servant.Subscriber (Subscriber, SubscriberEff)
 import Servant.Subscriber.Connection (setPongRequest)
 import Signal (foldp, map2, runSignal, constant, Signal)
-import Signal.Channel (CHANNEL, Channel, send, subscribe, channel)
+import Signal.Channel (Channel, CHANNEL, send, subscribe, channel)
 import Unsafe.Coerce (unsafeCoerce)
 import Prelude hiding (div)
 
@@ -80,6 +80,7 @@ _LoadedS = prism' LoadedS (\s -> case s of
 
 type LoadingS' = { actionQueue :: List LoadedC.Action -- | We queue actions until we are loaded.
                  , userError :: UserError
+                 , sendAction :: Action -> IO Unit
                  }
 
 type LoadedState = {
@@ -87,10 +88,11 @@ type LoadedState = {
              , settings :: Settings
              }
 
-init :: State
-init = LoadingS { actionQueue : Nil
-                , userError : NoError
-                }
+init :: (Action -> IO Unit) -> State
+init sendAction' = LoadingS { actionQueue : Nil
+                            , userError : NoError
+                            , sendAction : sendAction'
+                            }
 
 data Action = Start
             | Init LoadedC.State
@@ -128,21 +130,23 @@ toLoaded :: ToChild Unit State Unit LoadedC.State
 toLoaded = pure $ makeChildData _LoadedS unit
 
 updateLoading' ::  Update Unit LoadingS' Action
-updateLoading' action = case action of
-  Start           -> pure [ load ]
-  LoadedA action  -> onlyModify $ \state -> state {
-                         actionQueue = Cons action state.actionQueue
-                       }
-  Init ls         -> pure [ do
-                                 Gonimo.log "Init command should be handled in toplevel update!"
-                                 pure Nop
-                            ]
-  ReportError err -> handleError err
-  ResetDevice     -> handleResetDevice
-  ClearError      -> do
-    modify $ _ { userError = NoError }
-    pure $ wrapAction Start
-  Nop             -> noEffects
+updateLoading' action = do
+  state <- get
+  case action of
+    Start           -> pure [ load state.sendAction ]
+    LoadedA action  -> onlyModify $ \state -> state {
+                          actionQueue = Cons action state.actionQueue
+                        }
+    Init ls         -> pure [ do
+                                  Gonimo.log "Init command should be handled in toplevel update!"
+                                  pure Nop
+                              ]
+    ReportError err -> handleError err
+    ResetDevice     -> handleResetDevice
+    ClearError      -> do
+      modify $ _ { userError = NoError }
+      pure $ wrapAction Start
+    Nop             -> noEffects
 
 handleResetDevice :: ComponentType Unit LoadingS' Action
 handleResetDevice = pure $ [ do
@@ -196,8 +200,8 @@ viewLoading state = case state.userError of
 --------------------------------------------------------------------------------
 
 
-load :: IO Action
-load = Gonimo.toIO initSettings $ authToAction =<< LoadedC.getAuthData
+load :: (Action -> IO Unit) -> IO Action
+load sendAction' = Gonimo.toIO initSettings $ authToAction =<< LoadedC.getAuthData
   where
     initSettings = mkSettings $ GonimoSecret (Secret "blabala")
 
@@ -223,6 +227,7 @@ load = Gonimo.toIO initSettings $ authToAction =<< LoadedC.getAuthData
             , onlineDevices : []
             , deviceInfos   : []
             , userError     : NoError
+            , sendAction    : lmap LoadedA sendAction'
             }
 
 makeCallback :: forall eff. Channel Action ->  (LoadedC.Action -> SubscriberEff (channel :: CHANNEL | eff) Unit)
@@ -284,7 +289,7 @@ main = do
   let controlSig = subscribe controlChan
   let routeSignal = map (LoadedA <<< LoadedC.SetURL) urlSignal
   app <- start $
-    { initialState: init
+    { initialState: init (liftEff <<< send controlChan)
     , update: toPux update
     , view: view
     , inputs: [controlSig, routeSignal]

@@ -47,6 +47,7 @@ import Data.Lens ((.=), to, (^.), (^?))
 import Data.Map (Map)
 import Data.Maybe (isNothing, maybe, Maybe(..))
 import Data.Monoid (mempty)
+import Data.Profunctor (lmap)
 import Data.Semigroup (append)
 import Data.String (takeWhile)
 import Data.Traversable (traverse)
@@ -410,6 +411,7 @@ mkProps state = { settings : mkSettings $ state^.authData
                 , family : flip Map.lookup state.families =<< state^?currentFamily
                 , onlineDevices : state.onlineDevices
                 , deviceInfos : state.deviceInfos
+                , sendActionSocket : lmap SocketA state.sendAction
                 }
 
 mkSettings :: AuthData -> Settings

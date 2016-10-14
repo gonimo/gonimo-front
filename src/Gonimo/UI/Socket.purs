@@ -3,6 +3,7 @@ module Gonimo.UI.Socket where
 import Prelude
 import Data.Array as Arr
 import Data.Map as Map
+import Gonimo.Client.Effects as Console
 import Gonimo.UI.Socket.Channel as ChannelC
 import Gonimo.UI.Socket.Channel.Types as ChannelC
 import WebRTC.MediaStream.Track as Track
@@ -18,6 +19,7 @@ import Data.Lens (use, to, (^?), (^.), _Just, (.=))
 import Data.Map (Map)
 import Data.Maybe (maybe, fromMaybe, Maybe(Nothing, Just))
 import Data.Monoid (mempty)
+import Data.Profunctor (lmap)
 import Data.Traversable (traverse_)
 import Data.Tuple (uncurry, snd, Tuple(Tuple))
 import Gonimo.Client.Types (toIO, Settings)
@@ -33,9 +35,8 @@ import Gonimo.WebAPI.Subscriber (receiveSocketByFamilyIdByToDevice, receiveSocke
 import Gonimo.WebAPI.Types (AuthData(AuthData))
 import Gonimo.WebAPI.Types.Helpers (runAuthData)
 import Servant.Subscriber (Subscriptions)
-import WebRTC.MediaStream (MediaStreamConstraints(MediaStreamConstraints), getUserMedia, MediaStream, getTracks)
+import WebRTC.MediaStream (stopStream, MediaStreamConstraints(MediaStreamConstraints), getUserMedia, MediaStream, getTracks)
 import WebRTC.RTC (RTCPeerConnection)
-import Gonimo.Client.Effects as Console
 
 
 -- We only use props for initialization
@@ -121,8 +122,7 @@ handleStopBabyStation = do
   let action = case state.onlineStatus of
         Nothing -> []
         Just station -> [ toIO props.settings <<< liftEff $ do
-                             tracks <- getTracks station.mediaStream
-                             traverse_ Track.stop tracks
+                             stopStream station.mediaStream
                              pure Nop
                         ]
   pure $ doCleanup state CloseBabyChannel action
@@ -185,4 +185,5 @@ mkChannelProps props state channelId = { ourId : state ^. authData <<< to runAut
                                        , cSecret : toCSecret channelId
                                        , familyId : ChannelC.unsafeMakeFamilyId state.currentFamily
                                        , settings : props.settings
+                                       , sendAction : lmap (ChannelA channelId) props.sendActionSocket
                                        }
