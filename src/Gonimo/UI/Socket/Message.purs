@@ -11,7 +11,8 @@ data Message =
     StartStreaming -- Ask a baby station to start streaming (Will be ignored by parent stations).
 -- https://github.com/purescript/purescript/issues/1443 :
 --    SessionDescription SessionDescription
-  | SessionDescription { sdp :: String, "type" :: String }
+  | SessionDescriptionOffer { sdp :: String, "type" :: String }
+  | SessionDescriptionAnswer { sdp :: String, "type" :: String }
   | IceCandidate MaybeIceCandidate
 -- Indicate the other party that we want to close the connection.
 -- After sending this message we will close the connection, the other party may do

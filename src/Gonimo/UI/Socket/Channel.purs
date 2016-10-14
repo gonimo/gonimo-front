@@ -21,14 +21,14 @@ import Gonimo.Server.DbEntities (Family(Family), Device(Device))
 import Gonimo.Types (Secret(Secret), Key(Key))
 import Gonimo.UI.Socket.Channel.Types (Action, Action(OnAddStream, OnIceCandidate), Action(..), State, Props)
 import Gonimo.UI.Socket.Lenses (mediaStream)
-import Gonimo.UI.Socket.Message (runMaybeIceCandidate, encodeToString, decodeFromString, Message)
+import Gonimo.UI.Socket.Message (MaybeIceCandidate(JustIceCandidate, NoIceCandidate), runMaybeIceCandidate, encodeToString, decodeFromString, Message)
 import Gonimo.UI.Socket.Types (BabyStation)
 import Gonimo.Util (coerceEffects)
 import Gonimo.WebAPI (putSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
 import Gonimo.WebAPI.Subscriber (receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
 import Servant.Subscriber (Subscriptions)
 import WebRTC.MediaStream (stopStream, getUserMedia, MediaStreamConstraints(MediaStreamConstraints), MediaStream)
-import WebRTC.RTC (setLocalDescription, iceEventCandidate, IceEvent, onicecandidate, onaddstream, addIceCandidate, setRemoteDescription, fromRTCSessionDescription, createOffer, addStream, RTCIceCandidateInit, RTCPeerConnection, Ice, newRTCPeerConnection)
+import WebRTC.RTC (setLocalDescription, createAnswer, iceEventCandidate, IceEvent, onicecandidate, onaddstream, addIceCandidate, setRemoteDescription, fromRTCSessionDescription, createOffer, addStream, RTCIceCandidateInit, RTCPeerConnection, Ice, newRTCPeerConnection)
 
 
 
@@ -79,18 +79,16 @@ startStreaming stream = do
             liftEff $ addStream stream state.rtcConnection
             offer <- liftAff $ createOffer state.rtcConnection
             liftAff $ setLocalDescription offer state.rtcConnection
-            sendMessage $ Message.SessionDescription offer
+            sendMessage $ Message.SessionDescriptionOffer offer
             pure Nop
        ]
 
 handleOnIceCandidate :: forall ps. IceEvent -> ComponentType (Props ps) State Action
 handleOnIceCandidate event = do
   let candidate = iceEventCandidate event
-  state <- get
-  pure [ liftEff $ do
-           addIceCandidate candidate state.rtcConnection
-           pure Nop
-       ]
+  let mCandidate = maybe NoIceCandidate JustIceCandidate candidate
+  sendMessage <- getSendMessage
+  pure [ sendMessage $ Message.IceCandidate mCandidate ]
 
 getSendMessage :: forall ps. Component (Props ps) State (Message -> IO Action)
 getSendMessage = do
@@ -111,7 +109,14 @@ handleAcceptMessage msg = do
   sendMessage <- getSendMessage
   case msg of
     Message.StartStreaming -> fromMaybe (pure []) $ startStreaming <$> state.mediaStream
-    Message.SessionDescription description ->
+    Message.SessionDescriptionOffer description ->
+      pure [ do
+              liftAff $ setRemoteDescription description state.rtcConnection
+              answer <- liftAff $ createAnswer state.rtcConnection
+              liftAff $ setLocalDescription answer state.rtcConnection
+              sendMessage $ Message.SessionDescriptionAnswer answer
+           ]
+    Message.SessionDescriptionAnswer description ->
       pure [ do
               liftAff $ setRemoteDescription description state.rtcConnection
               pure Nop
