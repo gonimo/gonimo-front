@@ -1,5 +1,6 @@
 module Gonimo.UI.Socket.Channel.Types where
 
+import Control.Monad.Eff (Eff)
 import Control.Monad.IO (IO)
 import Data.Maybe (Maybe(Just, Nothing))
 import Gonimo.Client.Types (class ReportErrorAction, GonimoError, Settings)
@@ -10,7 +11,7 @@ import Partial.Unsafe (unsafeCrashWith)
 import Prelude (Unit)
 import Signal.Channel (Channel)
 import WebRTC.MediaStream (MediaStream, MediaStreamConstraints(MediaStreamConstraints))
-import WebRTC.RTC (RTCPeerConnection)
+import WebRTC.RTC (MediaStreamEvent, IceEvent, RTCPeerConnection)
 
 
 type State =
@@ -25,7 +26,7 @@ type Props ps =
   , cSecret :: Secret
   , ourId :: Key Device
   , familyId :: Key Family
-  , sendAction :: Action -> IO Unit
+  , sendAction :: Action -> Eff () Unit
   }
 
 data Action = AcceptMessage Message
@@ -34,6 +35,8 @@ data Action = AcceptMessage Message
             | SetMediaStream MediaStream
             | CloseConnection -- Say bye and tear down all connections!
             | ReportError GonimoError
+            | OnIceCandidate IceEvent
+            | OnAddStream MediaStreamEvent
             | Nop
 
 instance reportErrorAction :: ReportErrorAction Action where

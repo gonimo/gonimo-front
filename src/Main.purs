@@ -80,7 +80,7 @@ _LoadedS = prism' LoadedS (\s -> case s of
 
 type LoadingS' = { actionQueue :: List LoadedC.Action -- | We queue actions until we are loaded.
                  , userError :: UserError
-                 , sendAction :: Action -> IO Unit
+                 , sendAction :: Action -> Eff () Unit
                  }
 
 type LoadedState = {
@@ -88,7 +88,7 @@ type LoadedState = {
              , settings :: Settings
              }
 
-init :: (Action -> IO Unit) -> State
+init :: (Action -> Eff () Unit) -> State
 init sendAction' = LoadingS { actionQueue : Nil
                             , userError : NoError
                             , sendAction : sendAction'
@@ -200,7 +200,7 @@ viewLoading state = case state.userError of
 --------------------------------------------------------------------------------
 
 
-load :: (Action -> IO Unit) -> IO Action
+load :: (Action -> Eff () Unit) -> IO Action
 load sendAction' = Gonimo.toIO initSettings $ authToAction =<< LoadedC.getAuthData
   where
     initSettings = mkSettings $ GonimoSecret (Secret "blabala")
@@ -289,7 +289,7 @@ main = do
   let controlSig = subscribe controlChan
   let routeSignal = map (LoadedA <<< LoadedC.SetURL) urlSignal
   app <- start $
-    { initialState: init (liftEff <<< send controlChan)
+    { initialState: init (coerceEffects <<< send controlChan)
     , update: toPux update
     , view: view
     , inputs: [controlSig, routeSignal]

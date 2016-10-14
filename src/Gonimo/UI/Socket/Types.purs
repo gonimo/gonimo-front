@@ -4,6 +4,7 @@ module Gonimo.UI.Socket.Types where
 import Prelude
 import Data.Map as Map
 import Gonimo.UI.Socket.Channel.Types as ChannelC
+import Control.Monad.Eff (Eff)
 import Control.Monad.IO (IO)
 import Control.Monad.Reader (runReader)
 import Control.Monad.Reader.Class (class MonadReader)
@@ -28,7 +29,7 @@ import WebRTC.MediaStream (MediaStreamConstraints(MediaStreamConstraints), Media
 import WebRTC.RTC (newRTCPeerConnection, RTCPeerConnection)
 
 type Props ps = { settings :: Settings
-                , sendActionSocket :: Action -> IO Unit
+                , sendActionSocket :: Action -> Eff () Unit
                 | ps }
 
 type State =

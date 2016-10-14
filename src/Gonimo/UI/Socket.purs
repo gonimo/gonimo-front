@@ -96,7 +96,8 @@ handleStartBabyStation baby constraints =
 handleAcceptConnection :: forall ps. ChannelId -> ComponentType (Props ps) State  Action
 handleAcceptConnection channelId' = do
   state <- get
-  pure [ AddChannel channelId' <$> ChannelC.init state.onlineStatus ]
+  sendAction' <- lmap (ChannelA channelId') <<< _.sendActionSocket <$> ask
+  pure [ AddChannel channelId' <$> ChannelC.init sendAction' state.onlineStatus ]
 
 handleFamilySwitch :: forall ps. Key Family -> ComponentType (Props ps) State Action
 handleFamilySwitch familyId' = do
