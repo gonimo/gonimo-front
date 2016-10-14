@@ -28,7 +28,7 @@ import Gonimo.WebAPI (putSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
 import Gonimo.WebAPI.Subscriber (receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
 import Servant.Subscriber (Subscriptions)
 import WebRTC.MediaStream (stopStream, getUserMedia, MediaStreamConstraints(MediaStreamConstraints), MediaStream)
-import WebRTC.RTC (iceEventCandidate, IceEvent, onicecandidate, onaddstream, addIceCandidate, setRemoteDescription, fromRTCSessionDescription, createOffer, addStream, RTCIceCandidateInit, RTCPeerConnection, Ice, newRTCPeerConnection)
+import WebRTC.RTC (setLocalDescription, iceEventCandidate, IceEvent, onicecandidate, onaddstream, addIceCandidate, setRemoteDescription, fromRTCSessionDescription, createOffer, addStream, RTCIceCandidateInit, RTCPeerConnection, Ice, newRTCPeerConnection)
 
 
 
@@ -78,6 +78,7 @@ startStreaming stream = do
   pure [ do
             liftEff $ addStream stream state.rtcConnection
             offer <- liftAff $ createOffer state.rtcConnection
+            liftAff $ setLocalDescription offer state.rtcConnection
             sendMessage $ Message.SessionDescription offer
             pure Nop
        ]
