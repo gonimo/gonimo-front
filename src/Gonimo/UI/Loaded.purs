@@ -368,7 +368,7 @@ getSubscriptions state =
       ]
   in
    case state.userError of
-     NoError -> foldl append mempty subArray
+     NoError -> foldl append mempty subArray <> map SocketA (SocketC.getSubscriptions (mkProps state) state.socketS)
      _       -> mempty
 
 getPongRequest :: State -> Maybe HttpRequest
