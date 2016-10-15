@@ -10,6 +10,7 @@ import WebRTC.MediaStream.Track as Track
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.IO (IO)
+import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader (ask, runReader)
 import Control.Monad.Reader.Class (class MonadReader, ask)
 import Control.Monad.State.Class (gets, modify, put, get, class MonadState)
@@ -28,9 +29,9 @@ import Gonimo.Server.DbEntities (Family(Family), Device(Device))
 import Gonimo.Types (Secret(Secret), Key(Key))
 import Gonimo.UI.Socket.Lenses (currentFamily, onlineStatus, authData)
 import Gonimo.UI.Socket.Message (decodeFromString)
-import Gonimo.UI.Socket.Types (BabyStation, toCSecret, toTheirId, makeChannelId, ChannelId(ChannelId), channel, Props, State, Action(..))
-import Gonimo.WebAPI (deleteOnlineStatusByFamilyIdByDeviceId)
-import Gonimo.WebAPI.Lenses (_AuthData, deviceId)
+import Gonimo.UI.Socket.Types (makeChannelId, BabyStation, toCSecret, toTheirId, ChannelId(ChannelId), channel, Props, State, Action(..))
+import Gonimo.WebAPI (postSocketByFamilyIdByToDevice, deleteOnlineStatusByFamilyIdByDeviceId)
+import Gonimo.WebAPI.Lenses (deviceId, _AuthData)
 import Gonimo.WebAPI.Subscriber (receiveSocketByFamilyIdByToDevice, receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
 import Gonimo.WebAPI.Types (AuthData(AuthData))
 import Gonimo.WebAPI.Types.Helpers (runAuthData)
@@ -50,8 +51,8 @@ init authData' = { authData : authData'
 update :: forall ps. Update (Props ps) State Action
 update action = case action of
   AcceptConnection channelId'                    -> handleAcceptConnection channelId'
-  AddChannel channelId' cState                   -> channel channelId' .= Just cState
-                                                    *> pure []
+  AddChannel channelId' cState                   -> do channel channelId' .= Just cState
+                                                       updateChannel channelId' ChannelC.InitConnection
   ChannelA channelId' (ChannelC.ReportError err) -> pure [pure $ ReportError err]
   ChannelA channelId' action'                    -> updateChannel channelId' action'
   CloseChannel channelId'                        -> pure [ pure $ ChannelA channelId' ChannelC.CloseConnection
@@ -70,7 +71,7 @@ update action = case action of
   (StartBabyStation baby constraints)            -> handleStartBabyStation baby constraints
   (InitBabyStation baby stream)                  -> onlineStatus .= Just { babyName : baby, mediaStream : stream }
                                                     *> pure []
-  (ConnectToBaby _ )                             -> noEffects
+  (ConnectToBaby babyId)                         -> handleConnectToBaby babyId
   StopBabyStation                                -> handleStopBabyStation
   (ReportError _)                                -> noEffects
   Nop                                            -> noEffects
@@ -96,8 +97,7 @@ handleStartBabyStation baby constraints =
 handleAcceptConnection :: forall ps. ChannelId -> ComponentType (Props ps) State  Action
 handleAcceptConnection channelId' = do
   state <- get
-  sendAction' <- lmap (ChannelA channelId') <<< _.sendActionSocket <$> ask
-  pure [ AddChannel channelId' <$> ChannelC.init sendAction' state.onlineStatus ]
+  pure [ AddChannel channelId' <$> ChannelC.init state.onlineStatus ]
 
 handleFamilySwitch :: forall ps. Key Family -> ComponentType (Props ps) State Action
 handleFamilySwitch familyId' = do
@@ -135,6 +135,20 @@ handleServerFamilyGoOffline familyId = do
     runGonimo $ do
       deleteOnlineStatusByFamilyIdByDeviceId familyId deviceId
       pure Nop
+
+handleConnectToBaby :: forall ps. Key Device -> ComponentType (Props ps) State Action
+handleConnectToBaby babyId = do
+  state <- get
+  props <- ask
+  let ourId = state ^. authData <<< to runAuthData <<< deviceId
+  let actions = fromMaybe [] $ do
+        familyId <- state.currentFamily
+        pure [ toIO props.settings $ do
+                  secret <- postSocketByFamilyIdByToDevice ourId familyId babyId
+                  let channelId' = makeChannelId babyId secret
+                  AddChannel channelId' <$> liftIO (ChannelC.init Nothing)
+             ]
+  pure actions
 
 updateChannel :: forall ps. ChannelId -> ChannelC.Action -> ComponentType (Props ps) State Action
 updateChannel channelId' = toParent [] (ChannelA channelId')

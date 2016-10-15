@@ -11,15 +11,17 @@ import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.IO (IO)
 import Control.Monad.Maybe.Trans (MaybeT(MaybeT), runMaybeT)
+import Control.Monad.Reader (runReaderT)
 import Control.Monad.Reader.Class (ask, class MonadReader)
 import Control.Monad.State.Class (get)
-import Data.Lens ((.=))
+import Data.Identity (runIdentity)
+import Data.Lens (lens, Lens, (.=))
 import Data.Maybe (fromMaybe, isJust, maybe, Maybe(Nothing, Just))
 import Gonimo.Client.Types (toIO, Settings)
 import Gonimo.Pux (noEffects, runGonimo, Component, Update, onlyModify, ComponentType)
 import Gonimo.Server.DbEntities (Family(Family), Device(Device))
 import Gonimo.Types (Secret(Secret), Key(Key))
-import Gonimo.UI.Socket.Channel.Types (Action, Action(OnAddStream, OnIceCandidate), Action(..), State, Props)
+import Gonimo.UI.Socket.Channel.Types (Action, Action(..), State, Props)
 import Gonimo.UI.Socket.Lenses (mediaStream)
 import Gonimo.UI.Socket.Message (MaybeIceCandidate(JustIceCandidate, NoIceCandidate), runMaybeIceCandidate, encodeToString, decodeFromString, Message)
 import Gonimo.UI.Socket.Types (BabyStation)
@@ -28,43 +30,64 @@ import Gonimo.WebAPI (putSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
 import Gonimo.WebAPI.Subscriber (receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
 import Servant.Subscriber (Subscriptions)
 import WebRTC.MediaStream (stopStream, getUserMedia, MediaStreamConstraints(MediaStreamConstraints), MediaStream)
-import WebRTC.RTC (setLocalDescription, createAnswer, iceEventCandidate, IceEvent, onicecandidate, onaddstream, addIceCandidate, setRemoteDescription, fromRTCSessionDescription, createOffer, addStream, RTCIceCandidateInit, RTCPeerConnection, Ice, newRTCPeerConnection)
+import WebRTC.RTC (MediaStreamEvent, setLocalDescription, createAnswer, iceEventCandidate, IceEvent, onicecandidate, onaddstream, addIceCandidate, setRemoteDescription, fromRTCSessionDescription, createOffer, addStream, RTCIceCandidateInit, RTCPeerConnection, Ice, newRTCPeerConnection)
 
 
 
-init :: (Action -> Eff () Unit) -> Maybe BabyStation -> IO State
-init sendAction' babyStation = do
+init :: Maybe BabyStation -> IO State
+init babyStation = do
   rtcConnection <- liftEff (newRTCPeerConnection { iceServers : [ {url : "stun:stun.l.google.com:19302"} ] })
-  liftEff $ onaddstream (coerceEffects <<< sendAction' <<< OnAddStream ) rtcConnection
-  liftEff $ onicecandidate (coerceEffects <<< sendAction' <<< OnIceCandidate ) rtcConnection
   let sockStream = _.mediaStream <$> babyStation
   ourStream <- runMaybeT $ do
     origStream <- MaybeT <<< pure $ sockStream
     liftEff $ MediaStream.clone origStream
   pure $  { mediaStream : ourStream
+          , remoteStream : Nothing
           , rtcConnection : rtcConnection
           , isBabyStation : isJust babyStation
           }
 
 
+remoteStream :: forall a b r. Lens { "remoteStream" :: a | r } { "remoteStream" :: b | r } a b
+remoteStream = lens _."remoteStream" (_ { "remoteStream" = _ })
 
 update :: forall ps. Update (Props ps) State Action
 update action = case action of
+  InitConnection                     -> handleInit -- Things we can't do in init already.
   StartStreaming constraints         -> handleStartStreaming constraints
   SetMediaStream stream              -> handleSetMediaStream stream
-  StopStreaming                      -> noEffects
+  StopStreaming                      -> closeStream
   CloseConnection                    -> handleCloseConnection
   AcceptMessage message              -> handleAcceptMessage message
   OnIceCandidate iceEvent            -> handleOnIceCandidate iceEvent
-  OnAddStream streamEvent            -> noEffects -- handleOnAddStream iceEvent
+  OnAddStream streamEvent            -> handleOnAddStream streamEvent
   ReportError _                      -> noEffects
   Nop                                -> noEffects
+
+handleInit :: forall ps. ComponentType (Props ps) State Action
+handleInit = do
+  props <- ask :: Component (Props ps) State (Props ps)
+  state <- get :: Component (Props ps) State State
+  sendMessage <- getSendMessage
+  pure
+    [ do
+         liftEff $ onaddstream (coerceEffects <<< props.sendAction <<< OnAddStream ) state.rtcConnection
+         liftEff $ onicecandidate (coerceEffects <<< props.sendAction <<< OnIceCandidate ) state.rtcConnection
+         if state.isBabyStation
+           then pure Nop
+           else sendMessage Message.StartStreaming
+    ]
 
 handleStartStreaming :: forall ps.
                         MediaStreamConstraints
                         -> ComponentType (Props ps) State Action
 handleStartStreaming constraints =
   pure [ liftAff $ SetMediaStream <$> coerceEffects (getUserMedia constraints) ]
+
+handleSendStartStreaming :: forall ps. ComponentType (Props ps) State Action
+handleSendStartStreaming = do
+  sendMessage <- getSendMessage
+  pure [ sendMessage Message.StartStreaming ]
 
 handleSetMediaStream :: forall ps. MediaStream -> ComponentType (Props ps) State Action
 handleSetMediaStream stream = do
@@ -90,10 +113,15 @@ handleOnIceCandidate event = do
   sendMessage <- getSendMessage
   pure [ sendMessage $ Message.IceCandidate mCandidate ]
 
+handleOnAddStream :: forall ps. MediaStreamEvent  -> ComponentType (Props ps) State Action
+handleOnAddStream event = do
+  remoteStream .= Just event.stream
+  pure []
+
 getSendMessage :: forall ps. Component (Props ps) State (Message -> IO Action)
 getSendMessage = do
   let sendString = putSocketByFamilyIdByFromDeviceByToDeviceByChannelId
-  props <- ask :: Component (Props ps) State (Props ps)
+  props <- ask
   let familyId' = props.familyId
   let fromDevice' = props.ourId
   let toDevice' = props.theirId

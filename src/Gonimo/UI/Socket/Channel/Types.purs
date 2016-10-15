@@ -16,6 +16,7 @@ import WebRTC.RTC (MediaStreamEvent, IceEvent, RTCPeerConnection)
 
 type State =
   { mediaStream :: Maybe MediaStream
+  , remoteStream :: Maybe MediaStream
   , rtcConnection :: RTCPeerConnection
   , isBabyStation :: Boolean
   }
@@ -29,7 +30,8 @@ type Props ps =
   , sendAction :: Action -> Eff () Unit
   }
 
-data Action = AcceptMessage Message
+data Action = InitConnection
+            | AcceptMessage Message
             | StartStreaming MediaStreamConstraints
             | StopStreaming
             | SetMediaStream MediaStream
