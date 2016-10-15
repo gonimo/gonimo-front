@@ -3,6 +3,9 @@ module Gonimo.UI.Socket.Channel where
 import Prelude
 import Data.Array as Arr
 import Gonimo.UI.Socket.Message as Message
+import Pux.Html.Attributes as A
+import Pux.Html.Elements as H
+import Pux.Html.Events as E
 import WebRTC.MediaStream as MediaStream
 import WebRTC.RTC as RTC
 import Control.Monad.Aff (Aff)
@@ -28,7 +31,9 @@ import Gonimo.UI.Socket.Types (BabyStation)
 import Gonimo.Util (coerceEffects)
 import Gonimo.WebAPI (putSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
 import Gonimo.WebAPI.Subscriber (receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
+import Pux.Html (text, Html)
 import Servant.Subscriber (Subscriptions)
+import Unsafe.Coerce (unsafeCoerce)
 import WebRTC.MediaStream (stopStream, getUserMedia, MediaStreamConstraints(MediaStreamConstraints), MediaStream)
 import WebRTC.RTC (MediaStreamEvent, setLocalDescription, createAnswer, iceEventCandidate, IceEvent, onicecandidate, onaddstream, addIceCandidate, setRemoteDescription, fromRTCSessionDescription, createOffer, addStream, RTCIceCandidateInit, RTCPeerConnection, Ice, newRTCPeerConnection)
 
@@ -172,6 +177,20 @@ handleCloseConnection = do
   sendMessage <- getSendMessage
   closeActions <- closeStream
   pure $ closeActions <> [ sendMessage Message.CloseConnection ]
+
+
+view :: forall ps. Props ps -> State -> Html Action
+view props state = if state.isBabyStation
+                    then text "There is no view currently for baby stations."
+                    else viewParentStation props state
+
+viewParentStation :: forall ps. Props ps -> State -> Html Action
+viewParentStation props state =
+  case state.remoteStream of
+    Nothing -> text "Sorry - no video there yet!"
+    Just stream -> H.video [ A.src (unsafeCoerce stream) ] []
+
+
 
 getSubscriptions :: forall m ps. (MonadReader Settings m) => Props ps -> m (Subscriptions Action)
 getSubscriptions props =
