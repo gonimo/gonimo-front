@@ -10,8 +10,11 @@ import Control.Monad.Eff.Console (CONSOLE)
 import Control.Monad.Eff.Exception (Error, EXCEPTION)
 import Control.Monad.Eff.Ref (REF)
 import Control.Monad.Error.Class (catchError, throwError)
+import Control.Monad.Except (ExceptT(ExceptT))
 import Control.Monad.Except.Trans (runExceptT, class MonadError, ExceptT)
 import Control.Monad.IO (IO)
+import Control.Monad.IO.Class (liftIO, class MonadIO)
+import Control.Monad.Reader (ReaderT(ReaderT))
 import Control.Monad.Reader.Class (local, ask, class MonadReader)
 import Control.Monad.Reader.Trans (runReaderT, ReaderT)
 import Data.Either (Either(Right, Left), either)
@@ -81,11 +84,14 @@ instance monadErrorAjaxErrorGonimo :: MonadError AjaxError (Gonimo) where
       handleAjax (AjaxError err) = ef err
       handleAjax err = throwError err
 
-instance monadEffeffGonimo :: MonadEff eff (Gonimo) where
+instance monadEffeffGonimo :: MonadEff eff Gonimo where
   liftEff = Gonimo <<< liftEff
 
-instance monadAffeffGonimo :: MonadAff eff (Gonimo) where
+instance monadAffeffGonimo :: MonadAff eff Gonimo where
   liftAff = Gonimo <<< liftAff
+
+instance monadIOGonimo :: MonadIO Gonimo where
+  liftIO m = Gonimo $ ReaderT $ \r -> ExceptT (map Right m)
 
 
 -- | Info about an online baby station.
