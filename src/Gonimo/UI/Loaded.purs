@@ -16,6 +16,7 @@ import Gonimo.UI.Error as Error
 import Gonimo.UI.Home as HomeC
 import Gonimo.UI.Invite as InviteC
 import Gonimo.UI.Socket as SocketC
+import Gonimo.UI.Socket.Channel as ChannelC
 import Gonimo.UI.Socket.Lenses as SocketC
 import Gonimo.UI.Socket.Types as SocketC
 import Gonimo.WebAPI.MakeRequests as Reqs
@@ -62,6 +63,7 @@ import Gonimo.Server.Types (DeviceType(Baby, NoBaby), AuthToken, AuthToken(Gonim
 import Gonimo.Types (dateToString, Key(Key), Secret(Secret))
 import Gonimo.UI.Error (viewError, class ErrorAction, UserError(NoError, DeviceInvalid), handleSubscriber, handleError)
 import Gonimo.UI.Loaded.Types (familyIds, authData, currentFamily, socketS, homeS, centralHome, Props, acceptS, inviteS, State, Action(..), Central(..))
+import Gonimo.UI.Socket (viewParentChannels, getParentChannels)
 import Gonimo.Util (toString, fromString)
 import Gonimo.WebAPI (deleteOnlineStatusByFamilyIdByDeviceId, SPParams_(SPParams_), postAccounts)
 import Gonimo.WebAPI.Types (DeviceInfo(DeviceInfo), AuthData(AuthData))
@@ -216,6 +218,10 @@ view state =
         [ viewHeader state
         , viewNavbar state
         , viewCentral state
+        , div []
+          [ h3 [] [ text "Videos - yeah:" ]
+          , div [] $ map SocketA <$> viewParentChannels state.socketS
+          ]
         , div []
           [ h3 [] [ text $ show numDevices <> " Device(s) currently online:" ]
           , div [] [ viewOnlineDevices state ]

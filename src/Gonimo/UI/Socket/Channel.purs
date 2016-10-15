@@ -179,13 +179,13 @@ handleCloseConnection = do
   pure $ closeActions <> [ sendMessage Message.CloseConnection ]
 
 
-view :: forall ps. Props ps -> State -> Html Action
-view props state = if state.isBabyStation
-                    then text "There is no view currently for baby stations."
-                    else viewParentStation props state
+view :: State -> Html Action
+view state = if state.isBabyStation
+             then text "There is no view currently for baby stations."
+             else viewParentStation state
 
-viewParentStation :: forall ps. Props ps -> State -> Html Action
-viewParentStation props state =
+viewParentStation :: State -> Html Action
+viewParentStation state =
   case state.remoteStream of
     Nothing -> text "Sorry - no video there yet!"
     Just stream -> H.video [ A.src (unsafeCoerce stream) ] []

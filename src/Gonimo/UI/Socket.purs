@@ -35,6 +35,7 @@ import Gonimo.WebAPI.Lenses (deviceId, _AuthData)
 import Gonimo.WebAPI.Subscriber (receiveSocketByFamilyIdByToDevice, receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
 import Gonimo.WebAPI.Types (AuthData(AuthData))
 import Gonimo.WebAPI.Types.Helpers (runAuthData)
+import Pux.Html (Html)
 import Servant.Subscriber (Subscriptions)
 import WebRTC.MediaStream (stopStream, MediaStreamConstraints(MediaStreamConstraints), getUserMedia, MediaStream, getTracks)
 import WebRTC.RTC (RTCPeerConnection)
@@ -75,6 +76,7 @@ update action = case action of
   StopBabyStation                                -> handleStopBabyStation
   (ReportError _)                                -> noEffects
   Nop                                            -> noEffects
+
 
 
 toChannel :: forall ps. ChannelId -> ToChild (Props ps) State (ChannelC.Props {}) ChannelC.State
@@ -161,6 +163,18 @@ doCleanup state cleanup action =
     then action
     else Arr.fromFoldable (pure <<< cleanup <$> Map.keys state.channels)
          <> action
+
+getParentChannels :: State -> Array (Tuple ChannelId ChannelC.State)
+getParentChannels =  Arr.filter (not _.isBabyStation <<< snd ) <<< Arr.fromFoldable
+                     <<< Map.toList <<< _.channels
+
+viewParentChannels :: State -> Array (Html Action)
+viewParentChannels state = let
+    channels = getParentChannels state
+    makeView :: Tuple ChannelId ChannelC.State -> Html Action
+    makeView (Tuple chanId state) = ChannelA chanId <$> ChannelC.view state
+  in
+     makeView <$> channels
 
 getSubscriptions :: forall ps. Props ps -> State -> Subscriptions Action
 getSubscriptions props state =
