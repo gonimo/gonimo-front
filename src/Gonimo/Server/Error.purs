@@ -16,10 +16,7 @@ data ServerError =
   | NoSuchSocket 
   | Forbidden 
   | NotFound 
-  | NoDataAvailable 
-  | NoNewChannel 
   | TransactionTimeout 
-  | NotPossible 
 
 derive instance genericServerError :: Generic ServerError
 
