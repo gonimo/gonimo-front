@@ -8,7 +8,7 @@ import Control.Monad.Error.Class (class MonadError)
 import Control.Monad.Reader.Class (ask, class MonadReader)
 import Data.Argonaut.Generic.Aeson (decodeJson, encodeJson)
 import Data.Argonaut.Printer (printJson)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe, Maybe(..))
 import Data.Nullable (Nullable(), toNullable)
 import Data.Tuple (Tuple)
 import Global (encodeURIComponent)
@@ -261,7 +261,7 @@ postSocketByFamilyIdByToDevice reqBody familyId toDevice = do
 receiveSocketByFamilyIdByToDevice :: forall eff m.
                                      (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
                                      => Key Family -> Key Device
-                                     -> m (Tuple (Key Device) Secret)
+                                     -> m (Maybe (Tuple (Key Device) Secret))
 receiveSocketByFamilyIdByToDevice familyId toDevice = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
@@ -318,7 +318,7 @@ receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId :: forall eff m.
                                                             -> Key Device
                                                             -> Key Device
                                                             -> Secret
-                                                            -> m String
+                                                            -> m (Maybe String)
 receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId familyId fromDevice
                                                          toDevice channelId = do
   spOpts_' <- ask

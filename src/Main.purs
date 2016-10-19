@@ -188,7 +188,7 @@ handleInit ls = do
 
 view :: State -> Html Action
 view (LoadingS state) = viewLoading state
-view (LoadedS state)  = map LoadedA  $ LoadedC.view state
+view (LoadedS state)  = map LoadedA $ LoadedC.view state
 
 viewLoading :: LoadingS' -> Html Action
 viewLoading state = case state.userError of

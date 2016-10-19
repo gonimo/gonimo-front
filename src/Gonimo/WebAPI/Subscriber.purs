@@ -8,7 +8,7 @@ import Control.Monad.Error.Class (class MonadError)
 import Control.Monad.Reader.Class (ask, class MonadReader)
 import Data.Argonaut.Generic.Aeson (decodeJson, encodeJson)
 import Data.Argonaut.Printer (printJson)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe, Maybe(..))
 import Data.Nullable (Nullable(), toNullable)
 import Data.Tuple (Tuple, Tuple(..))
 import Global (encodeURIComponent)
@@ -55,7 +55,7 @@ getFamiliesByFamilyIdDeviceInfos spToUser_ familyId = do
 
 receiveSocketByFamilyIdByToDevice :: forall m a.
                                      MonadReader (SPSettings_ SPParams_) m =>
-                                     TypedToUser (Tuple (Key Device) Secret) a
+                                     TypedToUser (Maybe (Tuple (Key Device) Secret)) a
                                      -> Key Family -> Key Device
                                      -> m (Subscriptions a)
 receiveSocketByFamilyIdByToDevice spToUser_ familyId toDevice = do
@@ -65,7 +65,7 @@ receiveSocketByFamilyIdByToDevice spToUser_ familyId toDevice = do
 receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId :: forall m a.
                                                             MonadReader (SPSettings_ SPParams_) m
                                                             =>
-                                                            TypedToUser String a
+                                                            TypedToUser (Maybe String) a
                                                             -> Key Family
                                                             -> Key Device
                                                             -> Key Device

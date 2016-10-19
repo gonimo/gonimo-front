@@ -26,15 +26,17 @@ import Gonimo.Server.DbEntities (Family(Family), Device(Device))
 import Gonimo.Types (Secret(Secret), Key(Key))
 import Gonimo.UI.Socket.Channel.Types (Action, Action(..), State, Props)
 import Gonimo.UI.Socket.Lenses (mediaStream)
-import Gonimo.UI.Socket.Message (MaybeIceCandidate(JustIceCandidate, NoIceCandidate), runMaybeIceCandidate, encodeToString, decodeFromString, Message)
+import Gonimo.UI.Socket.Message (runMaybeIceCandidate, MaybeIceCandidate(JustIceCandidate, NoIceCandidate), encodeToString, decodeFromString, Message)
 import Gonimo.UI.Socket.Types (BabyStation)
 import Gonimo.Util (coerceEffects)
 import Gonimo.WebAPI (putSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
 import Gonimo.WebAPI.Subscriber (receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
 import Pux.Html (text, Html)
+import Pux.Html.Attributes (offset)
+import Pux.Html.Attributes.Bootstrap (srcObject)
 import Servant.Subscriber (Subscriptions)
 import Unsafe.Coerce (unsafeCoerce)
-import WebRTC.MediaStream (stopStream, getUserMedia, MediaStreamConstraints(MediaStreamConstraints), MediaStream)
+import WebRTC.MediaStream (createObjectURL, mediaStreamToBlob, stopStream, getUserMedia, MediaStreamConstraints(MediaStreamConstraints), MediaStream)
 import WebRTC.RTC (MediaStreamEvent, setLocalDescription, createAnswer, iceEventCandidate, IceEvent, onicecandidate, onaddstream, addIceCandidate, setRemoteDescription, fromRTCSessionDescription, createOffer, addStream, RTCIceCandidateInit, RTCPeerConnection, Ice, newRTCPeerConnection)
 
 
@@ -66,6 +68,7 @@ update action = case action of
   AcceptMessage message              -> handleAcceptMessage message
   OnIceCandidate iceEvent            -> handleOnIceCandidate iceEvent
   OnAddStream streamEvent            -> handleOnAddStream streamEvent
+  SetRemoteStream stream             -> remoteStream .= Just stream *> pure []
   ReportError _                      -> noEffects
   Nop                                -> noEffects
 
@@ -120,8 +123,10 @@ handleOnIceCandidate event = do
 
 handleOnAddStream :: forall ps. MediaStreamEvent  -> ComponentType (Props ps) State Action
 handleOnAddStream event = do
-  remoteStream .= Just event.stream
-  pure []
+  pure [ do
+            url <- liftEff <<< createObjectURL <<< mediaStreamToBlob $ event.stream
+            pure $ SetRemoteStream $ { stream : event.stream, objectURL : url }
+       ]
 
 getSendMessage :: forall ps. Component (Props ps) State (Message -> IO Action)
 getSendMessage = do
@@ -156,7 +161,10 @@ handleAcceptMessage msg = do
            ]
     Message.IceCandidate candidate ->
       pure [ do
-               liftEff $ addIceCandidate (runMaybeIceCandidate candidate) state.rtcConnection
+               let test = runMaybeIceCandidate candidate
+               case test of
+                 Nothing -> pure unit -- let's see whether this helps
+                 Just c -> liftAff $ addIceCandidate (runMaybeIceCandidate candidate) state.rtcConnection
                pure Nop
            ]
     Message.CloseConnection -> closeStream
@@ -188,7 +196,11 @@ viewParentStation :: State -> Html Action
 viewParentStation state =
   case state.remoteStream of
     Nothing -> text "Sorry - no video there yet!"
-    Just stream -> H.video [ A.src (unsafeCoerce stream) ] []
+    Just stream -> H.div []
+                   [ text $ "Got video, is enabled: "
+                          <> show ((unsafeCoerce stream.stream).enabled :: Boolean)
+                   , H.video [ A.src stream.objectURL, A.autoPlay "true",  A.controls true] []
+                   ]
 
 
 
@@ -196,6 +208,8 @@ getSubscriptions :: forall m ps. (MonadReader Settings m) => Props ps -> m (Subs
 getSubscriptions props =
   let
     receiveMessage = receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId
-                      ((maybe Nop AcceptMessage) <<< (decodeFromString =<< _))
+                      doDecode
+    doDecode :: Maybe (Maybe String) -> Action
+    doDecode = maybe Nop AcceptMessage <<< (\mv -> decodeFromString =<< join mv)
   in
     receiveMessage props.familyId props.theirId props.ourId props.cSecret
