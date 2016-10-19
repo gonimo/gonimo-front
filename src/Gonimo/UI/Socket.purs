@@ -168,6 +168,16 @@ getParentChannels :: State -> Array (Tuple ChannelId ChannelC.State)
 getParentChannels =  Arr.filter (not _.isBabyStation <<< snd ) <<< Arr.fromFoldable
                      <<< Map.toList <<< _.channels
 
+-- view :: State -> Html Action
+-- view state = 
+--   case state.onlineStatus of
+--     Nothing -> text "Sorry - no video there yet!"
+--     Just station -> H.div []
+--                     [ text $ "Got video, is enabled: "
+--                             <> show ((unsafeCoerce station.mediaStream).enabled :: Boolean)
+--                     , H.video [ A.src stream.objectURL, A.autoPlay "true" ] []
+--                     ]
+
 viewParentChannels :: State -> Array (Html Action)
 viewParentChannels state = let
     channels = getParentChannels state
@@ -183,7 +193,7 @@ getSubscriptions props state =
     familyId' = state ^. currentFamily
     receiveAChannel deviceId' familyId'' =
       receiveSocketByFamilyIdByToDevice
-        (maybe Nop (AcceptConnection <<< uncurry makeChannelId ))
+        (maybe Nop (AcceptConnection <<< uncurry makeChannelId ) <<< join)
         familyId''
         deviceId'
 
@@ -203,7 +213,11 @@ getSubscriptions props state =
     subArray :: Array (Subscriptions Action)
     subArray = map (flip runReader props.settings)
                 $ getChannelsSubscriptions state.channels
-                <> fromFoldable (receiveAChannel authData'.deviceId <$> familyId')
+                <> ( fromFoldable $ do
+                        r <- state.onlineStatus -- Get only online if a baby.
+                        familyId'' <- familyId'
+                        pure $ receiveAChannel authData'.deviceId familyId''
+                   )
   in
      foldl append mempty subArray
 
