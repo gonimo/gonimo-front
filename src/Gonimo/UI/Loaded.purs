@@ -259,6 +259,11 @@ viewNavbar state =
                 , E.onClick $ const $ SetCentral centralHome
                 ]
               [ text "Home" ]
+            , a [ A.className "navbar-brand"
+                , A.role "button"
+                , E.onClick $ const $ SetCentral CentralInvite
+                ]
+              [ text "Invite" ]
             ]
           , -- Collect the nav links, forms, and other content for toggling
             div [ A.className "collapse navbar-collapse", A.id_ "navbar-collapse-1" ]
