@@ -11,19 +11,24 @@
   ],
   "dependencies": {
     "purescript-pux": "https://github.com/eskimor/purescript-pux.git#dropRepeats",
-    "purescript-affjax": "^1.1.0",
-    "purescript-argonaut-generic-codecs": "^3.0.0",
-    "purescript-generics": "^1.0.1",
-    "purescript-partial": "^1.1.2",
-    "purescript-localstorage": "^1.0.0",
-    "purescript-servant-support": "^5.0.0",
-    "purescript-subscriber": "^1.1.1",
-    "purescript-profunctor-lenses": "^1.0.0",
-    "purescript-unfoldable": "git@github.com:eskimor/purescript-unfoldable.git#master",
+    "purescript-affjax": "~1.1.0",
+    "purescript-argonaut-generic-codecs": "~3.0.0",
+    "purescript-generics": "~1.0.1",
+    "purescript-partial": "~1.1.2",
+    "purescript-localstorage": "~1.0.0",
+    "purescript-servant-support": "~5.0.0",
+    "purescript-subscriber": "~1.1.1",
+    "purescript-profunctor-lenses": "~1.0.0",
+    "purescript-unfoldable": "~1.1.0",
     "purescript-webrtc": "git@github.com:eskimor/purescript-webrtc#gonimo",
-    "purescript-io": "^2.0.0"
+    "purescript-io": "~2.0.0"
   },
   "devDependencies": {
-    "purescript-debug": "^1.0.0"
+    "purescript-debug": "1.0.0"
+  },
+  "resolutions": {
+    "purescript-signal": "^7.0.0",
+    "purescript-dom": "~2.0.1",
+    "purescript-js-date": "^1.0.0"
   }
 }
