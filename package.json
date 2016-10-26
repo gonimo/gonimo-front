@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "description": "Frontend code for gonimo.org",
   "dependencies": {
+    "react": "^15.3.2",
+    "react-dom": "^15.3.2",
     "virtual-dom": "^2.1.1"
   },
   "repository": {
@@ -19,8 +21,26 @@
   "directories": {
     "test": "test"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "connect-history-api-fallback": "^1.2.0",
+    "express": "^4.13.4",
+    "html-webpack-plugin": "^2.15.0",
+    "http-server": "^0.9.0",
+    "purescript-psa": "^0.3.5",
+    "purs-loader": "^2.0.0-rc.1",
+    "rimraf": "^2.5.2",
+    "webpack": "^1.12.14",
+    "source-map-loader": "^0.1.5",
+    "webpack-dev-middleware": "^1.6.1",
+    "webpack-hot-middleware": "^2.10.0"
+  },
   "scripts": {
+    "postinstall": "bower cache clean && bower install",
+    "clean": "rimraf static/dist && rimraf output",
+    "build": "npm run clean && webpack --config ./webpack.production.config.js --progress --profile --colors",
+    "watch": "npm run clean && node ./webpack.config.js",
+    "serve": "http-server static --cors -p 3000",
+    "start": "npm run watch",
     "test": "echo \"Error: no test specified\" && exit 1"
   }
 }

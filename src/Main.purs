@@ -55,6 +55,7 @@ import Partial.Unsafe (unsafeCrashWith)
 import Pux (App, renderToDOM, fromSimple, start)
 import Pux.Html (text, span, Html, img, div)
 import Pux.Router (sampleUrl)
+import Pux.Devtool (Action, start) as Pux.Devtool
 import Servant.PureScript.Affjax (AjaxError)
 import Servant.PureScript.Settings (defaultSettings, SPSettings_(SPSettings_))
 import Servant.Subscriber (Subscriber, SubscriberEff)
@@ -303,6 +304,30 @@ main = do
   runSignal $ Console.log <$> urlSignal
   runSignal $ (Console.log <<< ("Central widget: " <> _ ) <<< showCentral) <$> app.state
   renderToDOM "#app" app.html
+  pure app
+
+debug = do
+  urlSignal <- sampleUrl
+  controlChan <- channel Nop
+  subscriberRef <- newRef Nothing
+  let controlSig = subscribe controlChan
+  let routeSignal = map (LoadedA <<< LoadedC.SetURL) urlSignal
+  app <- Pux.Devtool.start $
+    { initialState: init (coerceEffects <<< send controlChan)
+    , update: toPux update
+    , view: view
+    , inputs: [controlSig, routeSignal]
+    }
+  -- We have to send Start after the fact, because on merging const signals one gets lost!
+  send controlChan Start
+  let subscriberSignal = map (renewSubscriber controlChan subscriberRef) app.state
+  let subscribeSignal = deploySubscriptions <$> subscriberSignal <*> app.state
+  runSignal $ coerceEffects <<< map (const unit) <<< launchAff <<< runIO <$> subscribeSignal
+  runSignal $ map (\_ -> Console.log "State changed!") app.state
+  runSignal $ Console.log <$> urlSignal
+  runSignal $ (Console.log <<< ("Central widget: " <> _ ) <<< showCentral) <$> app.state
+  renderToDOM "#app" app.html
+  pure app
 
 showCentral :: State -> String
 showCentral (LoadingS _) = ""
