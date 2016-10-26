@@ -22,7 +22,7 @@ Workflow for deployment
 > cd path/to/gonimo-front
 > bower update
 > rm -rf ./bower_components/purescript-newtype
-> pulp browserify --to dist/app.js
+> pulp browserify --to dist/app.js && cp -R ./static/* dist
 
 the removal of `purescript-newtype` should only be necessary temporarily as this
 is either fixed by checking the `"resolutions"` section in `bower.json`, or by
