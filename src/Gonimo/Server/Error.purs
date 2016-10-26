@@ -13,10 +13,14 @@ data ServerError =
   | AlreadyFamilyMember 
   | NoSuchFamily (Key Family)
   | NoSuchInvitation 
+  | SocketBusy 
+  | ChannelBusy 
   | NoSuchSocket 
+  | NoSuchChannel 
   | Forbidden 
   | NotFound 
   | TransactionTimeout 
+  | InternalServerError 
 
 derive instance genericServerError :: Generic ServerError
 
