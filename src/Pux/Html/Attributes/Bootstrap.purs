@@ -10,6 +10,8 @@ dataToggle = attr "data-toggle"
 dataTarget :: forall a. String -> Attribute a
 dataTarget = attr "data-target"
 
+dataPlacement :: forall a. String -> Attribute a
+dataPlacement = attr "data-placement"
 
 
 -- Non bootstrap:
