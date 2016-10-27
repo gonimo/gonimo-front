@@ -37,6 +37,7 @@ init = { newBabyName : "baby" }
 
 data Action = SocketA SocketC.Action
             | SetBabyName String -- Internal: keep track of user edit
+            | GoToInviteView
             | Nop
 
 
@@ -52,12 +53,16 @@ stopBabyStation = SocketA SocketC.StopBabyStation
 update :: forall ps. Update (Props ps) State Action
 update (SetBabyName val) = onlyModify $ _ { newBabyName = val }
 update (SocketA _)       = noEffects
+update GoToInviteView    = noEffects
 update Nop               = noEffects
 
 view :: forall ps. Props ps -> State -> Html Action
 view props state = div []
                    [
-                     viewAvailableBabies props state
+                     button [ A.className "btn btn-lg"
+                            , E.onClick $ const GoToInviteView ]
+                     [ text "Add Device" ]
+                   , viewAvailableBabies props state
                    ,
                      case props.onlineStatus of
                        NoBaby -> viewOffline props state

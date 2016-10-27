@@ -55,14 +55,14 @@ import Data.Traversable (traverse)
 import Data.Tuple (uncurry, fst, Tuple(Tuple))
 import Debug.Trace (trace)
 import Gonimo.Client.Types (toIO, Settings, GonimoError, class ReportErrorAction, Gonimo)
-import Gonimo.Pux (Component, toParent, runGonimo, liftChild, ComponentType, makeChildData, ToChild, noEffects, onlyModify, Update, wrapAction)
+import Gonimo.Pux (noEffects, Component, toParent, runGonimo, liftChild, ComponentType, makeChildData, ToChild, onlyModify, Update, wrapAction)
 import Gonimo.Server.DbEntities (Device(Device), Family(Family))
 import Gonimo.Server.DbEntities.Helpers (runFamily)
 import Gonimo.Server.Error (ServerError(InvalidAuthToken))
 import Gonimo.Server.Types (DeviceType(Baby, NoBaby), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (dateToString, Key(Key), Secret(Secret))
 import Gonimo.UI.Error (viewError, class ErrorAction, UserError(NoError, DeviceInvalid), handleSubscriber, handleError)
-import Gonimo.UI.Loaded.Types (familyIds, authData, currentFamily, socketS, homeS, centralHome, Props, acceptS, inviteS, State, Action(..), Central(..))
+import Gonimo.UI.Loaded.Types (central, familyIds, authData, currentFamily, socketS, homeS, centralHome, Props, acceptS, inviteS, State, Action(..), Central(..))
 import Gonimo.UI.Socket (viewParentChannels, getParentChannels)
 import Gonimo.Util (toString, fromString)
 import Gonimo.WebAPI (deleteOnlineStatusByFamilyIdByDeviceId, SPParams_(SPParams_), postAccounts)
@@ -139,6 +139,7 @@ updateAccept = toParent [] AcceptA <<< liftChild toAccept <<< AcceptC.update
 updateHome :: HomeC.Action -> ComponentType Unit State Action
 updateHome action = case action of
     HomeC.SocketA socketA -> updateSocket socketA
+    HomeC.GoToInviteView  -> central .= CentralInvite *> noEffects
     _                     -> toParent [] HomeA <<< liftChild toHome $ HomeC.update action
 
 updateSocket :: SocketC.Action -> ComponentType Unit State Action
