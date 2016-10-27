@@ -243,19 +243,41 @@ viewHeader state =
             ]
           ]
 
-        ,div [ A.className "collapse navbar-collapse"]
+        , div [ A.className "collapse navbar-collapse"]
           [ ul [ A.className "nav navbar-nav"]
             [ li []
               [ a [ E.onClick $ const $ SetCentral centralHome ] [ text "Overview" ]]
             , li []
               [ a [ E.onClick $ const $ SetCentral CentralInvite ] [ text "Invite Device" ] ]
 
+            , table []
+              [ tr [] [ text "Your current family is:" ]
+              , tr [ A.className "nav navbar-nav"]
+                [ li [A.className "dropdown"]
+                  [ a [ A.className "dropdown-toggle" , A.href "#"
+                      , A.dataToggle "dropdown"       , A.role "button"]
+                    [ text "funky hedgehogs"
+                    , text " "
+                    , span [A.className "caret"] [] ]
+                  , ul [A.className "dropdown-menu"]
+                    [ li [] [a [] [text "wild frogs"]]
+                    , li [] [a [] [text "funny cats"]]
+                    , li [] [a [] [text "running dogs"]]
+                    , li [] [a [] [ text "funky hedgehogs"
+                                  , text " ✔"
+                                  ]]
+                    ]
+                  ]
+                ]
+              ]
             , li [A.className "dropdown"]
               [ a [ A.className "dropdown-toggle" , A.href "#"
                   , A.dataToggle "dropdown"       , A.role "button"]
-                [ text "funky hedgehogs"
+                [ text "Signed in as"
+                , H.br [] []
+                , text "epsilonhalbe"
                 , text " "
-                , span [A.className "caret"] [] ]
+                , H.i [A.className "fa fa-cog"] [] ]
               , ul [A.className "dropdown-menu"]
                 [ li [] [a [] [text "wild frogs"]]
                 , li [] [a [] [text "funny cats"]]
@@ -265,14 +287,10 @@ viewHeader state =
                               ]]
                 ]
               ]
-            ]
-           , p [ A.className "navbar-text"]
-                [ text "Signed in as ε/2"
-                --, small [] [text "your family name: foobarbaz"]
-                ]
-          ]
-        ]
-      ]
+             ]
+           ]
+         ]
+       ]
 
 viewNavbar :: State -> Html Action
 viewNavbar state =
