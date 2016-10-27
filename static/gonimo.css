@@ -1,0 +1,42 @@
+#logo {
+    width: 100%;
+    border-radius: 50%;
+    border: 1px solid #ddd;
+    position: relative;
+}
+
+#main {
+    height: 90%;
+    width: 800px;
+}
+
+body {
+    display: flex;
+    justify-content: center;
+    flex-direction: column;
+}
+
+#site {
+    display: flex;
+    justify-content: center;
+    flex-direction: row;
+}
+
+input.funnyName {
+    width: 22em;
+}
+
+.centered-content {
+    display: flex;
+    justify-content: center;
+    flex-direction: row;
+    width: 100%;
+}
+
+.btn-group {
+    width: 100%;
+}
+ 
+.btn {
+    margin: 1em;
+}

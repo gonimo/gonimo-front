@@ -231,16 +231,51 @@ view state =
 
 viewHeader :: State -> Html Action
 viewHeader state =
-      div [ A.className "page-header" ]
-      [ h1 []
-        [ text "gonimo.com "
-        , small [] [ text "Good Night Monitor!" ]
+      nav [ A.className "navbar navbar-default" ]
+      [ div [ A.className "container"]
+        [ div [ A.className "navbar-header"]
+          [ a [ A.className "navbar-brand navbar-left"]
+            [ img [ A.alt "gonimo"
+                  , A.src "./pix/gonimo-logo-05.svg"
+                  , A.width "35px"
+                  , A.height "35px"] []
+            ]
+          ]
+
+        ,div [ A.className "collapse navbar-collapse"]
+          [ ul [ A.className "nav navbar-nav"]
+            [ li []
+              [ a [ E.onClick $ const $ SetCentral centralHome ] [ text "Overview" ]]
+            , li []
+              [ a [ E.onClick $ const $ SetCentral CentralInvite ] [ text "Invite Device" ] ]
+
+            , li [A.className "dropdown"]
+              [ a [ A.className "dropdown-toggle" , A.href "#"
+                  , A.dataToggle "dropdown"       , A.role "button"]
+                [ text "funky hedgehogs"
+                , text " "
+                , span [A.className "caret"] [] ]
+              , ul [A.className "dropdown-menu"]
+                [ li [] [a [] [text "wild frogs"]]
+                , li [] [a [] [text "funny cats"]]
+                , li [] [a [] [text "running dogs"]]
+                , li [] [a [] [ text "funky hedgehogs"
+                              , text " ✔"
+                              ]]
+                ]
+              ]
+            ]
+           , p [ A.className "navbar-text"]
+                [ text "Signed in as ε/2"
+                --, small [] [text "your family name: foobarbaz"]
+                ]
+          ]
         ]
       ]
 
 viewNavbar :: State -> Html Action
 viewNavbar state =
-       nav [ A.className ".navbar .navbar-default" ]
+       nav [ A.className "navbar navbar-default" ]
         [ div [ A.className "container-fluid" ]
           [ -- Brand and toggle get grouped for better mobile display
             div [ A.className "navbar-header" ]
@@ -258,7 +293,7 @@ viewNavbar state =
                 , A.role "button"
                 , E.onClick $ const $ SetCentral centralHome
                 ]
-              [ text "Home" ]
+                [ text "Home" ]
             , a [ A.className "navbar-brand"
                 , A.role "button"
                 , E.onClick $ const $ SetCentral CentralInvite
@@ -279,17 +314,12 @@ viewNavbar state =
                          , A.dataToggle "dropdown"
                          , A.role "button"
                          ]
-                  [ text "Account"
-                  , span [ A.className "carret" ] []
-                  ]
+                  [ text "Account" , span [ A.className "caret" ] [] ]
                   , ul [ A.className "dropdown-menu" ]
-                    [ li []
-                      [ a [ A.href "#" ] [ text "Configure User Details" ] ]
-                    , li []
-                      [ a [ A.href "#" ] [ text "change password" ] ]
+                    [ li [] [ a [ A.href "#" ] [ text "Configure User Details" ] ]
+                    , li [] [ a [ A.href "#" ] [ text "change password" ] ]
                     , li [ A.role "separator",  A.className "divider" ] []
-                    , li []
-                      [ a [ A.href "#" ] [ text "Log out" ] ]
+                    , li [] [ a [ A.href "#" ] [ text "Log out" ] ]
                     ]
                   ]
                 ]
