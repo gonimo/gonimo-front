@@ -6,6 +6,7 @@ import Gonimo.UI.Html
 import Gonimo.Client.Effects as Gonimo
 import Gonimo.Client.LocalStorage as Key
 import Gonimo.Client.Types as Gonimo
+import Gonimo.UI.Html as Html
 import Gonimo.WebAPI.Types as WebAPI
 import Pux.Html.Attributes as A
 import Pux.Html.Events as E
@@ -32,33 +33,37 @@ import Gonimo.WebAPI.Types (AuthData(AuthData))
 import Partial.Unsafe (unsafeCrashWith)
 import Pux (renderToDOM, fromSimple, start)
 import Pux.Html (button, i, input, p, h1, h2, h3, text, span, Html, img, div)
+import Pux.Html.Attributes (offset)
 import Servant.PureScript.Affjax (AjaxError)
 import Servant.PureScript.Settings (defaultSettings, SPSettings_(SPSettings_))
 import Signal (constant, Signal)
 import Prelude hiding (div)
 
 type Props ps = { settings :: Settings
-                , familyId :: (Maybe (Key Family))
+                , familyId :: Maybe (Key Family)
+                , family   :: Maybe Family
                 | ps
                 }
 
 type State =
-  { familyName     :: String
-  , email          :: String
+  { email          :: String
   , invitationSent :: Boolean
+  , familyId       :: Key Family
+  , family         :: Family
   }
 
-init :: Gonimo State
-init = let
-    initWithFamily family = { familyName :     family
-                            , email :          ""
-                            , invitationSent : false
-                            }
-  in
-     initWithFamily <$> postFunnyName
+init :: forall ps. Props ps -> Maybe State
+init props = do
+  familyId' <- props.familyId
+  family' <- props.family
+  pure { email : ""
+       , invitationSent : false
+       , familyId : familyId'
+       , family : family'
+       }
 
-data Action = SetFamilyName String
-            | SetEmail String
+
+data Action = SetEmail String
             | SendInvitation
             | InvitationSent
             | ReportError GonimoError
@@ -69,7 +74,6 @@ instance reportErrorActionAction :: ReportErrorAction Action where
 
 update :: forall ps. Update (Props ps) State Action
 update action = case action of
-  (SetFamilyName name ) -> onlyModify $ _ { familyName = name }
   (SetEmail email )     -> onlyModify $ _ { email = email }
   InvitationSent        -> onlyModify $ _ { invitationSent = true }
   SendInvitation        -> handleSendInvitation
@@ -79,25 +83,26 @@ update action = case action of
 
 handleSendInvitation :: forall m ps. (MonadComponent (Props ps) State m) => m (Array (IO Action))
 handleSendInvitation = do
-  props <- ask
-  state <- get
-  runGonimo $ do
-    (SPSettings_ settings) <- ask
-    let params' = case settings.params of (SPParams_ params) -> params
-    Gonimo.log $ "Using AuthToken: " <> gShow params'.authorization
-    fid <- case props.familyId of
-      Nothing   -> postFamilies state.familyName
-      Just fid' -> pure fid'
-    (Tuple invId invitation) <- postInvitationsByFamilyId fid
-    postInvitationsOutbox $ WebAPI.SendInvitation invId (EmailInvitation state.email)
-    pure InvitationSent
+  noEffects
+  -- props <- ask
+  -- state <- get
+  -- runGonimo $ do
+  --   (SPSettings_ settings) <- ask
+  --   let params' = case settings.params of (SPParams_ params) -> params
+  --   Gonimo.log $ "Using AuthToken: " <> gShow params'.authorization
+  --   fid <- case props.familyId of
+  --     Nothing   -> postFamilies state.familyName
+  --     Just fid' -> pure fid'
+  --   (Tuple invId invitation) <- postInvitationsByFamilyId fid
+  --   postInvitationsOutbox $ WebAPI.SendInvitation invId (EmailInvitation state.email)
+  --   pure InvitationSent
 
 --------------------------------------------------------------------------------
 
 view :: forall ps. Props ps -> State -> Html Action
 view props state = if state.invitationSent
-  then viewSent state
-  else viewSend props state
+                    then viewSent state
+                    else viewSend props state
 
 viewSend :: forall ps. Props ps -> State -> Html Action
 viewSend props state =
@@ -108,7 +113,7 @@ viewSend props state =
     , h2 [] [ div [ A.className "well"]
                 [ i [A.className "fa fa-users"] []
                 , text " "
-                , text state.familyName ]
+                ]
             ]
     , div [ E.onKeyUp handleEnter ]
       [ div [A.className "input-group"]
@@ -118,8 +123,6 @@ viewSend props state =
           , span [A.className "input-group-addon glyphicon glyphicon-edit"] []
           , input [ A.type_ "text"
                   , A.className "form-control"
-                  , E.onInput $ \ev -> SetFamilyName ev.target.value
-                  , A.value state.familyName
                   ] []
           ]
           else

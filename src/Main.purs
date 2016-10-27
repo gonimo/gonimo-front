@@ -46,7 +46,7 @@ import Gonimo.Pux (toPux, noEffects, wrapAction, onlyModify, Update, ComponentTy
 import Gonimo.Server.Types (DeviceType(NoBaby), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (Secret(Secret))
 import Gonimo.UI.Error (viewError, handleError, class ErrorAction, UserError(NoError))
-import Gonimo.UI.Html (viewLogo)
+import Gonimo.UI.Html as Html
 import Gonimo.Util (fromMaybeM, coerceEffects)
 import Gonimo.WebAPI (postFunnyName, SPParams_(SPParams_), postAccounts)
 import Gonimo.WebAPI.Types (AuthData(AuthData))
@@ -135,7 +135,7 @@ updateLoading' action = do
   state <- get
   case action of
     Start           -> pure [ load state.sendAction ]
-    LoadedA action  -> onlyModify $ \state -> state {
+    LoadedA action  -> onlyModify $ \state' -> state' {
                           actionQueue = Cons action state.actionQueue
                         }
     Init ls         -> pure [ do
@@ -193,9 +193,7 @@ view (LoadedS state)  = map LoadedA $ LoadedC.view state
 
 viewLoading :: LoadingS' -> Html Action
 viewLoading state = case state.userError of
-      NoError -> viewLogo $ div []
-                            [ span [] [ text "Loading your gonimo, stay tight ..."]
-                            ]
+      NoError -> Html.viewLoading "Loading your gonimo, stay tight ..."
       _ -> viewError state
 
 --------------------------------------------------------------------------------
@@ -214,15 +212,12 @@ load sendAction' = Gonimo.toIO initSettings $ authToAction =<< LoadedC.getAuthDa
 
     authToAction :: AuthData -> Gonimo Action
     authToAction (authData@(AuthData auth)) = do
-      inviteState <- InviteC.init
       pure $ Init
             { subscriberUrl : "ws://localhost:8081/subscriber"
-            , inviteS       : inviteState
-            , acceptS       : AcceptC.init
             , homeS         : HomeC.init
-            , socketS        : SocketC.init authData
-            , central       : LoadedC.CentralInvite
-            , familyIds      : []
+            , socketS       : SocketC.init authData
+            , central       : LoadedC.CentralHome
+            , familyIds     : []
             , families      : Map.empty
             , url           : ""
             , onlineDevices : []
@@ -302,7 +297,6 @@ main = do
   runSignal $ coerceEffects <<< map (const unit) <<< launchAff <<< runIO <$> subscribeSignal
   runSignal $ map (\_ -> Console.log "State changed!") app.state
   runSignal $ Console.log <$> urlSignal
-  runSignal $ (Console.log <<< ("Central widget: " <> _ ) <<< showCentral) <$> app.state
   renderToDOM "#app" app.html
   pure app
 
@@ -325,13 +319,8 @@ debug = do
   runSignal $ coerceEffects <<< map (const unit) <<< launchAff <<< runIO <$> subscribeSignal
   runSignal $ map (\_ -> Console.log "State changed!") app.state
   runSignal $ Console.log <$> urlSignal
-  runSignal $ (Console.log <<< ("Central widget: " <> _ ) <<< showCentral) <$> app.state
   renderToDOM "#app" app.html
   pure app
-
-showCentral :: State -> String
-showCentral (LoadingS _) = ""
-showCentral (LoadedS s) = gShow s.central
 
 coerceSubscriberEffects :: forall eff1 eff2 a. Subscriber eff1 a -> Subscriber eff2 a
 coerceSubscriberEffects = unsafeCoerce

@@ -44,9 +44,9 @@ import Data.Either (either, Either(Right, Left))
 import Data.Foldable (foldl)
 import Data.Generic (class Generic)
 import Data.Generic (gShow)
-import Data.Lens ((.=), to, (^.), (^?))
+import Data.Lens (_Just, (.=), to, (^.), (^?))
 import Data.Map (Map)
-import Data.Maybe (isNothing, maybe, Maybe(..))
+import Data.Maybe (fromMaybe, isNothing, maybe, Maybe(..))
 import Data.Monoid (mempty)
 import Data.Profunctor (lmap)
 import Data.Semigroup (append)
@@ -62,7 +62,7 @@ import Gonimo.Server.Error (ServerError(InvalidAuthToken))
 import Gonimo.Server.Types (DeviceType(Baby, NoBaby), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (dateToString, Key(Key), Secret(Secret))
 import Gonimo.UI.Error (viewError, class ErrorAction, UserError(NoError, DeviceInvalid), handleSubscriber, handleError)
-import Gonimo.UI.Loaded.Types (central, familyIds, authData, currentFamily, socketS, homeS, centralHome, Props, acceptS, inviteS, State, Action(..), Central(..))
+import Gonimo.UI.Loaded.Types (mkSettings, mkProps, central, familyIds, authData, currentFamily, socketS, homeS, centralHome, Props, acceptS, inviteS, State, Action(..), Central(..))
 import Gonimo.UI.Socket (viewParentChannels, getParentChannels)
 import Gonimo.Util (toString, fromString)
 import Gonimo.WebAPI (deleteOnlineStatusByFamilyIdByDeviceId, SPParams_(SPParams_), postAccounts)
@@ -99,7 +99,7 @@ update (SocketA action)                    = updateSocket action
 update (HomeA action)                      = updateHome action
 update (SetFamilyIds ids)                  = handleSetFamilyIds ids
 update (UpdateFamily familyId' family')    = onlyModify $ \state ->  state { families = Map.insert familyId' family' state.families }
-update (SetCentral c)                      = onlyModify $ _ { central = c }
+update (SetCentral c)                      = handleSetCentral c
 update (SetOnlineDevices devices)          = onlyModify $ _ { onlineDevices = devices }
 update (SetDeviceInfos devices)            = onlyModify $ _ { deviceInfos = devices }
 update (SetURL url)                        = handleSetURL url
@@ -137,9 +137,14 @@ updateAccept :: AcceptC.Action -> ComponentType Unit State Action
 updateAccept = toParent [] AcceptA <<< liftChild toAccept <<< AcceptC.update
 
 updateHome :: HomeC.Action -> ComponentType Unit State Action
-updateHome action = case action of
+updateHome action = do
+  state <- get
+  case action of
     HomeC.SocketA socketA -> updateSocket socketA
-    HomeC.GoToInviteView  -> central .= CentralInvite *> noEffects
+    HomeC.GoToInviteView  -> do
+      let inviteS' = InviteC.init (mkProps state)
+      let actions = handleSetCentral <<< CentralInvite <$> inviteS'
+      fromMaybe noEffects actions
     _                     -> toParent [] HomeA <<< liftChild toHome $ HomeC.update action
 
 updateSocket :: SocketC.Action -> ComponentType Unit State Action
@@ -159,6 +164,11 @@ handleResetDevice = do
               liftEff $ localStorage.removeItem Key.authData
               SocketA <<< SocketC.SetAuthData <$> getAuthData
          ]
+
+handleSetCentral :: Central -> ComponentType Unit State Action
+handleSetCentral c = do
+  central .= c
+  noEffects
 
 handleSetAuthData :: Component Unit State Unit
 handleSetAuthData = modify $ \state -> state
@@ -185,7 +195,7 @@ handleSetURL url = do
     Router.Home -> onlyModify $ _ { url = url }
     Router.AcceptInvitation s -> do
       modify $ _ { url = withoutQuery
-                 , central = CentralAccept
+                 , central = CentralAccept (AcceptC.init)
                  }
       pure [ do
               liftEff $ navigateTo withoutQuery
@@ -197,10 +207,8 @@ handleClearError = do
   state <- (get :: Component Unit State State)
   let
     newCentral = case state.central of
-      CentralAccept -> case state.acceptS of
-        Nothing  -> centralHome
-        Just _ -> state.central
-      _ -> state.central
+      CentralAccept Nothing -> centralHome
+      _                     -> state.central
 
   onlyModify $ _ { userError = NoError
                  , central = newCentral
@@ -217,7 +225,6 @@ view state =
       NoError ->
         div []
         [ viewHeader state
-        , viewNavbar state
         , viewCentral state
         , div []
           [ h3 [] [ text "Videos - yeah:" ]
@@ -245,27 +252,28 @@ viewHeader state =
 
         , div [ A.className "collapse navbar-collapse"]
           [ ul [ A.className "nav navbar-nav"]
-            [ li []
-              [ a [ E.onClick $ const $ SetCentral centralHome ] [ text "Overview" ]]
-            , li []
-              [ a [ E.onClick $ const $ SetCentral CentralInvite ] [ text "Invite Device" ] ]
-
-            , table []
-              [ tr [] [ text "Your current family is:" ]
-              , tr [ A.className "nav navbar-nav"]
-                [ li [A.className "dropdown"]
-                  [ a [ A.className "dropdown-toggle" , A.href "#"
-                      , A.dataToggle "dropdown"       , A.role "button"]
-                    [ text "funky hedgehogs"
-                    , text " "
-                    , span [A.className "caret"] [] ]
-                  , ul [A.className "dropdown-menu"]
-                    [ li [] [a [] [text "wild frogs"]]
-                    , li [] [a [] [text "funny cats"]]
-                    , li [] [a [] [text "running dogs"]]
-                    , li [] [a [] [ text "funky hedgehogs"
-                                  , text " ✔"
-                                  ]]
+            $  map viewCentralItem (availableCentrals state)
+            <>
+            [
+              li []
+              [ table []
+                [ tr [] [ text "Your current family is:" ]
+                , tr [ A.className "nav navbar-nav"]
+                  [ li [A.className "dropdown"]
+                    [ a [ A.className "dropdown-toggle" , A.href "#"
+                        , A.dataToggle "dropdown"       , A.role "button"]
+                      [ text "funky hedgehogs"
+                      , text " "
+                      , span [A.className "caret"] [] ]
+                    , ul [A.className "dropdown-menu"]
+                      [ li [] [a [] [text "wild frogs"]]
+                      , li [] [a [] [text "funny cats"]]
+                      , li [] [a [] [text "running dogs"]]
+                      , li [] [a [] [ text "funky hedgehogs"
+                                    , text " ✔"
+                                    ]
+                              ]
+                      ]
                     ]
                   ]
                 ]
@@ -287,64 +295,72 @@ viewHeader state =
                               ]]
                 ]
               ]
-             ]
-           ]
-         ]
-       ]
-
-viewNavbar :: State -> Html Action
-viewNavbar state =
-       nav [ A.className "navbar navbar-default" ]
-        [ div [ A.className "container-fluid" ]
-          [ -- Brand and toggle get grouped for better mobile display
-            div [ A.className "navbar-header" ]
-            [ button [ A.type_ "button"
-                     , A.className "navbar-toggle collapsed"
-                     , A.dataToggle "collapse"
-                     , A.dataTarget "navbar-collapse-1"
-                     ]
-              [ span [ A.className "sr-only" ] [ text "Toggle navigation" ]
-              , span [ A.className "icon-bar" ] []
-              , span [ A.className "icon-bar" ] []
-              , span [ A.className "icon-bar" ] []
-              ]
-            , a [ A.className "navbar-brand"
-                , A.role "button"
-                , E.onClick $ const $ SetCentral centralHome
-                ]
-                [ text "Home" ]
-            , a [ A.className "navbar-brand"
-                , A.role "button"
-                , E.onClick $ const $ SetCentral CentralInvite
-                ]
-              [ text "Invite" ]
-            ]
-          , -- Collect the nav links, forms, and other content for toggling
-            div [ A.className "collapse navbar-collapse", A.id_ "navbar-collapse-1" ]
-            [
-              ul [ A.className "nav navbar-nav" ]
-              [ li []
-                [ viewFamilyChooser state
-                ]
-              ]
-            , ul [ A.className "nav navbar-nav navbar-right" ]
-              [ li [ A.className "dropdown" ]
-                [ a [ A.className "dropdown-toggle"
-                         , A.dataToggle "dropdown"
-                         , A.role "button"
-                         ]
-                  [ text "Account" , span [ A.className "caret" ] [] ]
-                  , ul [ A.className "dropdown-menu" ]
-                    [ li [] [ a [ A.href "#" ] [ text "Configure User Details" ] ]
-                    , li [] [ a [ A.href "#" ] [ text "change password" ] ]
-                    , li [ A.role "separator",  A.className "divider" ] []
-                    , li [] [ a [ A.href "#" ] [ text "Log out" ] ]
-                    ]
-                  ]
-                ]
-              ]
             ]
           ]
+         ]
+       ]
+  where
+    viewCentralItem :: Tuple String Central -> Html Action
+    viewCentralItem (Tuple name item) =
+      li []
+      [ a [ E.onClick $ const $ SetCentral item ]
+        [ text name ]
+      ]
+
+
+-- viewNavbar :: State -> Html Action
+-- viewNavbar state =
+--        nav [ A.className "navbar navbar-default" ]
+--         [ div [ A.className "container-fluid" ]
+--           [ -- Brand and toggle get grouped for better mobile display
+--             div [ A.className "navbar-header" ]
+--             [ button [ A.type_ "button"
+--                      , A.className "navbar-toggle collapsed"
+--                      , A.dataToggle "collapse"
+--                      , A.dataTarget "navbar-collapse-1"
+--                      ]
+--               [ span [ A.className "sr-only" ] [ text "Toggle navigation" ]
+--               , span [ A.className "icon-bar" ] []
+--               , span [ A.className "icon-bar" ] []
+--               , span [ A.className "icon-bar" ] []
+--               ]
+--             , a [ A.className "navbar-brand"
+--                 , A.role "button"
+--                 , E.onClick $ const $ SetCentral centralHome
+--                 ]
+--                 [ text "Home" ]
+--             , a [ A.className "navbar-brand"
+--                 , A.role "button"
+--                 , E.onClick $ const $ SetCentral CentralInvite
+--                 ]
+--               [ text "Invite" ]
+--             ]
+--           , -- Collect the nav links, forms, and other content for toggling
+--             div [ A.className "collapse navbar-collapse", A.id_ "navbar-collapse-1" ]
+--             [
+--               ul [ A.className "nav navbar-nav" ]
+--               [ li []
+--                 [ viewFamilyChooser state
+--                 ]
+--               ]
+--             , ul [ A.className "nav navbar-nav navbar-right" ]
+--               [ li [ A.className "dropdown" ]
+--                 [ a [ A.className "dropdown-toggle"
+--                          , A.dataToggle "dropdown"
+--                          , A.role "button"
+--                          ]
+--                   [ text "Account" , span [ A.className "caret" ] [] ]
+--                   , ul [ A.className "dropdown-menu" ]
+--                     [ li [] [ a [ A.href "#" ] [ text "Configure User Details" ] ]
+--                     , li [] [ a [ A.href "#" ] [ text "change password" ] ]
+--                     , li [ A.role "separator",  A.className "divider" ] []
+--                     , li [] [ a [ A.href "#" ] [ text "Log out" ] ]
+--                     ]
+--                   ]
+--                 ]
+--               ]
+--             ]
+--           ]
 
 viewCentral :: State -> Html Action
 viewCentral state =
@@ -352,9 +368,9 @@ viewCentral state =
     props = mkProps state
   in
    case state.central of
-    CentralInvite -> map InviteA $ InviteC.view props state.inviteS
-    CentralAccept -> map AcceptA $ AcceptC.view state.acceptS
-    CentralHome   -> map HomeA   $ HomeC.view props state.homeS
+    CentralInvite s -> map InviteA $ InviteC.view props s
+    CentralAccept s -> map AcceptA $ AcceptC.view s
+    CentralHome     -> map HomeA   $ HomeC.view props state.homeS
 
 
 viewOnlineDevices :: State -> Html Action
@@ -399,6 +415,15 @@ viewFamilyChooser state = H.div []
     makeOption :: Key Family -> Family -> Html Action
     makeOption familyId (Family family) = H.option [ A.value (toString familyId) ]
                                           [ text family.familyName ]
+
+availableCentrals :: State -> Array (Tuple String Central)
+availableCentrals state =
+  let
+    props = mkProps state
+    centralInvite = Tuple "Add Device" <<< CentralInvite <$> InviteC.init props
+  in
+   [ Tuple "Overview" CentralHome ]
+   <> fromFoldable centralInvite
 --------------------------------------------------------------------------------
 getSubscriptions :: State -> Subscriptions Action
 getSubscriptions state =
@@ -463,19 +488,3 @@ getAuthData = do
       pure auth
     Just d  -> pure d
 
-mkProps :: State -> Props
-mkProps state = { settings : mkSettings $ state^.authData
-                , deviceId : (runAuthData $ state^.authData).deviceId
-                , familyId : state^?currentFamily
-                , onlineStatus  : state ^. socketS <<< SocketC.onlineStatus <<< to SocketC.toDeviceType
-                , family : flip Map.lookup state.families =<< state^?currentFamily
-                , onlineDevices : state.onlineDevices
-                , deviceInfos : state.deviceInfos
-                , sendActionSocket : lmap SocketA state.sendAction
-                }
-
-mkSettings :: AuthData -> Settings
-mkSettings (AuthData auth) = defaultSettings $ SPParams_ {
-      authorization : auth.authToken
-    , baseURL       : "http://localhost:8081/"
-    }
