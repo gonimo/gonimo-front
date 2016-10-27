@@ -14,5 +14,6 @@ viewLogo inner =
         ]
     ]
 
+-- | Loading something screen.
 viewLoading :: forall action. String -> Html action
 viewLoading inner = viewLogo $ span [] [text inner]
