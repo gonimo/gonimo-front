@@ -43,6 +43,7 @@ data UserError = NoError
                | DeviceInvalid -- Server does not accept our device secret.
                | AlreadyFamilyMember
                | NoSuchFamily
+               | FamilyNotOnline
                | NoSuchInvitation
                | InvitationAlreadyClaimed
                | ConnectionFailed
@@ -138,6 +139,10 @@ viewError state = case state.userError of
     $ div []
       [ p [] [ text "It probably got deleted, we are sorry about that."]
       ]
+  FamilyNotOnline -> errorView (Just clearError) "Your family is not online!"
+    $ div []
+      [ p [] [ text "This should not happen - like ever, if it happens this is a bug. It can also happen if you open gonimo on multiple tabs in the same browser - which currently is not prevented."]
+      ]
   InvitationAlreadyClaimed -> errorView (Just clearError) "This invitation is already claimed!"
     $ div []
       [ p [] [ text "Another device already claimed this invitation."]
@@ -185,6 +190,7 @@ fromServerError err = case err of
     Server.InvalidAuthToken -> Just DeviceInvalid
     Server.AlreadyFamilyMember -> Just AlreadyFamilyMember
     Server.NoSuchFamily _ -> Just NoSuchFamily
+    Server.FamilyNotOnline _ -> Just FamilyNotOnline
     Server.InvitationAlreadyClaimed -> Just InvitationAlreadyClaimed
     Server.NoSuchInvitation -> Just NoSuchInvitation
     _ -> Nothing

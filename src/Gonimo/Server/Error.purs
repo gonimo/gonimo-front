@@ -12,6 +12,7 @@ data ServerError =
   | InvitationAlreadyClaimed 
   | AlreadyFamilyMember 
   | NoSuchFamily (Key Family)
+  | FamilyNotOnline (Key Family)
   | NoSuchInvitation 
   | SocketBusy 
   | ChannelBusy 
