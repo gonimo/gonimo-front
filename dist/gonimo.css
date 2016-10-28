@@ -40,3 +40,7 @@ input.funnyName {
 .btn {
     margin: 1em;
 }
+
+.copy-link {
+    font-size: 130%;
+}
