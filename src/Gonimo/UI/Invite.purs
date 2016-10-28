@@ -9,6 +9,7 @@ import Gonimo.Client.Types as Gonimo
 import Gonimo.UI.Html as Html
 import Gonimo.WebAPI.Types as WebAPI
 import Pux.Html.Attributes as A
+import Pux.Html.Elements as H
 import Pux.Html.Events as E
 import Browser.LocalStorage (STORAGE, localStorage)
 import Control.Apply ((*>))
@@ -78,7 +79,7 @@ instance reportErrorActionAction :: ReportErrorAction Action where
 update :: forall ps. Update (Props ps) State Action
 update action = case action of
   (SetEmail email )         -> onlyModify $ _ { email = email, invitationSent = false }
-  InvitationSent            -> onlyModify $ _ { invitationSent = true }
+  InvitationSent            -> handleInvitationSent
   SendInvitation            -> handleSendInvitation
   MakeNewInvitation         -> handleMakeNewInvitation
   SetInvitationData id' inv -> onlyModify $ \state -> state { invitationId = id', invitation = inv }
@@ -88,6 +89,11 @@ update action = case action of
 makeInviteLink :: String -> Invitation -> String
 makeInviteLink baseURL (Invitation inv) = baseURL <> "?" <> "acceptInvitation="
                                           <> gDefaultEncodeURLPiece inv.invitationSecret
+
+handleInvitationSent :: forall m ps. (MonadComponent (Props ps) State m) => m (Array (IO Action))
+handleInvitationSent = do
+  modify $ _ { invitationSent = true }
+  pure [ pure MakeNewInvitation ] -- Prevent user from re-using the already sent invitation
 
 handleMakeNewInvitation :: forall m ps. (MonadComponent (Props ps) State m) => m (Array (IO Action))
 handleMakeNewInvitation = do
@@ -104,40 +110,31 @@ handleSendInvitation = do
 --------------------------------------------------------------------------------
 
 view :: forall ps. Props ps -> State -> Html Action
-view props state = if state.invitationSent
-                    then viewSent state
-                    else viewSend props state
-
-viewSend :: forall ps. Props ps -> State -> Html Action
-viewSend props state = div []
-                       [
-                         div [A.className "jumbotron"]
-                         [ div [A.className "container"]
-                           [ h3 [] [ text "Welcome to Gonimo!"]
-                           , p []  [ text "In order to add another device, you have to visit the following one-time link on another device."
-                                   ]
-                           ]
-                         ]
-                       , div [A.className "jumbotron"]
-                         [ div [A.className "container"]
-                           [ p []  [ text "Copy & Paste it in order to send it, e.g. with WhatsApp ..." ]
-                           , span [ A.className "label label-default" ]
-                             [ span [ A.className "glyphicon glyphicon-copy" ] []
-                             , text $ " " <> makeInviteLink (props.baseURL) state.invitation
-                             ]
-                           ]
-                         ]
-                       , h2 [] [ div [ A.className "well"]
-                                 [ i [A.className "fa fa-users"] []
-                                 , text " "
-                                 ]
+view props state = div []
+                   [ div [A.className "jumbotron"]
+                     [ div [A.className "container"]
+                       [ h3 [] [ text "Welcome to Gonimo!"]
+                       , p []  [ text "In order to add another device, you have to visit the following one-time link on another device."
                                ]
+                       ]
+                     ]
+                   , div [A.className "jumbotron"]
+                     [ div [A.className "container"]
+                       [ p []
+                         [ text "Copy & Paste it in order to send it, e.g. with WhatsApp ..." ]
+                       , div [ A.className "input-group" ]
+                           [ span [ A.className "input-group-addon glyphicon glyphicon-copy", A.id_ "sdflkjsll291" ]
+                             []
+                           , input [ A.type_ "text", A.className "form-control", A.readOnly true
+                                   , A.value (makeInviteLink (props.baseURL) state.invitation) ] []
+                           ]
+                       ]
+                     ]
+                   , div [A.className "jumbotron"]
+                     [ div [A.className "container"]
+                       [ p []  [ text "Or you can send it via email ..." ]
                        , div [ E.onKeyUp handleEnter ]
                          [ div [A.className "input-group"]
-                           []
-
-                         , p [] []
-                         , div [A.className "input-group"]
                            [ span [A.className "input-group-addon glyphicon glyphicon-envelope"] []
                            , input [ A.type_ "text"
                                    , A.className "form-control"
@@ -148,14 +145,16 @@ viewSend props state = div []
                            ]
                          ]
                        , button [ A.className "btn btn-block btn-info"
-                                , A.style [Tuple "margin-left" "0px"]
-                                , A.type_ "button"
-                                , E.onClick $ const $ SendInvitation
-                                ]
+                                 , A.style [Tuple "margin-left" "0px"]
+                                 , A.type_ "button"
+                                 , E.onClick $ const $ SendInvitation
+                                 ]
                          [ text " Send Invitation! "
                          , span [A.className "glyphicon glyphicon-send"] []
                          ]
                        ]
+                     ]
+                   ]
   where
     handleEnter :: E.KeyboardEvent -> Action
     handleEnter ev = if ev.keyCode == 13 then SendInvitation else Nop

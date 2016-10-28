@@ -54,7 +54,7 @@ import Gonimo.WebAPI.Types.Helpers (runAuthData)
 import Partial.Unsafe (unsafeCrashWith)
 import Pux (App, renderToDOM, fromSimple, start)
 import Pux.Html (text, span, Html, img, div)
-import Pux.Router (sampleUrl)
+import Gonimo.Util (sampleUrl)
 import Pux.Devtool (Action, start) as Pux.Devtool
 import Servant.PureScript.Affjax (AjaxError)
 import Servant.PureScript.Settings (defaultSettings, SPSettings_(SPSettings_))
