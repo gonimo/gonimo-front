@@ -70,7 +70,7 @@ import Gonimo.WebAPI.Types (DeviceInfo(DeviceInfo), AuthData(AuthData))
 import Gonimo.WebAPI.Types.Helpers (runAuthData)
 import Partial.Unsafe (unsafeCrashWith)
 import Pux (renderToDOM, fromSimple, start)
-import Pux.Html (text, small, script, li, a, nav, h3, h2, td, tbody, th, tr, thead, table, ul, p, button, input, h1, span, Html, img, div)
+import Pux.Html (text, small, script, li, i, a, nav, h3, h2, td, tbody, th, tr, thead, table, ul, p, button, input, h1, span, Html, img, div)
 import Pux.Html.Attributes (letterSpacing, offset)
 import Pux.Html.Events (FormEvent, FocusEvent)
 import Pux.Router (navigateTo)
@@ -251,47 +251,49 @@ viewHeader state =
           ]
 
         , div [ A.className "collapse navbar-collapse"]
-          [ ul [ A.className "nav navbar-nav"]
-            $  map viewCentralItem (availableCentrals state)
-            <>
-            [
-              li []
-              [ table []
-                [ tr [] [ text "Your current family is:" ]
-                , tr [ A.className "nav navbar-nav"]
-                  [ li [A.className "dropdown"]
-                    [ a [ A.className "dropdown-toggle" , A.href "#"
-                        , A.dataToggle "dropdown"       , A.role "button"]
-                      [ text "funky hedgehogs"
-                      , text " "
-                      , span [A.className "caret"] [] ]
-                    , ul [A.className "dropdown-menu"]
-                      [ li [] [a [] [text "wild frogs"]]
-                      , li [] [a [] [text "funny cats"]]
-                      , li [] [a [] [text "running dogs"]]
-                      , li [] [a [] [ text "funky hedgehogs"
-                                    , text " ✔"
-                                    ]
-                              ]
-                      ]
+          [ ul [ A.className "nav navbar-nav"] $
+            (map viewCentralItem $ availableCentrals state) <>
+            [ li []
+              [ ul [ A.className "nav navbar-nav "]
+                [ li [A.className "dropdown"]
+                  [ a [ A.className "dropdown-toggle" , A.href "#"
+                      , A.dataToggle "dropdown"       , A.role "button"]
+                    [ i [A.className "fa fa-users"] []
+                    , text " "
+                    , text "funky hedgehogs"
+                    , text " "
+                    , span [A.className "caret"] [] ]
+                  , ul [A.className "dropdown-menu"]
+                    [ li [] [div [A.className "navbar-text"] [text "Change family to"]]
+                    , li [] [a [] [text "wild frogs"]]
+                    , li [] [a [] [text "funny cats"]]
+                    , li [] [a [] [text "running dogs"]]
+                    , li [] [a [] [ text "funky hedgehogs"
+                                  , text " ✔"
+                                  ]]
                     ]
                   ]
                 ]
               ]
             , li [A.className "dropdown"]
               [ a [ A.className "dropdown-toggle" , A.href "#"
-                  , A.dataToggle "dropdown"       , A.role "button"]
-                [ text "Signed in as"
-                , H.br [] []
+                  , A.dataToggle "dropdown"       , A.role "button"
+                  , A.style [Tuple "minWidth" "180px"]]
+                [ i [A.className "fa fa-user"] []
+                , text " "
                 , text "epsilonhalbe"
                 , text " "
-                , H.i [A.className "fa fa-cog"] [] ]
-              , ul [A.className "dropdown-menu"]
-                [ li [] [a [] [text "wild frogs"]]
-                , li [] [a [] [text "funny cats"]]
-                , li [] [a [] [text "running dogs"]]
-                , li [] [a [] [ text "funky hedgehogs"
-                              , text " ✔"
+                , span [A.className "caret"] []
+                ]
+              , ul [A.className "dropdown-menu", A.style [Tuple "minWidth" "180px"]]
+                [ li [] [a [] [text " User settings "
+                              ,i [A.className "fa fa-cog pull-right"] []]]
+                , li [] [ a [] [ text "Change password "
+                               , i [A.className "fa fa-lock pull-right" ][]
+                               ]]
+                , li [A.className "divider", A.role "separator"] []
+                , li [] [a [] [ text "Log-Out "
+                              , i [A.className "fa fa-sign-out pull-right"] []
                               ]]
                 ]
               ]
@@ -299,10 +301,11 @@ viewHeader state =
           ]
          ]
        ]
+
   where
     viewCentralItem :: Tuple String Central -> Html Action
     viewCentralItem (Tuple name item) =
-      li []
+      li [A.className "nav navbar-nav"]
       [ a [ E.onClick $ const $ SetCentral item ]
         [ text name ]
       ]
@@ -374,7 +377,7 @@ viewCentral state =
 
 
 viewOnlineDevices :: State -> Html Action
-viewOnlineDevices state = table [ A.className "table table-stripped"]
+viewOnlineDevices state = table [ A.className "table table-striped"]
                           [ head
                           , body
                           ]
@@ -393,7 +396,12 @@ viewOnlineDevices state = table [ A.className "table table-stripped"]
         let name = info.deviceInfoName
         let lastAccessed = dateToString info.deviceInfoLastAccessed
         pure $ tr []
-               [ td [] [ text name ]
+               [ td [] [ text name, i [ A.className "fa fa-pencil"
+                                      , A.dataToggle "tooltip"
+                                      , A.dataPlacement "right"
+                                      , A.title "edit"
+                                      ] []
+                       ]
                , td [] [ text lastAccessed ]
                ]
 
