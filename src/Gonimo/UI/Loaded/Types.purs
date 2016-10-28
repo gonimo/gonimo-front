@@ -104,6 +104,7 @@ mkInviteProps' familyId' family' state =
   { settings : mkSettings $ state^.authData
   , rFamilyId : familyId'
   , rFamily : family'
+  , baseURL : state.url
   }
 
 mkSettings :: AuthData -> Settings

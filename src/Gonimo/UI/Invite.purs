@@ -22,10 +22,11 @@ import Control.Monad.State.Class (get, modify)
 import Data.Either (Either(Right, Left))
 import Data.Generic (gShow)
 import Data.Maybe (isJust, isNothing, Maybe(..))
-import Data.Tuple (Tuple(Tuple))
+import Data.Tuple (uncurry, Tuple(Tuple))
+import Global (encodeURI)
 import Gonimo.Client.Types (Settings, GonimoError, Gonimo, class ReportErrorAction)
 import Gonimo.Pux (noEffects, onlyModify, Update, runGonimo, class MonadComponent)
-import Gonimo.Server.DbEntities (Family(Family))
+import Gonimo.Server.DbEntities (Invitation(Invitation), Family(Family))
 import Gonimo.Server.Types (InvitationDelivery(EmailInvitation), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (Key(Key), Secret(Secret))
 import Gonimo.WebAPI (postInvitationsOutbox, postInvitationsByFamilyId, postFamilies, SPParams_(SPParams_), postAccounts, postFunnyName)
@@ -35,33 +36,40 @@ import Pux (renderToDOM, fromSimple, start)
 import Pux.Html (button, i, input, p, h1, h2, h3, text, span, Html, img, div)
 import Pux.Html.Attributes (offset)
 import Servant.PureScript.Affjax (AjaxError)
-import Servant.PureScript.Settings (defaultSettings, SPSettings_(SPSettings_))
+import Servant.PureScript.Settings (gDefaultEncodeURLPiece, defaultSettings, SPSettings_(SPSettings_))
 import Signal (constant, Signal)
 import Prelude hiding (div)
 
 type Props ps = { settings  :: Settings
                 , rFamilyId :: Key Family
                 , rFamily   :: Family
+                , baseURL :: String
                 | ps
                 }
 
 type State =
   { email          :: String
   , invitationSent :: Boolean
+  , invitationId   :: Key Invitation
+  , invitation   :: Invitation
   }
 
 -- | We take our props in init to ensure the caller takes care of providing proper props.
 --   Ensuring this on the first call to update is a tad to late.
-init :: forall ps. Props ps -> State
-init _ = { email : ""
-         , invitationSent : false
-         }
+init :: forall ps. Tuple (Key Invitation) Invitation -> Props ps -> State
+init (Tuple invKey inv) _ = { email : ""
+                            , invitationSent : false
+                            , invitationId : invKey
+                            , invitation : inv
+                            }
 
 
 data Action = SetEmail String
             | SendInvitation
             | InvitationSent
             | ReportError GonimoError
+            | MakeNewInvitation
+            | SetInvitationData (Key Invitation) Invitation
             | Nop
 
 instance reportErrorActionAction :: ReportErrorAction Action where
@@ -69,28 +77,29 @@ instance reportErrorActionAction :: ReportErrorAction Action where
 
 update :: forall ps. Update (Props ps) State Action
 update action = case action of
-  (SetEmail email )     -> onlyModify $ _ { email = email }
-  InvitationSent        -> onlyModify $ _ { invitationSent = true }
-  SendInvitation        -> handleSendInvitation
-  ReportError err       -> noEffects
-  Nop                   -> noEffects
+  (SetEmail email )         -> onlyModify $ _ { email = email, invitationSent = false }
+  InvitationSent            -> onlyModify $ _ { invitationSent = true }
+  SendInvitation            -> handleSendInvitation
+  MakeNewInvitation         -> handleMakeNewInvitation
+  SetInvitationData id' inv -> onlyModify $ \state -> state { invitationId = id', invitation = inv }
+  ReportError err           -> noEffects
+  Nop                       -> noEffects
 
+makeInviteLink :: String -> Invitation -> String
+makeInviteLink baseURL (Invitation inv) = baseURL <> "?" <> "acceptInvitation="
+                                          <> gDefaultEncodeURLPiece inv.invitationSecret
+
+handleMakeNewInvitation :: forall m ps. (MonadComponent (Props ps) State m) => m (Array (IO Action))
+handleMakeNewInvitation = do
+  props <- ask
+  runGonimo $ uncurry SetInvitationData <$> postInvitationsByFamilyId props.rFamilyId
 
 handleSendInvitation :: forall m ps. (MonadComponent (Props ps) State m) => m (Array (IO Action))
 handleSendInvitation = do
-  noEffects
-  -- props <- ask
-  -- state <- get
-  -- runGonimo $ do
-  --   (SPSettings_ settings) <- ask
-  --   let params' = case settings.params of (SPParams_ params) -> params
-  --   Gonimo.log $ "Using AuthToken: " <> gShow params'.authorization
-  --   fid <- case props.familyId of
-  --     Nothing   -> postFamilies state.familyName
-  --     Just fid' -> pure fid'
-  --   (Tuple invId invitation) <- postInvitationsByFamilyId fid
-  --   postInvitationsOutbox $ WebAPI.SendInvitation invId (EmailInvitation state.email)
-  --   pure InvitationSent
+  state <- get
+  runGonimo $ do
+    postInvitationsOutbox $ WebAPI.SendInvitation state.invitationId (EmailInvitation state.email)
+    pure InvitationSent
 
 --------------------------------------------------------------------------------
 
@@ -100,41 +109,53 @@ view props state = if state.invitationSent
                     else viewSend props state
 
 viewSend :: forall ps. Props ps -> State -> Html Action
-viewSend props state =
-  div [A.className "jumbotron"]
-  [ div [A.className "container"]
-    [ h1 [] [ text "Welcome to Gonimo!"]
-    , p []  [ text "In order to get you started, invite a second device via email to your family:"]
-    , h2 [] [ div [ A.className "well"]
-                [ i [A.className "fa fa-users"] []
-                , text " "
-                ]
-            ]
-    , div [ E.onKeyUp handleEnter ]
-      [ div [A.className "input-group"]
-          []
+viewSend props state = div []
+                       [
+                         div [A.className "jumbotron"]
+                         [ div [A.className "container"]
+                           [ h3 [] [ text "Welcome to Gonimo!"]
+                           , p []  [ text "In order to add another device, you have to visit the following one-time link on another device."
+                                   ]
+                           ]
+                         ]
+                       , div [A.className "jumbotron"]
+                         [ div [A.className "container"]
+                           [ p []  [ text "Copy & Paste it in order to send it, e.g. with WhatsApp ..." ]
+                           , span [ A.className "label label-default" ]
+                             [ span [ A.className "glyphicon glyphicon-copy" ] []
+                             , text $ " " <> makeInviteLink (props.baseURL) state.invitation
+                             ]
+                           ]
+                         ]
+                       , h2 [] [ div [ A.className "well"]
+                                 [ i [A.className "fa fa-users"] []
+                                 , text " "
+                                 ]
+                               ]
+                       , div [ E.onKeyUp handleEnter ]
+                         [ div [A.className "input-group"]
+                           []
 
-      , p [] []
-      , div [A.className "input-group"]
-        [ span [A.className "input-group-addon glyphicon glyphicon-envelope"] []
-        , input [ A.type_ "text"
-                , A.className "form-control"
-                , A.placeholder "mail@example.com"
-                , E.onInput $ \ev -> SetEmail ev.target.value
-                , A.value state.email
-                ] []
-        ]
-      ]
-    , button [ A.className "btn btn-block btn-info"
-             , A.style [Tuple "margin-left" "0px"]
-             , A.type_ "button"
-             , E.onClick $ const $ SendInvitation
-             ]
-             [ text " Send Invitation! "
-             , span [A.className "glyphicon glyphicon-send"] []
-             ]
-    ]
-  ]
+                         , p [] []
+                         , div [A.className "input-group"]
+                           [ span [A.className "input-group-addon glyphicon glyphicon-envelope"] []
+                           , input [ A.type_ "text"
+                                   , A.className "form-control"
+                                   , A.placeholder "mail@example.com"
+                                   , E.onInput $ \ev -> SetEmail ev.target.value
+                                   , A.value state.email
+                                   ] []
+                           ]
+                         ]
+                       , button [ A.className "btn btn-block btn-info"
+                                , A.style [Tuple "margin-left" "0px"]
+                                , A.type_ "button"
+                                , E.onClick $ const $ SendInvitation
+                                ]
+                         [ text " Send Invitation! "
+                         , span [A.className "glyphicon glyphicon-send"] []
+                         ]
+                       ]
   where
     handleEnter :: E.KeyboardEvent -> Action
     handleEnter ev = if ev.keyCode == 13 then SendInvitation else Nop

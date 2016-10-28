@@ -66,7 +66,7 @@ import Gonimo.UI.Loaded.Central (getCentrals)
 import Gonimo.UI.Loaded.Types (mkInviteProps', CentralReq(..), mkInviteProps, mkSettings, mkProps, central, familyIds, authData, currentFamily, socketS, homeS, centralHome, Props, acceptS, inviteS, State, Action(..), Central(..), InviteProps)
 import Gonimo.UI.Socket (viewParentChannels, getParentChannels)
 import Gonimo.Util (userShow, toString, fromString)
-import Gonimo.WebAPI (postFamilies, getFamiliesByFamilyId, postFunnyName, deleteOnlineStatusByFamilyIdByDeviceId, SPParams_(SPParams_), postAccounts)
+import Gonimo.WebAPI (postInvitationsByFamilyId, postFamilies, getFamiliesByFamilyId, postFunnyName, deleteOnlineStatusByFamilyIdByDeviceId, SPParams_(SPParams_), postAccounts)
 import Gonimo.WebAPI.Types (DeviceInfo(DeviceInfo), AuthData(AuthData))
 import Gonimo.WebAPI.Types.Helpers (runAuthData)
 import Partial.Unsafe (unsafeCrashWith)
@@ -154,7 +154,7 @@ updateHome action = do
   state <- get :: Component Unit State State
   case action of
     HomeC.SocketA socketA -> updateSocket socketA
-    HomeC.GoToInviteView  -> handleRequestCentral ReqCentralHome
+    HomeC.GoToInviteView  -> handleRequestCentral ReqCentralInvite
     _                     -> toParent [] HomeA <<< liftChild toHome $ HomeC.update action
 
 updateSocket :: SocketC.Action -> ComponentType Unit State Action
@@ -188,9 +188,14 @@ handleRequestCentral c = do
                         fid' <- postFamilies name
                         family' <- getFamiliesByFamilyId fid'
                         let newProps = mkInviteProps' fid' family' state
-                        pure <<< SetCentral <<< CentralInvite $ (InviteC.init newProps)
+                        invData <- postInvitationsByFamilyId fid'
+                        pure <<< SetCentral <<< CentralInvite $ (InviteC.init invData newProps)
                    ]
-        Just props -> handleSetCentral $ CentralInvite (InviteC.init props)
+        Just props -> pure
+                      [ toIO (mkSettings $ state^.authData) $ do
+                           invData <- postInvitationsByFamilyId props.rFamilyId
+                           pure <<< SetCentral $ CentralInvite (InviteC.init invData props)
+                      ]
     ReqCentralHome -> handleSetCentral CentralHome
 
 handleSetCentral :: Central -> ComponentType Unit State Action
