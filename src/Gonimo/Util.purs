@@ -3,16 +3,34 @@ module Gonimo.Util where
 import Prelude
 import Data.Argonaut.Generic.Aeson as Aeson
 import Control.Monad.Aff (Aff)
+import Control.Monad.Eff (Eff)
 import Control.Monad.IO (IO)
 import Data.Argonaut.Parser (jsonParser)
 import Data.Either (Either(Right, Left))
 import Data.Generic (class Generic)
 import Data.Maybe (Maybe(Just, Nothing))
 import Unsafe.Coerce (unsafeCoerce)
+import Signal (constant, Signal)
+import DOM (DOM)
 
 -- | Things that can be shown to the user
 class UserShow a where
   userShow  :: a -> String
+
+-- getHRef :: forall eff. Eff eff String
+-- getHRef = coerceEffects $ do
+--   w <- DOM.window
+--   l <- Dom.location w
+--   href l
+
+
+foreign import createUrlSignal :: forall eff url.
+                                  (url -> Signal url) ->
+                                  Eff (dom :: DOM | eff) (Signal String)
+
+-- | Returns a signal containing the full href, unlike pux routers sampleUrl.
+sampleUrl :: forall eff. Eff (dom :: DOM | eff) (Signal String)
+sampleUrl = createUrlSignal constant
 
 toString :: forall a. Generic a => a -> String
 toString = show <<< Aeson.encodeJson
