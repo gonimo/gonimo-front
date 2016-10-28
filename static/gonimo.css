@@ -40,3 +40,8 @@ input.funnyName {
 .btn {
     margin: 1em;
 }
+
+.centered {
+    text-align: center;
+    vertical-align: middle;
+}

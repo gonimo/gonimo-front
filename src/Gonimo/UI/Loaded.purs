@@ -419,8 +419,13 @@ viewOnlineDevices state = table [ A.className "table table-striped"]
   where
     head = thead []
            [ tr []
-             [ th [] [ text "Name" ]
+             [ th [ A.className "centered"] [ text "Online" ]
+             , th [ A.className "centered"] [ text "Type" ]
+             , th [] [ text "Name" ]
              , th [] [ text "Last Accessed"]
+             , th [] []
+             , th [] []
+             , th [] []
              ]
            ]
     body = tbody []
@@ -431,13 +436,28 @@ viewOnlineDevices state = table [ A.className "table table-striped"]
         let name = info.deviceInfoName
         let lastAccessed = dateToString info.deviceInfoLastAccessed
         pure $ tr []
-               [ td [] [ text name, i [ A.className "fa fa-pencil"
-                                      , A.dataToggle "tooltip"
-                                      , A.dataPlacement "right"
-                                      , A.title "edit"
-                                      ] []
+               [ td [A.className "centered"] [ i [ A.className ("fa fa-" <> "circle-o") -- "check-circle"
+                       , A.dataToggle "tooltip"
+                       , A.dataPlacement "right"
+                       , A.title "offline" ] []]
+                       --, A.title "online" ] []]
+               , td [A.className "centered"]
+                   [ i [ A.className ("fa fa-" <> "mobile")
+                       , A.dataToggle "tooltip"
+                       , A.dataPlacement "right"
+                       , A.title "edit device name" ] []
                        ]
+               , td [] [ text name ]
                , td [] [ text lastAccessed ]
+               , td [] [ i [ A.className "fa fa-pencil"
+                       , A.dataToggle "tooltip"
+                       , A.dataPlacement "right"
+                       , A.title "edit device name" ] []
+                       ]
+               , td [] [ i [ A.className "fa fa-trash"
+                       , A.dataToggle "tooltip"
+                       , A.dataPlacement "right"
+                       , A.title "delete device from family" ] []]
                ]
 
 viewFamilyChooser :: State -> Html Action
