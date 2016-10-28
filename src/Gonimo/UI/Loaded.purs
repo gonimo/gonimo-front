@@ -62,10 +62,11 @@ import Gonimo.Server.Error (ServerError(InvalidAuthToken))
 import Gonimo.Server.Types (DeviceType(Baby, NoBaby), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (dateToString, Key(Key), Secret(Secret))
 import Gonimo.UI.Error (viewError, class ErrorAction, UserError(NoError, DeviceInvalid), handleSubscriber, handleError)
-import Gonimo.UI.Loaded.Types (mkSettings, mkProps, central, familyIds, authData, currentFamily, socketS, homeS, centralHome, Props, acceptS, inviteS, State, Action(..), Central(..))
+import Gonimo.UI.Loaded.Central (getCentrals)
+import Gonimo.UI.Loaded.Types (mkInviteProps', CentralReq(..), mkInviteProps, mkSettings, mkProps, central, familyIds, authData, currentFamily, socketS, homeS, centralHome, Props, acceptS, inviteS, State, Action(..), Central(..), InviteProps)
 import Gonimo.UI.Socket (viewParentChannels, getParentChannels)
-import Gonimo.Util (toString, fromString)
-import Gonimo.WebAPI (deleteOnlineStatusByFamilyIdByDeviceId, SPParams_(SPParams_), postAccounts)
+import Gonimo.Util (userShow, toString, fromString)
+import Gonimo.WebAPI (postFamilies, getFamiliesByFamilyId, postFunnyName, deleteOnlineStatusByFamilyIdByDeviceId, SPParams_(SPParams_), postAccounts)
 import Gonimo.WebAPI.Types (DeviceInfo(DeviceInfo), AuthData(AuthData))
 import Gonimo.WebAPI.Types.Helpers (runAuthData)
 import Partial.Unsafe (unsafeCrashWith)
@@ -88,32 +89,30 @@ import Prelude hiding (div)
 
 
 update :: Update Unit State Action
-update (SetState state)                    = put state *> pure []
-update (ReportError err)                   = handleError err
-update (InviteA (InviteC.ReportError err)) = handleError err
-update (InviteA action)                    = updateInvite action
-update (AcceptA (AcceptC.ReportError err)) = handleError err
-update (AcceptA action)                    = updateAccept action
-update (SocketA (SocketC.ReportError err)) = handleError err
-update (SocketA action)                    = updateSocket action
-update (HomeA action)                      = updateHome action
-update (SetFamilyIds ids)                  = handleSetFamilyIds ids
-update (UpdateFamily familyId' family')    = onlyModify $ \state ->  state { families = Map.insert familyId' family' state.families }
-update (SetCentral c)                      = handleSetCentral c
-update (SetOnlineDevices devices)          = onlyModify $ _ { onlineDevices = devices }
-update (SetDeviceInfos devices)            = onlyModify $ _ { deviceInfos = devices }
-update (SetURL url)                        = handleSetURL url
-update (HandleSubscriber msg)              = handleSubscriber msg
-update ResetDevice                         = handleResetDevice
-update ClearError                          = handleClearError
-update Nop                                 = noEffects
-update _                                   = noEffects
+update (SetState state)                      = put state *> pure []
+update (ReportError err)                     = handleError err
+update (InviteA _ (InviteC.ReportError err)) = handleError err
+update (InviteA mProps action)               = updateInvite mProps action
+update (AcceptA (AcceptC.ReportError err))   = handleError err
+update (AcceptA action)                      = updateAccept action
+update (SocketA (SocketC.ReportError err))   = handleError err
+update (SocketA action)                      = updateSocket action
+update (HomeA action)                        = updateHome action
+update (SetFamilyIds ids)                    = handleSetFamilyIds ids
+update (UpdateFamily familyId' family')      = onlyModify $ \state ->  state { families = Map.insert familyId' family' state.families }
+update (RequestCentral c)                    = handleRequestCentral c
+update (SetCentral c)                        = handleSetCentral c
+update (SetOnlineDevices devices)            = onlyModify $ _ { onlineDevices = devices }
+update (SetDeviceInfos devices)              = onlyModify $ _ { deviceInfos = devices }
+update (SetURL url)                          = handleSetURL url
+update (HandleSubscriber msg)                = handleSubscriber msg
+update ResetDevice                           = handleResetDevice
+update ClearError                            = handleClearError
+update Nop                                   = noEffects
 
 
-toInvite :: ToChild Unit State Props InviteC.State
-toInvite = do
-  props <- mkProps <$> get
-  pure $ makeChildData inviteS props
+toInvite :: InviteProps -> ToChild Unit State InviteProps InviteC.State
+toInvite props = pure $ makeChildData inviteS props
 
 toAccept :: ToChild Unit State Props AcceptC.State
 toAccept = do
@@ -130,21 +129,32 @@ toSocket = do
   props <- mkProps <$> get
   pure $ makeChildData socketS props
 
-updateInvite :: InviteC.Action -> ComponentType Unit State Action
-updateInvite = toParent [] InviteA <<< liftChild toInvite <<< InviteC.update
+updateInvite :: Maybe InviteProps -> InviteC.Action -> ComponentType Unit State Action
+updateInvite mProps iAction = do
+  state <- get :: Component Unit State State
+  let props = mkInviteProps state <|> mProps -- State props have higher priority!
+  case props of
+    Nothing -> pure $
+               [ toIO (mkSettings $ state^.authData) $ do
+                    name <- postFunnyName
+                    fid' <- postFamilies name
+                    family' <- getFamiliesByFamilyId fid'
+                    let newProps = mkInviteProps' fid' family' state
+                    pure $ InviteA (Just newProps) iAction
+               ]
+    Just rProps ->
+      toParent [] (InviteA Nothing) <<< liftChild (toInvite rProps) <<< InviteC.update $ iAction
+
 
 updateAccept :: AcceptC.Action -> ComponentType Unit State Action
 updateAccept = toParent [] AcceptA <<< liftChild toAccept <<< AcceptC.update
 
 updateHome :: HomeC.Action -> ComponentType Unit State Action
 updateHome action = do
-  state <- get
+  state <- get :: Component Unit State State
   case action of
     HomeC.SocketA socketA -> updateSocket socketA
-    HomeC.GoToInviteView  -> do
-      let inviteS' = InviteC.init (mkProps state)
-      let actions = handleSetCentral <<< CentralInvite <$> inviteS'
-      fromMaybe noEffects actions
+    HomeC.GoToInviteView  -> handleRequestCentral ReqCentralHome
     _                     -> toParent [] HomeA <<< liftChild toHome $ HomeC.update action
 
 updateSocket :: SocketC.Action -> ComponentType Unit State Action
@@ -165,10 +175,26 @@ handleResetDevice = do
               SocketA <<< SocketC.SetAuthData <$> getAuthData
          ]
 
+handleRequestCentral :: CentralReq -> ComponentType Unit State Action
+handleRequestCentral c = do
+  state <- get
+  case c of
+    ReqCentralInvite -> do
+      let invProps = mkInviteProps state
+      case invProps of
+        Nothing -> pure
+                   [ toIO (mkSettings $ state^.authData) $ do
+                        name <- postFunnyName
+                        fid' <- postFamilies name
+                        family' <- getFamiliesByFamilyId fid'
+                        let newProps = mkInviteProps' fid' family' state
+                        pure <<< SetCentral <<< CentralInvite $ (InviteC.init newProps)
+                   ]
+        Just props -> handleSetCentral $ CentralInvite (InviteC.init props)
+    ReqCentralHome -> handleSetCentral CentralHome
+
 handleSetCentral :: Central -> ComponentType Unit State Action
-handleSetCentral c = do
-  central .= c
-  noEffects
+handleSetCentral central' = central .= central' *> noEffects
 
 handleSetAuthData :: Component Unit State Unit
 handleSetAuthData = modify $ \state -> state
@@ -195,20 +221,20 @@ handleSetURL url = do
     Router.Home -> onlyModify $ _ { url = url }
     Router.AcceptInvitation s -> do
       modify $ _ { url = withoutQuery
-                 , central = CentralAccept (AcceptC.init)
                  }
-      pure [ do
-              liftEff $ navigateTo withoutQuery
-              inviteEffect s
-            ]
+      actions <- handleSetCentral $ CentralAccept (AcceptC.init)
+      pure $ [ do
+               liftEff $ navigateTo withoutQuery
+               inviteEffect s
+             ] <> actions
 
 handleClearError :: ComponentType Unit State Action
 handleClearError = do
   state <- (get :: Component Unit State State)
   let
     newCentral = case state.central of
-      CentralAccept Nothing -> centralHome
-      _                     -> state.central
+      CentralAccept (Just _) -> state.central
+      _                     -> CentralHome
 
   onlyModify $ _ { userError = NoError
                  , central = newCentral
@@ -252,7 +278,7 @@ viewHeader state =
 
         , div [ A.className "collapse navbar-collapse"]
           [ ul [ A.className "nav navbar-nav"] $
-            (map viewCentralItem $ availableCentrals state) <>
+            (viewCentralItem <$> getCentrals state) <>
             [ li []
               [ ul [ A.className "nav navbar-nav "]
                 [ li [A.className "dropdown"]
@@ -270,7 +296,8 @@ viewHeader state =
                     , li [] [a [] [text "running dogs"]]
                     , li [] [a [] [ text "funky hedgehogs"
                                   , text " ✔"
-                                  ]]
+                                  ]
+                            ]
                     ]
                   ]
                 ]
@@ -303,11 +330,11 @@ viewHeader state =
        ]
 
   where
-    viewCentralItem :: Tuple String Central -> Html Action
-    viewCentralItem (Tuple name item) =
-      li [A.className "nav navbar-nav"]
-      [ a [ E.onClick $ const $ SetCentral item ]
-        [ text name ]
+    viewCentralItem :: Tuple Boolean CentralReq -> Html Action
+    viewCentralItem (Tuple active item) =
+      li [ A.className $ "nav navbar-nav" <> if active then " active" else "" ]
+      [ a [ E.onClick $ const $ RequestCentral item ]
+        [ text (userShow item) ]
       ]
 
 
@@ -369,9 +396,12 @@ viewCentral :: State -> Html Action
 viewCentral state =
   let
     props = mkProps state
+    invProps = mkInviteProps state
   in
    case state.central of
-    CentralInvite s -> map InviteA $ InviteC.view props s
+    CentralInvite s -> case invProps of
+      Nothing -> viewLoading "Loading, please wait ..."
+      Just invProps' -> map (InviteA Nothing) $ InviteC.view invProps' s
     CentralAccept s -> map AcceptA $ AcceptC.view s
     CentralHome     -> map HomeA   $ HomeC.view props state.homeS
 
@@ -424,14 +454,7 @@ viewFamilyChooser state = H.div []
     makeOption familyId (Family family) = H.option [ A.value (toString familyId) ]
                                           [ text family.familyName ]
 
-availableCentrals :: State -> Array (Tuple String Central)
-availableCentrals state =
-  let
-    props = mkProps state
-    centralInvite = Tuple "Add Device" <<< CentralInvite <$> InviteC.init props
-  in
-   [ Tuple "Overview" CentralHome ]
-   <> fromFoldable centralInvite
+
 --------------------------------------------------------------------------------
 getSubscriptions :: State -> Subscriptions Action
 getSubscriptions state =

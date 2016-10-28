@@ -21,6 +21,7 @@ import Gonimo.Server.DbEntities (Device(Device), Family(Family))
 import Gonimo.Server.Types (DeviceType)
 import Gonimo.Types (Secret(Secret), Key(Key))
 import Gonimo.UI.Error (class ErrorAction, UserError)
+import Gonimo.Util (class UserShow)
 import Gonimo.WebAPI (SPParams_(SPParams_))
 import Gonimo.WebAPI.Types (DeviceInfo(DeviceInfo), AuthData(AuthData))
 import Gonimo.WebAPI.Types.Helpers (runAuthData)
@@ -50,15 +51,18 @@ type Props = { settings :: Settings
              , sendActionSocket :: SocketC.Action -> Eff () Unit
              }
 
+type InviteProps = InviteC.Props ()
+
 data Action = ReportError GonimoError
             | SetState State
-            | InviteA InviteC.Action
+            | InviteA (Maybe InviteProps) InviteC.Action
             | AcceptA AcceptC.Action
             | HomeA HomeC.Action
             | SocketA SocketC.Action
             | SetFamilyIds (Array (Key Family))
             | UpdateFamily (Key Family) Family
             | SetCentral Central
+            | RequestCentral CentralReq
             | SetOnlineDevices (Array (Tuple (Key Device) DeviceType))
             | SetDeviceInfos (Array (Tuple (Key Device) DeviceInfo))
             | SetURL String
@@ -70,6 +74,10 @@ data Action = ReportError GonimoError
 data Central = CentralInvite InviteC.State
              | CentralAccept AcceptC.State
              | CentralHome
+
+
+data CentralReq = ReqCentralInvite
+                | ReqCentralHome
 
 centralHome :: Central
 centralHome = CentralHome
@@ -84,6 +92,19 @@ mkProps state = { settings : mkSettings $ state^.authData
                 , deviceInfos : state.deviceInfos
                 , sendActionSocket : lmap SocketA state.sendAction
                 }
+
+mkInviteProps :: State -> Maybe InviteProps
+mkInviteProps state = do
+  familyId' <- state^?currentFamily
+  family' <- Map.lookup familyId' state.families
+  pure $ mkInviteProps' familyId' family' state
+
+mkInviteProps' :: Key Family -> Family -> State -> InviteProps
+mkInviteProps' familyId' family' state =
+  { settings : mkSettings $ state^.authData
+  , rFamilyId : familyId'
+  , rFamily : family'
+  }
 
 mkSettings :: AuthData -> Settings
 mkSettings (AuthData auth) = defaultSettings $ SPParams_ {
@@ -134,3 +155,13 @@ currentFamily = socketS <<< SocketC.currentFamily <<< _Just
 
 familyIds :: LensP State (Array (Key Family))
 familyIds = lens _.familyIds (_ { familyIds = _ })
+
+instance eqCentralReq :: Eq CentralReq where
+  eq ReqCentralInvite ReqCentralInvite = true
+  eq ReqCentralHome ReqCentralHome = true
+  eq _ _ = false
+
+instance userShowCentralReq :: UserShow CentralReq where
+  userShow req = case req of
+    ReqCentralInvite -> "Add Device"
+    ReqCentralHome   -> "Overview"

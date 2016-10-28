@@ -10,6 +10,10 @@ import Data.Generic (class Generic)
 import Data.Maybe (Maybe(Just, Nothing))
 import Unsafe.Coerce (unsafeCoerce)
 
+-- | Things that can be shown to the user
+class UserShow a where
+  userShow  :: a -> String
+
 toString :: forall a. Generic a => a -> String
 toString = show <<< Aeson.encodeJson
 

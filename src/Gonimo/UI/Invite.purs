@@ -39,28 +39,23 @@ import Servant.PureScript.Settings (defaultSettings, SPSettings_(SPSettings_))
 import Signal (constant, Signal)
 import Prelude hiding (div)
 
-type Props ps = { settings :: Settings
-                , familyId :: Maybe (Key Family)
-                , family   :: Maybe Family
+type Props ps = { settings  :: Settings
+                , rFamilyId :: Key Family
+                , rFamily   :: Family
                 | ps
                 }
 
 type State =
   { email          :: String
   , invitationSent :: Boolean
-  , familyId       :: Key Family
-  , family         :: Family
   }
 
-init :: forall ps. Props ps -> Maybe State
-init props = do
-  familyId' <- props.familyId
-  family' <- props.family
-  pure { email : ""
-       , invitationSent : false
-       , familyId : familyId'
-       , family : family'
-       }
+-- | We take our props in init to ensure the caller takes care of providing proper props.
+--   Ensuring this on the first call to update is a tad to late.
+init :: forall ps. Props ps -> State
+init _ = { email : ""
+         , invitationSent : false
+         }
 
 
 data Action = SetEmail String
@@ -117,15 +112,6 @@ viewSend props state =
             ]
     , div [ E.onKeyUp handleEnter ]
       [ div [A.className "input-group"]
-          if isNothing props.familyId -- We can only set the family name here, if we are creating one!
-          then
-          [ p [] [text "Choose a name for your family."]
-          , span [A.className "input-group-addon glyphicon glyphicon-edit"] []
-          , input [ A.type_ "text"
-                  , A.className "form-control"
-                  ] []
-          ]
-          else
           []
 
       , p [] []
