@@ -125,7 +125,7 @@ viewError state = case state.userError of
   AlreadyFamilyMember -> errorView (Just clearError) "You are already a member of this family!"
     $ div []
       [ p [] [ text "You cannot join a family you are already a member of."]
-      , p [] [ text $ "We you want to invite another device, please send another invitation."
+      , p [] [ text $ "If you want to invite another device, please send another invitation."
                     <>"The link you just used, is now invalid! (Security, you know ... )"
              ]
       ]
@@ -141,7 +141,7 @@ viewError state = case state.userError of
       ]
   FamilyNotOnline -> errorView (Just clearError) "Your family is not online!"
     $ div []
-      [ p [] [ text "This should not happen - like ever, if it happens this is a bug. It can also happen if you open gonimo on multiple tabs in the same browser - which currently is not prevented."]
+      [ p [] [ text "This should not happen - like ever, if it happens, this is a bug. It can also happen if you open gonimo on multiple tabs in the same browser - which currently is not prevented (also a shortcoming of the current version)."]
       ]
   InvitationAlreadyClaimed -> errorView (Just clearError) "This invitation is already claimed!"
     $ div []
