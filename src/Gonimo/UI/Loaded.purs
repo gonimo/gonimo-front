@@ -13,8 +13,8 @@ import Gonimo.Client.Router as Router
 import Gonimo.Client.Types as Gonimo
 import Gonimo.UI.AcceptInvitation as AcceptC
 import Gonimo.UI.Error as Error
-import Gonimo.UI.Overview as OverviewC
 import Gonimo.UI.Invite as InviteC
+import Gonimo.UI.Overview as OverviewC
 import Gonimo.UI.Socket as SocketC
 import Gonimo.UI.Socket.Channel as ChannelC
 import Gonimo.UI.Socket.Lenses as SocketC
@@ -89,26 +89,30 @@ import Prelude hiding (div)
 
 
 update :: Update Unit State Action
-update (SetState state)                      = put state *> pure []
-update (ReportError err)                     = handleError err
-update (InviteA _ (InviteC.ReportError err)) = handleError err
-update (InviteA mProps action)               = updateInvite mProps action
-update (AcceptA (AcceptC.ReportError err))   = handleError err
-update (AcceptA action)                      = updateAccept action
-update (SocketA (SocketC.ReportError err))   = handleError err
-update (SocketA action)                      = updateSocket action
-update (OverviewA action)                        = updateOverview action
-update (SetFamilyIds ids)                    = handleSetFamilyIds ids
-update (UpdateFamily familyId' family')      = onlyModify $ \state ->  state { families = Map.insert familyId' family' state.families }
-update (RequestCentral c)                    = handleRequestCentral c
-update (SetCentral c)                        = handleSetCentral c
-update (SetOnlineDevices devices)            = onlyModify $ _ { onlineDevices = devices }
-update (SetDeviceInfos devices)              = onlyModify $ _ { deviceInfos = devices }
-update (SetURL url)                          = handleSetURL url
-update (HandleSubscriber msg)                = handleSubscriber msg
-update ResetDevice                           = handleResetDevice
-update ClearError                            = handleClearError
-update Nop                                   = noEffects
+update (SetState state)                        = put state *> pure []
+update (ReportError err)                       = handleError err
+update (InviteA _ InviteC.GoToOverview)        = handleRequestCentral ReqCentralOverview
+update (InviteA _ InviteC.GoToBabyStation)     = handleRequestCentral ReqCentralOverview -- TODO: Fix me!
+update (InviteA _ (InviteC.ReportError err))   = handleError err
+update (InviteA mProps action)                 = updateInvite mProps action
+update (AcceptA (AcceptC.ReportError err))     = handleError err
+update (AcceptA action)                        = updateAccept action
+update (SocketA (SocketC.ReportError err))     = handleError err
+update (SocketA action)                        = updateSocket action
+update (OverviewA (OverviewC.SocketA socketA)) = updateSocket socketA
+update (OverviewA OverviewC.GoToInviteView)    = handleRequestCentral ReqCentralInvite
+update (OverviewA action)                      = updateOverview action
+update (SetFamilyIds ids)                      = handleSetFamilyIds ids
+update (UpdateFamily familyId' family')        = onlyModify $ \state ->  state { families = Map.insert familyId' family' state.families }
+update (RequestCentral c)                      = handleRequestCentral c
+update (SetCentral c)                          = handleSetCentral c
+update (SetOnlineDevices devices)              = onlyModify $ _ { onlineDevices = devices }
+update (SetDeviceInfos devices)                = onlyModify $ _ { deviceInfos = devices }
+update (SetURL url)                            = handleSetURL url
+update (HandleSubscriber msg)                  = handleSubscriber msg
+update ResetDevice                             = handleResetDevice
+update ClearError                              = handleClearError
+update Nop                                     = noEffects
 
 
 toInvite :: InviteProps -> ToChild Unit State InviteProps InviteC.State
@@ -131,38 +135,26 @@ toSocket = do
 
 updateInvite :: Maybe InviteProps -> InviteC.Action -> ComponentType Unit State Action
 updateInvite mProps iAction = do
-  case iAction of
-    InviteC.GoToOverview -> handleRequestCentral ReqCentralOverview
-    InviteC.GoToBabyStation -> handleRequestCentral ReqCentralOverview
-    _ -> updateInvite' mProps iAction
-  where
-    updateInvite' :: Maybe InviteProps -> InviteC.Action -> ComponentType Unit State Action
-    updateInvite' mProps iAction = do
-      state <- get :: Component Unit State State
-      let props = mkInviteProps state <|> mProps -- State props have higher priority!
-      case props of
-        Nothing -> pure $
-                  [ toIO (mkSettings $ state^.authData) $ do
-                        name <- postFunnyName
-                        fid' <- postFamilies name
-                        family' <- getFamiliesByFamilyId fid'
-                        let newProps = mkInviteProps' fid' family' state
-                        pure $ InviteA (Just newProps) iAction
-                  ]
-        Just rProps ->
-          toParent [] (InviteA Nothing) <<< liftChild (toInvite rProps) <<< InviteC.update $ iAction
+  state <- get :: Component Unit State State
+  let props = mkInviteProps state <|> mProps -- State props have higher priority!
+  case props of
+    Nothing -> pure $
+              [ toIO (mkSettings $ state^.authData) $ do
+                    name <- postFunnyName
+                    fid' <- postFamilies name
+                    family' <- getFamiliesByFamilyId fid'
+                    let newProps = mkInviteProps' fid' family' state
+                    pure $ InviteA (Just newProps) iAction
+              ]
+    Just rProps ->
+      toParent [] (InviteA Nothing) <<< liftChild (toInvite rProps) <<< InviteC.update $ iAction
 
 
 updateAccept :: AcceptC.Action -> ComponentType Unit State Action
 updateAccept = toParent [] AcceptA <<< liftChild toAccept <<< AcceptC.update
 
 updateOverview :: OverviewC.Action -> ComponentType Unit State Action
-updateOverview action = do
-  state <- get :: Component Unit State State
-  case action of
-    OverviewC.SocketA socketA -> updateSocket socketA
-    OverviewC.GoToInviteView  -> handleRequestCentral ReqCentralInvite
-    _                     -> toParent [] OverviewA <<< liftChild toOverview $ OverviewC.update action
+updateOverview = toParent [] OverviewA <<< liftChild toOverview <<< OverviewC.update
 
 updateSocket :: SocketC.Action -> ComponentType Unit State Action
 updateSocket action = do

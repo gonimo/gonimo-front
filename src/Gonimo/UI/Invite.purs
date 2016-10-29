@@ -167,12 +167,12 @@ view props state = div []
                      [ p []
                        [ text "Invitation successfully transmitted? Then go back to overview or make this device a baby station right away .... "
                        ]
-                     , div [ A.className "btn-group", A.role "group" ]
-                       [ button [ A.type_ "button", A.className "btn btn-default"
+                     , div [ A.className "btn-group btn-group-lg", A.role "group" ]
+                       [ button [ A.type_ "button", A.className "btn btn-primary"
                                 , E.onClick $ const $ GoToOverview
                                 ]
                          [ text "Back to Overview" ]
-                       , button [ A.type_ "button", A.className "btn btn-default"
+                       , button [ A.type_ "button", A.className "btn btn-primary"
                                 , E.onClick $ const $ GoToBabyStation
                                 ]
                          [ text "I am a baby station"
