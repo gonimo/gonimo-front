@@ -68,7 +68,7 @@ update action = case action of
   CloseBabyChannel channelId'                    -> do
     isBabyStation' <- gets (_^?channel channelId' <<< _Just <<< to _.isBabyStation)
     case isBabyStation' of
-         Just true                               -> pure $ wrapAction (CloseBabyChannel channelId')
+         Just true                               -> pure $ wrapAction (CloseChannel channelId')
          _                                       -> pure []
   RemoveChannel channelId'                       -> channel channelId' .= Nothing
                                                     *> pure []
