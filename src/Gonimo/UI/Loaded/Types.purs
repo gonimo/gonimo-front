@@ -73,11 +73,13 @@ data Action = ReportError GonimoError
 
 data Central = CentralInvite InviteC.State
              | CentralAccept AcceptC.State
+             | CentralBaby
              | CentralOverview
 
 
 data CentralReq = ReqCentralInvite
                 | ReqCentralOverview
+                | ReqCentralBaby
 
 mkProps :: State -> Props
 mkProps state = { settings : mkSettings $ state^.authData
@@ -157,9 +159,11 @@ familyIds = lens _.familyIds (_ { familyIds = _ })
 instance eqCentralReq :: Eq CentralReq where
   eq ReqCentralInvite ReqCentralInvite = true
   eq ReqCentralOverview ReqCentralOverview = true
+  eq ReqCentralBaby ReqCentralBaby = true
   eq _ _ = false
 
 instance userShowCentralReq :: UserShow CentralReq where
   userShow req = case req of
     ReqCentralInvite -> "Add Device"
     ReqCentralOverview   -> "Overview"
+    ReqCentralBaby   -> "Baby Station"

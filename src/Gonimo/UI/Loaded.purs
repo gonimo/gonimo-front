@@ -196,6 +196,7 @@ handleRequestCentral c = do
                            pure <<< SetCentral $ CentralInvite (InviteC.init invData props)
                       ]
     ReqCentralOverview -> handleSetCentral CentralOverview
+    ReqCentralBaby     -> handleSetCentral CentralBaby
 
 handleSetCentral :: Central -> ComponentType Unit State Action
 handleSetCentral central' = central .= central' *> noEffects
@@ -408,6 +409,7 @@ viewCentral state =
       Just invProps' -> map (InviteA Nothing) $ InviteC.view invProps' s
     CentralAccept s -> map AcceptA $ AcceptC.view s
     CentralOverview     -> map OverviewA   $ OverviewC.view props state.overviewS
+    CentralBaby     -> map SocketA   $ SocketC.view props state.socketS
 
 
 viewOnlineDevices :: State -> Html Action

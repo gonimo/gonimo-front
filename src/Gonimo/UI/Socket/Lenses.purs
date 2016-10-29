@@ -24,6 +24,9 @@ onlineStatus = Lens.lens _."onlineStatus" (_ { "onlineStatus" = _ })
 babyName :: forall a b r. Lens.Lens { "babyName" :: a | r } { "babyName" :: b | r } a b
 babyName = Lens.lens _."babyName" (_ { "babyName" = _ })
 
+newBabyName :: forall a b r. Lens.Lens { "newBabyName" :: a | r } { "newBabyName" :: b | r } a b
+newBabyName = Lens.lens _."newBabyName" (_ { "newBabyName" = _ })
+
 mediaStream :: forall a b r. Lens.Lens { "mediaStream" :: a | r } { "mediaStream" :: b | r } a b
 mediaStream = Lens.lens _."mediaStream" (_ { "mediaStream" = _ })
 

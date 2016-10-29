@@ -6,6 +6,9 @@ import Data.Map as Map
 import Gonimo.Client.Effects as Console
 import Gonimo.UI.Socket.Channel as ChannelC
 import Gonimo.UI.Socket.Channel.Types as ChannelC
+import Pux.Html.Attributes as A
+import Pux.Html.Elements as H
+import Pux.Html.Events as E
 import WebRTC.MediaStream.Track as Track
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff.Class (liftEff)
@@ -14,7 +17,7 @@ import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader (ask, runReader)
 import Control.Monad.Reader.Class (class MonadReader, ask)
 import Control.Monad.State.Class (gets, modify, put, get, class MonadState)
-import Data.Array (fromFoldable)
+import Data.Array (concat, fromFoldable)
 import Data.Foldable (foldl)
 import Data.Lens (use, to, (^?), (^.), _Just, (.=))
 import Data.Map (Map)
@@ -26,8 +29,9 @@ import Data.Tuple (uncurry, snd, Tuple(Tuple))
 import Gonimo.Client.Types (toIO, Settings)
 import Gonimo.Pux (wrapAction, noEffects, runGonimo, Component, liftChild, toParent, ComponentType, makeChildData, ToChild, onlyModify, Update, class MonadComponent)
 import Gonimo.Server.DbEntities (Family(Family), Device(Device))
+import Gonimo.Server.DbEntities.Helpers (runFamily)
 import Gonimo.Types (Secret(Secret), Key(Key))
-import Gonimo.UI.Socket.Lenses (currentFamily, onlineStatus, authData)
+import Gonimo.UI.Socket.Lenses (babyName, currentFamily, onlineStatus, authData, newBabyName)
 import Gonimo.UI.Socket.Message (decodeFromString)
 import Gonimo.UI.Socket.Types (makeChannelId, BabyStation, toCSecret, toTheirId, ChannelId(ChannelId), channel, Props, State, Action(..))
 import Gonimo.WebAPI (postSocketByFamilyIdByToDevice, deleteOnlineStatusByFamilyIdByDeviceId)
@@ -47,6 +51,8 @@ init authData' = { authData : authData'
                  , currentFamily : Nothing
                  , channels : Map.empty
                  , onlineStatus : Nothing
+                 , babyName : ""
+                 , newBabyName : "baby"
                  }
 
 update :: forall ps. Update (Props ps) State Action
@@ -72,6 +78,12 @@ update action = case action of
   (StartBabyStation baby constraints)            -> handleStartBabyStation baby constraints
   (InitBabyStation baby stream)                  -> onlineStatus .= Just { babyName : baby, mediaStream : stream }
                                                     *> pure []
+
+  SetBabyName name                               -> babyName .= name *> pure []
+  SetNewBabyName name                            -> do
+    newBabyName .= name
+    babyName .= name
+    pure []
   (ConnectToBaby babyId)                         -> handleConnectToBaby babyId
   StopBabyStation                                -> handleStopBabyStation
   (ReportError _)                                -> noEffects
@@ -168,8 +180,52 @@ getParentChannels :: State -> Array (Tuple ChannelId ChannelC.State)
 getParentChannels =  Arr.filter (not _.isBabyStation <<< snd ) <<< Arr.fromFoldable
                      <<< Map.toList <<< _.channels
 
--- view :: State -> Html Action
--- view state = 
+view :: forall ps. Props ps -> State -> Html Action
+view = viewBabyNameSelect
+
+viewBabyNameSelect :: forall ps. Props ps -> State -> Html Action
+viewBabyNameSelect props state =
+  let
+    lastBabies = concat
+                 <<< fromFoldable -- Maybe Array -> Array Array
+                 <<< map (_.familyLastUsedBabyNames <<< runFamily)
+                 $ props.family
+
+  in
+    H.div [ A.className "well", A.role "group" ]
+    [ H.div [ A.className "btn-group btn-group btn-group-justified", A.role "group" ]
+      $ viewBabyButton state <$> lastBabies
+    , H.div [ A.className "input-group"]
+      [ H.span [ A.className "input-group-btn"]
+        [
+          H.button [ A.className $ "btn btn-default"
+                                 <> if state.newBabyName == state.babyName
+                                    then " active"
+                                    else ""
+                   , A.type_ "button"
+                   , E.onClick $ const (SetBabyName state.newBabyName) ]
+          [
+            H.text "New baby: "
+          ]
+        ]
+      , H.input [ A.type_ "text", A.className "form-control", A.placeholder "New baby name"
+                , E.onInput $ \ev -> SetNewBabyName ev.target.value
+                , A.value state.newBabyName
+                ] []
+      ]
+    ]
+
+viewBabyButton :: State -> String -> Html Action
+viewBabyButton state baby =
+  H.div [ A.className "btn-group", A.role "group" ]
+  [
+    H.button [ A.className $ "btn btn-default" <> if baby == state.babyName then " active" else ""
+             , A.type_ "button"
+             , E.onClick $ const $ SetBabyName baby
+             ]
+    [ H.text baby ]
+  ]
+
 --   case state.onlineStatus of
 --     Nothing -> text "Sorry - no video there yet!"
 --     Just station -> H.div []

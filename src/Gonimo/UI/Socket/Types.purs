@@ -30,13 +30,16 @@ import WebRTC.RTC (newRTCPeerConnection, RTCPeerConnection)
 
 type Props ps = { settings :: Settings
                 , sendActionSocket :: Action -> Eff () Unit
+                , family :: Maybe Family
                 | ps }
 
 type State =
   { authData :: AuthData
   , currentFamily :: Maybe (Key Family)
   , channels :: Map ChannelId ChannelC.State
-  , onlineStatus :: Maybe BabyStation
+  , babyName :: String
+  , newBabyName :: String -- Name in new baby edit input field.
+  , onlineStatus :: Maybe BabyStation -- TODO: Drop baby name here
   }
 
 type BabyStation = { babyName  :: String
@@ -86,6 +89,10 @@ data Action = AcceptConnection ChannelId
             | StartBabyStation String MediaStreamConstraints
             | InitBabyStation String MediaStream
             | StopBabyStation
+
+            | SetBabyName String
+            | SetNewBabyName String
+
             | ReportError GonimoError
             | Nop
 
