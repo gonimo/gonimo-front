@@ -6,3 +6,9 @@
 /src/.webpack.js
 /dist/gonimo-front.js
 /dist/app.js
+/dist/bootstrap-theme.min.css
+/dist/bootstrap.min.css
+/dist/bootstrap.min.js
+/dist/font-awesome.min.css
+/dist/jquery-2.2.4.min.js
+/dist/template-index.html
