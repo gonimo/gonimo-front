@@ -77,7 +77,7 @@ instance ordChannelId :: Ord ChannelId where
 
 data Action = AcceptConnection ChannelId
             | GetUserMedia
-            | StopUserMedia
+            | StopUserMedia -- Only effective if not a active
             | AddChannel ChannelId ChannelC.State
             | ConnectToBaby (Key Device)
             | CloseChannel ChannelId
@@ -91,7 +91,7 @@ data Action = AcceptConnection ChannelId
             | StartBabyStation
             | InitBabyStation MediaStream
             | SetStreamURL (Maybe String)
-            | StopBabyStation
+            | StopBabyStation 
 
             | SetBabyName String
             | SetNewBabyName String

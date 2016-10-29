@@ -117,7 +117,10 @@ handleGetUserMedia = do
 handleStopUserMedia :: forall ps. ComponentType (Props ps) State Action
 handleStopUserMedia = do
   state <- get :: Component (Props ps) State State
-  case state.localStream of
+  let stream' = if state.isAvailable
+                then Nothing
+                else state.localStream
+  case stream' of
     Nothing -> pure []
     Just stream' -> do
       localStream .= Nothing :: (Maybe MediaStream)
@@ -223,8 +226,10 @@ view props state = H.div []
 
 viewOffline :: forall ps. Props ps -> State -> Html Action
 viewOffline props state = H.div []
-                    [
-                      viewStartButton state
+                    [ case state.streamURL of
+                           Nothing -> H.span [] []
+                           Just url -> H.video [ A.src url, A.autoPlay "true",  A.controls true] []
+                    , viewStartButton state
                     ]
 
 viewOnline :: forall ps. Props ps -> State -> Html Action
