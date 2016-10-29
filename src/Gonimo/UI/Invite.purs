@@ -71,6 +71,8 @@ data Action = SetEmail String
             | ReportError GonimoError
             | MakeNewInvitation
             | SetInvitationData (Key Invitation) Invitation
+            | GoToOverview
+            | GoToBabyStation
             | Nop
 
 instance reportErrorActionAction :: ReportErrorAction Action where
@@ -83,6 +85,8 @@ update action = case action of
   SendInvitation            -> handleSendInvitation
   MakeNewInvitation         -> handleMakeNewInvitation
   SetInvitationData id' inv -> onlyModify $ \state -> state { invitationId = id', invitation = inv }
+  GoToOverview              -> noEffects
+  GoToBabyStation           -> noEffects
   ReportError err           -> noEffects
   Nop                       -> noEffects
 
@@ -152,6 +156,38 @@ view props state = div []
                          [ text " Send Invitation! "
                          , span [A.className "glyphicon glyphicon-send"] []
                          ]
+                       , if state.invitationSent
+                         then div [ A.className "alert alert-success"]
+                              [ text "Invitation successfully sent"
+                              ]
+                         else span [] []
+                       ]
+                     ]
+                   , div [ A.className "well well-lg"]
+                     [ p []
+                       [ text "Invitation successfully transmitted? Then go back to overview or make this device a baby station right away .... "
+                       ]
+                     , div [ A.className "btn-group", A.role "group" ]
+                       [ button [ A.type_ "button", A.className "btn btn-default"
+                                , E.onClick $ const $ GoToOverview
+                                ]
+                         [ text "Back to Overview" ]
+                       , button [ A.type_ "button", A.className "btn btn-default"
+                                , E.onClick $ const $ GoToBabyStation
+                                ]
+                         [ text "I am a baby station"
+                         ]
+                       ]
+
+                     ]
+                   , div [A.className "jumbotron"]
+                     [ p [] [ text "Want to add another device?" ]
+                     , button [ A.className "btn btn-block btn-info"
+                              , A.type_ "button"
+                              , E.onClick $ const $ MakeNewInvitation
+                              ]
+                       [ span [ A.className "glyphicon glyphicon-repeat"] []
+                       , text " Generate new one-time link "
                        ]
                      ]
                    ]

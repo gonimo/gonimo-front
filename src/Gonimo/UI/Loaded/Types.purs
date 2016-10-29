@@ -3,7 +3,7 @@ module Gonimo.UI.Loaded.Types where
 import Prelude
 import Data.Map as Map
 import Gonimo.UI.AcceptInvitation as AcceptC
-import Gonimo.UI.Home as HomeC
+import Gonimo.UI.Overview as OverviewC
 import Gonimo.UI.Invite as InviteC
 import Gonimo.UI.Socket.Lenses as SocketC
 import Gonimo.UI.Socket.Types as SocketC
@@ -29,7 +29,7 @@ import Servant.PureScript.Settings (defaultSettings)
 import Servant.Subscriber.Connection (Notification)
 
 type State = { subscriberUrl :: String
-             , homeS    :: HomeC.State
+             , overviewS    :: OverviewC.State
              , socketS   :: SocketC.State
              , central  :: Central
              , familyIds :: Array (Key Family)
@@ -57,7 +57,7 @@ data Action = ReportError GonimoError
             | SetState State
             | InviteA (Maybe InviteProps) InviteC.Action
             | AcceptA AcceptC.Action
-            | HomeA HomeC.Action
+            | OverviewA OverviewC.Action
             | SocketA SocketC.Action
             | SetFamilyIds (Array (Key Family))
             | UpdateFamily (Key Family) Family
@@ -73,14 +73,11 @@ data Action = ReportError GonimoError
 
 data Central = CentralInvite InviteC.State
              | CentralAccept AcceptC.State
-             | CentralHome
+             | CentralOverview
 
 
 data CentralReq = ReqCentralInvite
-                | ReqCentralHome
-
-centralHome :: Central
-centralHome = CentralHome
+                | ReqCentralOverview
 
 mkProps :: State -> Props
 mkProps state = { settings : mkSettings $ state^.authData
@@ -139,8 +136,8 @@ inviteS = central <<< _CentralInvite
 acceptS :: TraversalP State AcceptC.State
 acceptS = central <<< _CentralAccept
 
-homeS :: LensP State HomeC.State
-homeS = lens _.homeS (_ { homeS = _ })
+overviewS :: LensP State OverviewC.State
+overviewS = lens _.overviewS (_ { overviewS = _ })
 
 central :: LensP State Central
 central = lens _.central (_ { central = _})
@@ -159,10 +156,10 @@ familyIds = lens _.familyIds (_ { familyIds = _ })
 
 instance eqCentralReq :: Eq CentralReq where
   eq ReqCentralInvite ReqCentralInvite = true
-  eq ReqCentralHome ReqCentralHome = true
+  eq ReqCentralOverview ReqCentralOverview = true
   eq _ _ = false
 
 instance userShowCentralReq :: UserShow CentralReq where
   userShow req = case req of
     ReqCentralInvite -> "Add Device"
-    ReqCentralHome   -> "Overview"
+    ReqCentralOverview   -> "Overview"

@@ -7,7 +7,7 @@ import Gonimo.Client.Effects as Gonimo
 import Gonimo.Client.LocalStorage as Key
 import Gonimo.Client.Types as Gonimo
 import Gonimo.UI.AcceptInvitation as AcceptC
-import Gonimo.UI.Home as HomeC
+import Gonimo.UI.Overview as OverviewC
 import Gonimo.UI.Invite as InviteC
 import Gonimo.UI.Loaded as LoadedC
 import Gonimo.UI.Loaded.Types as LoadedC
@@ -214,9 +214,9 @@ load sendAction' = Gonimo.toIO initSettings $ authToAction =<< LoadedC.getAuthDa
     authToAction (authData@(AuthData auth)) = do
       pure $ Init
             { subscriberUrl : "ws://localhost:8081/subscriber"
-            , homeS         : HomeC.init
+            , overviewS         : OverviewC.init
             , socketS       : SocketC.init authData
-            , central       : LoadedC.CentralHome
+            , central       : LoadedC.CentralOverview
             , familyIds     : []
             , families      : Map.empty
             , url           : ""

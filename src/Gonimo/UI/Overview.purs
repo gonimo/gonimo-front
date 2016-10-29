@@ -1,4 +1,4 @@
-module  Gonimo.UI.Home where
+module  Gonimo.UI.Overview where
 
 import Data.Array as Arr
 import Data.Tuple as Tuple
