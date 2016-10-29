@@ -36,8 +36,8 @@ input.funnyName {
 .btn-group {
     width: 100%;
 }
- 
-.btn {
+
+.btn-with-margin {
     margin: 1em;
 }
 
