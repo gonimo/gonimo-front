@@ -92,7 +92,7 @@ update :: Update Unit State Action
 update (SetState state)                        = put state *> pure []
 update (ReportError err)                       = handleError err
 update (InviteA _ InviteC.GoToOverview)        = handleRequestCentral ReqCentralOverview
-update (InviteA _ InviteC.GoToBabyStation)     = handleRequestCentral ReqCentralOverview -- TODO: Fix me!
+update (InviteA _ InviteC.GoToBabyStation)     = handleRequestCentral ReqCentralBaby
 update (InviteA _ (InviteC.ReportError err))   = handleError err
 update (InviteA mProps action)                 = updateInvite mProps action
 update (AcceptA (AcceptC.ReportError err))     = handleError err
