@@ -39,13 +39,16 @@ type State =
   , channels :: Map ChannelId ChannelC.State
   , babyName :: String
   , newBabyName :: String -- Name in new baby edit input field.
-  , onlineStatus :: Maybe MediaStream
+  , isAvailable :: Boolean
+  , localStream :: Maybe MediaStream
+  , streamURL :: Maybe String
+  , constraints :: MediaStreamConstraints
   }
 
 toDeviceType :: State -> DeviceType
-toDeviceType state = case state.onlineStatus of
-  Nothing -> NoBaby
-  Just _ -> Baby state.babyName
+toDeviceType state = if state.isAvailable
+                     then Baby state.babyName
+                     else NoBaby
 
 data ChannelId = ChannelId (Key Device) Secret
 
@@ -73,6 +76,8 @@ instance ordChannelId :: Ord ChannelId where
 
 
 data Action = AcceptConnection ChannelId
+            | GetUserMedia
+            | StopUserMedia
             | AddChannel ChannelId ChannelC.State
             | ConnectToBaby (Key Device)
             | CloseChannel ChannelId
@@ -83,8 +88,9 @@ data Action = AcceptConnection ChannelId
             | SwitchFamily (Key Family)
             | ServerFamilyGoOffline (Key Family) -- | A bit of a hack - for reliably switching families
             | SetAuthData AuthData
-            | StartBabyStation MediaStreamConstraints
+            | StartBabyStation
             | InitBabyStation MediaStream
+            | SetStreamURL (Maybe String)
             | StopBabyStation
 
             | SetBabyName String

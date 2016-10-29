@@ -18,8 +18,8 @@ currentFamily = Lens.lens _."currentFamily" (_ { "currentFamily" = _ })
 channels :: forall a b r. Lens.Lens { "channels" :: a | r } { "channels" :: b | r } a b
 channels = Lens.lens _."channels" (_ { "channels" = _ })
 
-onlineStatus :: forall a b r. Lens.Lens { "onlineStatus" :: a | r } { "onlineStatus" :: b | r } a b
-onlineStatus = Lens.lens _."onlineStatus" (_ { "onlineStatus" = _ })
+isAvailable :: forall a b r. Lens.Lens { "isAvailable" :: a | r } { "isAvailable" :: b | r } a b
+isAvailable = Lens.lens _."isAvailable" (_ { "isAvailable" = _ })
 
 babyName :: forall a b r. Lens.Lens { "babyName" :: a | r } { "babyName" :: b | r } a b
 babyName = Lens.lens _."babyName" (_ { "babyName" = _ })
@@ -29,6 +29,12 @@ newBabyName = Lens.lens _."newBabyName" (_ { "newBabyName" = _ })
 
 mediaStream :: forall a b r. Lens.Lens { "mediaStream" :: a | r } { "mediaStream" :: b | r } a b
 mediaStream = Lens.lens _."mediaStream" (_ { "mediaStream" = _ })
+
+localStream :: forall a b r. Lens.Lens { "localStream" :: a | r } { "localStream" :: b | r } a b
+localStream = Lens.lens _."localStream" (_ { "localStream" = _ })
+
+streamURL :: forall a b r. Lens.Lens { "streamURL" :: a | r } { "streamURL" :: b | r } a b
+streamURL = Lens.lens _."streamURL" (_ { "streamURL" = _ })
 
 _AcceptConnection :: Lens.PrismP Action ChannelId
 _AcceptConnection = Lens.prism AcceptConnection unwrap

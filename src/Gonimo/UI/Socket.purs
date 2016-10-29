@@ -21,7 +21,7 @@ import Data.Array (concat, fromFoldable)
 import Data.Foldable (foldl)
 import Data.Lens (use, to, (^?), (^.), _Just, (.=))
 import Data.Map (Map)
-import Data.Maybe (isJust, maybe, fromMaybe, Maybe(Nothing, Just))
+import Data.Maybe (isNothing, isJust, maybe, fromMaybe, Maybe(Nothing, Just))
 import Data.Monoid (mempty)
 import Data.Profunctor (lmap)
 import Data.Traversable (traverse_)
@@ -31,7 +31,7 @@ import Gonimo.Pux (wrapAction, noEffects, runGonimo, Component, liftChild, toPar
 import Gonimo.Server.DbEntities (Family(Family), Device(Device))
 import Gonimo.Server.DbEntities.Helpers (runFamily)
 import Gonimo.Types (Secret(Secret), Key(Key))
-import Gonimo.UI.Socket.Lenses (babyName, currentFamily, onlineStatus, authData, newBabyName)
+import Gonimo.UI.Socket.Lenses (streamURL, isAvailable, mediaStream, babyName, currentFamily, localStream, authData, newBabyName)
 import Gonimo.UI.Socket.Message (decodeFromString)
 import Gonimo.UI.Socket.Types (makeChannelId, toCSecret, toTheirId, ChannelId(ChannelId), channel, Props, State, Action(..))
 import Gonimo.WebAPI (postSocketByFamilyIdByToDevice, deleteOnlineStatusByFamilyIdByDeviceId)
@@ -41,7 +41,7 @@ import Gonimo.WebAPI.Types (AuthData(AuthData))
 import Gonimo.WebAPI.Types.Helpers (runAuthData)
 import Pux.Html (Html)
 import Servant.Subscriber (Subscriptions)
-import WebRTC.MediaStream (stopStream, MediaStreamConstraints(MediaStreamConstraints), getUserMedia, MediaStream, getTracks)
+import WebRTC.MediaStream (mediaStreamToBlob, createObjectURL, stopStream, MediaStreamConstraints(MediaStreamConstraints), getUserMedia, MediaStream, getTracks)
 import WebRTC.RTC (RTCPeerConnection)
 
 
@@ -50,14 +50,19 @@ init :: AuthData-> State
 init authData' = { authData : authData'
                  , currentFamily : Nothing
                  , channels : Map.empty
-                 , onlineStatus : Nothing
+                 , isAvailable : false
+                 , localStream : Nothing
+                 , streamURL : Nothing
                  , babyName : "baby"
                  , newBabyName : "baby"
+                 , constraints : MediaStreamConstraints { audio : true, video : true }
                  }
 
 update :: forall ps. Update (Props ps) State Action
 update action = case action of
   AcceptConnection channelId'                    -> handleAcceptConnection channelId'
+  GetUserMedia                                   -> handleGetUserMedia
+  StopUserMedia                                  -> handleStopUserMedia
   AddChannel channelId' cState                   -> do channel channelId' .= Just cState
                                                        updateChannel channelId' ChannelC.InitConnection
   ChannelA channelId' (ChannelC.ReportError err) -> pure [pure $ ReportError err]
@@ -72,21 +77,22 @@ update action = case action of
          _                                       -> pure []
   RemoveChannel channelId'                       -> channel channelId' .= Nothing
                                                     *> pure []
-  (SwitchFamily familyId')                       -> handleFamilySwitch familyId'
-  (ServerFamilyGoOffline familyId)               -> handleServerFamilyGoOffline familyId
-  (SetAuthData auth)                             -> handleSetAuthData auth
-  (StartBabyStation constraints)                 -> handleStartBabyStation constraints
-  (InitBabyStation stream)                       -> onlineStatus .= Just stream
-                                                    *> pure []
+  SwitchFamily familyId'                       -> handleFamilySwitch familyId'
+  ServerFamilyGoOffline familyId               -> handleServerFamilyGoOffline familyId
+  SetAuthData auth                             -> handleSetAuthData auth
+  StartBabyStation                             -> handleStartBabyStation
+  InitBabyStation stream                       -> handleInitBabyStation stream
+  SetStreamURL url                             -> streamURL .= url -- TODO: On Nothing we should free the url.
+                                                  *> pure []
 
   SetBabyName name                               -> babyName .= name *> pure []
   SetNewBabyName name                            -> do
     newBabyName .= name
     babyName .= name
     pure []
-  (ConnectToBaby babyId)                         -> handleConnectToBaby babyId
+  ConnectToBaby babyId                         -> handleConnectToBaby babyId
   StopBabyStation                                -> handleStopBabyStation
-  (ReportError _)                                -> noEffects
+  ReportError _                                -> noEffects
   Nop                                            -> noEffects
 
 
@@ -100,17 +106,51 @@ toChannel channelId' = do
     props = mkChannelProps pProps state channelId'
   pure $ makeChildData (channel channelId' <<< _Just) props
 
-handleStartBabyStation :: forall ps.
-                          MediaStreamConstraints
+handleGetUserMedia :: forall ps. ComponentType (Props ps) State Action
+handleGetUserMedia = do
+  state <- get :: Component (Props ps) State State
+  case state.localStream of
+    Nothing -> runGonimo $
+        InitBabyStation <$> liftAff (getUserMedia state.constraints)
+    Just _ -> pure []
+
+handleStopUserMedia :: forall ps. ComponentType (Props ps) State Action
+handleStopUserMedia = do
+  state <- get :: Component (Props ps) State State
+  case state.localStream of
+    Nothing -> pure []
+    Just stream' -> do
+      localStream .= Nothing :: (Maybe MediaStream)
+      pure [ do
+                liftEff $ stopStream stream'
+                pure Nop
+           ]
+
+handleStartBabyStation :: forall ps. ComponentType (Props ps) State Action
+handleStartBabyStation = do
+  state <- get :: Component (Props ps) State State
+  if isJust state.localStream
+    then isAvailable .= true
+    else isAvailable .= false
+  noEffects
+
+handleInitBabyStation :: forall ps.
+                          MediaStream
                        -> ComponentType (Props ps) State Action
-handleStartBabyStation constraints =
-  runGonimo $
-    InitBabyStation <$> liftAff (getUserMedia constraints)
+handleInitBabyStation stream = do
+  localStream .= Just stream
+  pure [ do
+            url <- liftEff <<< createObjectURL <<< mediaStreamToBlob $ stream
+            pure $ SetStreamURL (Just url)
+       ]
 
 handleAcceptConnection :: forall ps. ChannelId -> ComponentType (Props ps) State  Action
 handleAcceptConnection channelId' = do
   state <- get
-  pure [ AddChannel channelId' <$> ChannelC.init state.onlineStatus ]
+  if state.isAvailable
+    then pure [ AddChannel channelId' <$> ChannelC.init state.localStream ]
+    else pure []
+
 
 handleFamilySwitch :: forall ps. Key Family -> ComponentType (Props ps) State Action
 handleFamilySwitch familyId' = do
@@ -132,14 +172,8 @@ handleStopBabyStation :: forall ps. ComponentType (Props ps) State Action
 handleStopBabyStation = do
   state <- get :: Component (Props ps) State State
   props <- ask :: Component (Props ps) State (Props ps)
-  onlineStatus .= (Nothing :: Maybe MediaStream)
-  let action = case state.onlineStatus of
-        Nothing -> []
-        Just stream -> [ toIO props.settings <<< liftEff $ do
-                             stopStream stream
-                             pure Nop
-                        ]
-  pure $ doCleanup state CloseBabyChannel action
+  isAvailable .= false
+  pure $ doCleanup state CloseBabyChannel []
 
 handleServerFamilyGoOffline :: forall ps. Key Family -> ComponentType (Props ps) State Action
 handleServerFamilyGoOffline familyId = do
@@ -182,10 +216,19 @@ getParentChannels =  Arr.filter (not _.isBabyStation <<< snd ) <<< Arr.fromFolda
 view :: forall ps. Props ps -> State -> Html Action
 view props state = H.div []
        [ viewBabyNameSelect props state
-       , if isJust state.onlineStatus
-         then viewStopButton state
-         else viewStartButton state
+       , if state.isAvailable
+         then viewOnline props state
+         else viewOffline props state
        ]
+
+viewOffline :: forall ps. Props ps -> State -> Html Action
+viewOffline props state = H.div []
+                    [
+                      viewStartButton state
+                    ]
+
+viewOnline :: forall ps. Props ps -> State -> Html Action
+viewOnline props = viewStopButton
 
 viewBabyNameSelect :: forall ps. Props ps -> State -> Html Action
 viewBabyNameSelect props state =
@@ -248,12 +291,25 @@ viewStartButton state =
   H.div [ A.className "btn-group", A.role "group" ]
   [
     H.button [ A.className "btn btn-block btn-info"
+             , A.disabled $ isNothing state.localStream
              , A.type_ "button"
-             , E.onClick $ const $ StartBabyStation (MediaStreamConstraints { video : true, audio : true })
+             , E.onClick $ const $ StartBabyStation
              ]
     [ H.text $ "Start Baby Station for cute " <> state.babyName <> " "
     , H.span [A.className "glyphicon glyphicon-transfer"] []
     ]
+  , H.div []
+    $ if isNothing state.localStream
+      then [ H.div [ A.className "alert alert-danger" ]
+             [ H.p [] [ H.text "We need to enable your camera/microphone first." ]
+             , H.button [ A.className "btn btn-block btn-default"
+                         , A.type_ "button"
+                         , E.onClick $ const $ GetUserMedia
+                         ]
+               [ H.text "Enable camera/microphone!" ]
+             ]
+           ]
+      else []
   ]
   --   case state.onlineStatus of
 --     Nothing -> text "Sorry - no video there yet!"
@@ -298,10 +354,11 @@ getSubscriptions props state =
     subArray :: Array (Subscriptions Action)
     subArray = map (flip runReader props.settings)
                 $ getChannelsSubscriptions state.channels
-                <> ( fromFoldable $ do
-                        r <- state.onlineStatus -- Get only online if a baby.
-                        familyId'' <- familyId'
-                        pure $ receiveAChannel authData'.deviceId familyId''
+                <> ( if state.isAvailable
+                     then fromFoldable $ do
+                               familyId'' <- familyId'
+                               pure $ receiveAChannel authData'.deviceId familyId''
+                     else []
                    )
   in
      foldl append mempty subArray

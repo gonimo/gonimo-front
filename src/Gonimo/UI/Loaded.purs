@@ -72,7 +72,7 @@ import Gonimo.WebAPI.Types.Helpers (runAuthData)
 import Partial.Unsafe (unsafeCrashWith)
 import Pux (renderToDOM, fromSimple, start)
 import Pux.Html (text, small, script, li, i, a, nav, h3, h2, td, tbody, th, tr, thead, table, ul, p, button, input, h1, span, Html, img, div)
-import Pux.Html.Attributes (letterSpacing, offset)
+import Pux.Html.Attributes (offset, letterSpacing)
 import Pux.Html.Events (FormEvent, FocusEvent)
 import Pux.Router (navigateTo)
 import Servant.PureScript.Affjax (AjaxError)
@@ -177,11 +177,11 @@ handleResetDevice = do
 handleRequestCentral :: CentralReq -> ComponentType Unit State Action
 handleRequestCentral c = do
   state <- get
-  case c of
-    ReqCentralInvite -> do
+  r <- case c of
+    ReqCentralInvite   -> do
       let invProps = mkInviteProps state
       case invProps of
-        Nothing -> pure
+        Nothing    -> pure
                    [ toIO (mkSettings $ state^.authData) $ do
                         name <- postFunnyName
                         fid' <- postFamilies name
@@ -196,7 +196,13 @@ handleRequestCentral c = do
                            pure <<< SetCentral $ CentralInvite (InviteC.init invData props)
                       ]
     ReqCentralOverview -> handleSetCentral CentralOverview
-    ReqCentralBaby     -> handleSetCentral CentralBaby
+    ReqCentralBaby     -> do
+                          handleSetCentral CentralBaby
+                          pure [ pure $ SocketA SocketC.GetUserMedia ]
+  case Tuple state.central c of
+    Tuple CentralBaby ReqCentralBaby -> pure r
+    Tuple CentralBaby _              -> pure $ [ pure $ SocketA SocketC.StopUserMedia ] <> r
+    Tuple _ _                        -> pure r
 
 handleSetCentral :: Central -> ComponentType Unit State Action
 handleSetCentral central' = central .= central' *> noEffects
