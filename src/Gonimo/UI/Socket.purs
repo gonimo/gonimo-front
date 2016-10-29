@@ -21,7 +21,7 @@ import Data.Array (concat, fromFoldable)
 import Data.Foldable (foldl)
 import Data.Lens (use, to, (^?), (^.), _Just, (.=))
 import Data.Map (Map)
-import Data.Maybe (maybe, fromMaybe, Maybe(Nothing, Just))
+import Data.Maybe (isJust, maybe, fromMaybe, Maybe(Nothing, Just))
 import Data.Monoid (mempty)
 import Data.Profunctor (lmap)
 import Data.Traversable (traverse_)
@@ -33,7 +33,7 @@ import Gonimo.Server.DbEntities.Helpers (runFamily)
 import Gonimo.Types (Secret(Secret), Key(Key))
 import Gonimo.UI.Socket.Lenses (babyName, currentFamily, onlineStatus, authData, newBabyName)
 import Gonimo.UI.Socket.Message (decodeFromString)
-import Gonimo.UI.Socket.Types (makeChannelId, BabyStation, toCSecret, toTheirId, ChannelId(ChannelId), channel, Props, State, Action(..))
+import Gonimo.UI.Socket.Types (makeChannelId, toCSecret, toTheirId, ChannelId(ChannelId), channel, Props, State, Action(..))
 import Gonimo.WebAPI (postSocketByFamilyIdByToDevice, deleteOnlineStatusByFamilyIdByDeviceId)
 import Gonimo.WebAPI.Lenses (deviceId, _AuthData)
 import Gonimo.WebAPI.Subscriber (receiveSocketByFamilyIdByToDevice, receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
@@ -51,7 +51,7 @@ init authData' = { authData : authData'
                  , currentFamily : Nothing
                  , channels : Map.empty
                  , onlineStatus : Nothing
-                 , babyName : ""
+                 , babyName : "baby"
                  , newBabyName : "baby"
                  }
 
@@ -75,8 +75,8 @@ update action = case action of
   (SwitchFamily familyId')                       -> handleFamilySwitch familyId'
   (ServerFamilyGoOffline familyId)               -> handleServerFamilyGoOffline familyId
   (SetAuthData auth)                             -> handleSetAuthData auth
-  (StartBabyStation baby constraints)            -> handleStartBabyStation baby constraints
-  (InitBabyStation baby stream)                  -> onlineStatus .= Just { babyName : baby, mediaStream : stream }
+  (StartBabyStation constraints)                 -> handleStartBabyStation constraints
+  (InitBabyStation stream)                       -> onlineStatus .= Just stream
                                                     *> pure []
 
   SetBabyName name                               -> babyName .= name *> pure []
@@ -101,12 +101,11 @@ toChannel channelId' = do
   pure $ makeChildData (channel channelId' <<< _Just) props
 
 handleStartBabyStation :: forall ps.
-                          String
-                       -> MediaStreamConstraints
+                          MediaStreamConstraints
                        -> ComponentType (Props ps) State Action
-handleStartBabyStation baby constraints =
+handleStartBabyStation constraints =
   runGonimo $
-    InitBabyStation baby <$> liftAff (getUserMedia constraints)
+    InitBabyStation <$> liftAff (getUserMedia constraints)
 
 handleAcceptConnection :: forall ps. ChannelId -> ComponentType (Props ps) State  Action
 handleAcceptConnection channelId' = do
@@ -133,11 +132,11 @@ handleStopBabyStation :: forall ps. ComponentType (Props ps) State Action
 handleStopBabyStation = do
   state <- get :: Component (Props ps) State State
   props <- ask :: Component (Props ps) State (Props ps)
-  onlineStatus .= (Nothing :: Maybe BabyStation)
+  onlineStatus .= (Nothing :: Maybe MediaStream)
   let action = case state.onlineStatus of
         Nothing -> []
-        Just station -> [ toIO props.settings <<< liftEff $ do
-                             stopStream station.mediaStream
+        Just stream -> [ toIO props.settings <<< liftEff $ do
+                             stopStream stream
                              pure Nop
                         ]
   pure $ doCleanup state CloseBabyChannel action
@@ -181,7 +180,12 @@ getParentChannels =  Arr.filter (not _.isBabyStation <<< snd ) <<< Arr.fromFolda
                      <<< Map.toList <<< _.channels
 
 view :: forall ps. Props ps -> State -> Html Action
-view = viewBabyNameSelect
+view props state = H.div []
+       [ viewBabyNameSelect props state
+       , if isJust state.onlineStatus
+         then viewStopButton state
+         else viewStartButton state
+       ]
 
 viewBabyNameSelect :: forall ps. Props ps -> State -> Html Action
 viewBabyNameSelect props state =
@@ -226,7 +230,32 @@ viewBabyButton state baby =
     [ H.text baby ]
   ]
 
---   case state.onlineStatus of
+viewStopButton :: State -> Html Action
+viewStopButton state =
+    H.div [ A.className "btn-group", A.role "group" ]
+    [ H.h2 [] [ H.text $ "Baby monitor running for cute " <> state.babyName <> " ..." ]
+    , H.button [ A.className "btn btn-block btn-danger"
+                , A.type_ "button"
+                , E.onClick $ const $ StopBabyStation
+                ]
+      [ H.text "Stop Baby Monitor "
+      , H.span [A.className "glyphicon glyphicon-off"] []
+      ]
+    ]
+
+viewStartButton :: State -> Html Action
+viewStartButton state =
+  H.div [ A.className "btn-group", A.role "group" ]
+  [
+    H.button [ A.className "btn btn-block btn-info"
+             , A.type_ "button"
+             , E.onClick $ const $ StartBabyStation (MediaStreamConstraints { video : true, audio : true })
+             ]
+    [ H.text $ "Start Baby Station for cute " <> state.babyName <> " "
+    , H.span [A.className "glyphicon glyphicon-transfer"] []
+    ]
+  ]
+  --   case state.onlineStatus of
 --     Nothing -> text "Sorry - no video there yet!"
 --     Just station -> H.div []
 --                     [ text $ "Got video, is enabled: "

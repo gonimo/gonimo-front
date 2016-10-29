@@ -19,7 +19,6 @@ import Gonimo.WebAPI.Types (DeviceInfo(..))
 import Prelude (class BooleanAlgebra)
 import Pux.Html (span, text, button, div, Html)
 import Pux.Html.Attributes (letterSpacing)
-import WebRTC.MediaStream (MediaStreamConstraints(MediaStreamConstraints))
 import Prelude hiding (div)
 
 
@@ -44,9 +43,6 @@ data Action = SocketA SocketC.Action
 connectToBaby :: Key Device -> Action
 connectToBaby = SocketA <<< SocketC.ConnectToBaby
 
-startBabyStation :: String -> MediaStreamConstraints -> Action
-startBabyStation name constraints = SocketA $ SocketC.StartBabyStation name constraints
-
 stopBabyStation :: Action
 stopBabyStation = SocketA SocketC.StopBabyStation
 
@@ -65,7 +61,7 @@ view props state = div []
                    , viewAvailableBabies props state
                    ,
                      case props.onlineStatus of
-                       NoBaby -> viewOffline props state
+                       NoBaby -> div [] []
                        Baby name -> viewOnline name
                    ]
 
@@ -138,57 +134,18 @@ viewOnline name =
       ]
     ]
 
-viewOffline :: forall ps. Props ps -> State -> Html Action
-viewOffline props state =
-  let
-    lastBabies = concat
-                 <<< fromFoldable -- Maybe Array -> Array Array
-                 <<< map (_.familyLastUsedBabyNames <<< runFamily)
-                 $ props.family
-  in
-    H.div [ A.className "jumbotron" ]
-    [ H.div [ A.className "container" ]
-      $ [ H.h2 [] [ text "Start baby monitor for ..." ]
-        ]
-        <> map (wrappingBox viewStartButton) lastBabies
-        <> [ wrappingBox viewStartNewBaby state.newBabyName ]
-    ]
 
-viewStartButton :: String -> Html Action
-viewStartButton baby =
-  button [ A.className "btn btn-block btn-info"
-         , A.style [Tuple "margin-left" "0px"]
-         , A.type_ "button"
-         , E.onClick $ const $ startBabyStation baby
-                                 (MediaStreamConstraints { video : true, audio : true })
-         ]
-  [ text $ baby <> " "
-  , span [A.className "glyphicon glyphicon-transfer"] []
-  ]
-
-viewStartNewBaby :: String -> Html Action
-viewStartNewBaby name =
-  div []
-  [ H.label [ A.htmlFor "newBabyNameInput" ] [ text "Baby Name: " ]
-  , H.input [ A.type_ "text", A.className "formControl"
-            , E.onInput $ \ev -> SetBabyName ev.target.value
-            , A.value name
-            , A.id_ "newBabyNameInput"
-            ] []
-  , viewStartButton name
-  ]
-
-wrappingBox :: (String -> Html Action) -> String -> Html Action
-wrappingBox inner name = H.div [ E.onKeyUp handleEnter
-                               , A.style
-                                 [ Tuple "padding" "1em"
-                                 , Tuple "border-bottom" "1px solid #ccc"
-                                 ]
-                               ]
-                         [ inner name ]
-  where
-    handleEnter :: E.KeyboardEvent -> Action
-    handleEnter ev = if ev.keyCode == 13 then startBabyStation name (MediaStreamConstraints { audio : true, video : true }) else Nop
+-- wrappingBox :: (String -> Html Action) -> String -> Html Action
+-- wrappingBox inner name = H.div [ E.onKeyUp handleEnter
+--                                , A.style
+--                                  [ Tuple "padding" "1em"
+--                                  , Tuple "border-bottom" "1px solid #ccc"
+--                                  ]
+--                                ]
+--                          [ inner name ]
+  -- where
+    -- handleEnter :: E.KeyboardEvent -> Action
+    -- handleEnter ev = if ev.keyCode == 13 then startBabyStation name (MediaStreamConstraints { audio : true, video : true }) else Nop
 
 -- getSubscriptions :: forall ps. Props ps -> State -> Subscriptions Action
 -- getSubscriptions props _ =

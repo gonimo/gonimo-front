@@ -511,7 +511,7 @@ getPongRequest :: State -> Maybe HttpRequest
 getPongRequest state =
   let
     deviceId = (runAuthData $ state^.authData).deviceId
-    onlineStatus' = state ^. socketS <<< SocketC.onlineStatus <<< to SocketC.toDeviceType
+    onlineStatus' = state ^. socketS <<< to SocketC.toDeviceType
     deviceData = Tuple deviceId onlineStatus'
     familyId = state^?currentFamily
   in

@@ -27,7 +27,6 @@ import Gonimo.Types (Secret(Secret), Key(Key))
 import Gonimo.UI.Socket.Channel.Types (Action, Action(..), State, Props)
 import Gonimo.UI.Socket.Lenses (mediaStream)
 import Gonimo.UI.Socket.Message (runMaybeIceCandidate, MaybeIceCandidate(JustIceCandidate, NoIceCandidate), encodeToString, decodeFromString, Message)
-import Gonimo.UI.Socket.Types (BabyStation)
 import Gonimo.Util (coerceEffects)
 import Gonimo.WebAPI (putSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
 import Gonimo.WebAPI.Subscriber (receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
@@ -40,17 +39,16 @@ import WebRTC.RTC (MediaStreamEvent, setLocalDescription, createAnswer, iceEvent
 
 
 
-init :: Maybe BabyStation -> IO State
-init babyStation = do
+init :: Maybe MediaStream -> IO State
+init stream = do
   rtcConnection <- liftEff (newRTCPeerConnection { iceServers : [ {url : "stun:stun.l.google.com:19302"} ] })
-  let sockStream = _.mediaStream <$> babyStation
   ourStream <- runMaybeT $ do
-    origStream <- MaybeT <<< pure $ sockStream
+    origStream <- MaybeT <<< pure $ stream
     liftEff $ MediaStream.clone origStream
   pure $  { mediaStream : ourStream
           , remoteStream : Nothing
           , rtcConnection : rtcConnection
-          , isBabyStation : isJust babyStation
+          , isBabyStation : isJust stream
           }
 
 

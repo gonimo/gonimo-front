@@ -85,7 +85,7 @@ mkProps :: State -> Props
 mkProps state = { settings : mkSettings $ state^.authData
                 , deviceId : (runAuthData $ state^.authData).deviceId
                 , familyId : state^?currentFamily
-                , onlineStatus  : state ^. socketS <<< SocketC.onlineStatus <<< to SocketC.toDeviceType
+                , onlineStatus  : state^.socketS <<< to SocketC.toDeviceType
                 , family : flip Map.lookup state.families =<< state^?currentFamily
                 , onlineDevices : state.onlineDevices
                 , deviceInfos : state.deviceInfos
