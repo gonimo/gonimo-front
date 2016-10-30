@@ -175,13 +175,13 @@ view props state =
                                            <> state.email <> "'!"
                                       , br [] []
                                       , small [] [text $ "But don't forget to add"
-                                            <> " 'noreply@gonimo.com' to your adress book,"
+                                            <> " 'noreply@gonimo.com' to your address book,"
                                             <> " otherwise this invitation might end up in"
                                             <> " your spam-folder!"]
                                       ]
-                              , button [ A.className "btn btn-block btn-primary"
+                              , button [ A.className "btn btn-block btn-default"
                                        , A.style [Tuple "margin-left" "0px"] ]
-                                [ text $ "Oops … - sent the invitation to the wrong recepient."
+                                [ text $ "Oops - Did you send the invitation to the wrong recipient?"
                                 , br [] [] 
                                 , text "No problem just click me and then and then 'decline' to invalidate the link."
                                 , br [] []
