@@ -192,11 +192,15 @@ view state = if state.isBabyStation
 viewParentStation :: State -> Html Action
 viewParentStation state =
   case state.remoteStream of
-    Nothing -> text "Sorry - no video there yet!"
+    Nothing -> text $ "Sorry - no video there yet, please check that your camera/microphone"
+                   <> "are enabled and your browser allows us to access it."
     Just stream -> H.div []
                    [ text $ "Got video, is enabled: "
                           <> show ((unsafeCoerce stream.stream).enabled :: Boolean)
-                   , H.video [ A.src stream.objectURL, A.autoPlay "true",  A.controls true] []
+                   , H.video [ A.className "thumbnail"
+                             , A.src stream.objectURL
+                             , A.autoPlay "true"
+                             , A.controls true] []
                    ]
 
 
