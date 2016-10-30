@@ -225,12 +225,20 @@ view props state = H.div []
        ]
 
 viewOffline :: forall ps. Props ps -> State -> Html Action
-viewOffline props state = H.div []
-                    [ case state.streamURL of
-                           Nothing -> H.span [] []
-                           Just url -> H.video [ A.src url, A.autoPlay "true",  A.controls true] []
-                    , viewStartButton state
-                    ]
+viewOffline props state =
+    H.div [A.className "container"] [
+        H.div [A.className "jumbotron"]
+          [ H.div [A.style [ Tuple "margin" "0 auto"
+                           , Tuple "width" "640px"]]
+            [ case state.streamURL of
+                Nothing -> H.span [] []
+                Just url -> H.video [ A.src url
+                                    , A.autoPlay "true"
+                                    , A.controls true] []
+          , viewStartButton state
+          ]
+        ]
+      ]
 
 viewOnline :: forall ps. Props ps -> State -> Html Action
 viewOnline props = viewStopButton
@@ -243,59 +251,59 @@ viewBabyNameSelect props state =
                  <<< map (_.familyLastUsedBabyNames <<< runFamily)
                  $ props.family
 
-  in
-    H.div [ A.className "well", A.role "group" ]
-    [ H.div [ A.className "btn-group btn-group btn-group-justified", A.role "group" ]
-      $ viewBabyButton state <$> lastBabies
-    , H.div [ A.className "input-group"]
-      [ H.span [ A.className "input-group-btn"]
-        [
-          H.button [ A.className $ "btn btn-default"
-                                 <> if state.newBabyName == state.babyName
-                                    then " active"
-                                    else ""
-                   , A.type_ "button"
-                   , E.onClick $ const (SetBabyName state.newBabyName) ]
-          [
-            H.text "New baby: "
-          ]
-        ]
-      , H.input [ A.type_ "text", A.className "form-control", A.placeholder "New baby name"
-                , E.onInput $ \ev -> SetNewBabyName ev.target.value
-                , A.value state.newBabyName
-                ] []
-      ]
-    ]
+   in
+    H.div [ A.className "container"]
+     [ H.div [ A.className "well", A.role "group" ]
+       [ H.h3 [] [ H.text "Select a name for your baby station"
+                 , H.br [][]
+                 , H.small [] [H.text "the last few names you used were:"]]
+       , H.div [ A.className "list-group", A.role "group" ]
+         $ (viewBabyButton state <$> lastBabies) <>
+         [ H.a [ A.className $ "list-group-item "
+                                    <> if state.newBabyName == state.babyName
+                                       then "active"
+                                       else "list-group-item-action"
+               , E.onClick $ const (SetBabyName state.newBabyName) ]
+             [ H.div [] [H.text "Or select a new name for this baby station "]
+             , H.input [ A.type_ "text", A.className "form-control", A.placeholder "New baby name"
+                   , E.onInput $ \ev -> SetNewBabyName ev.target.value
+                   , A.value state.newBabyName ] []
+             ]
+         ]
+       ]
+     ]
 
 viewBabyButton :: State -> String -> Html Action
 viewBabyButton state baby =
-  H.div [ A.className "btn-group", A.role "group" ]
-  [
-    H.button [ A.className $ "btn btn-default" <> if baby == state.babyName then " active" else ""
-             , A.type_ "button"
-             , E.onClick $ const $ SetBabyName baby
-             ]
-    [ H.text baby ]
-  ]
+  H.a [ A.className $ "list-group-item " <> if baby == state.babyName
+                                              then "active"
+                                              else "list-group-item-action"
+      , E.onClick $ const $ SetBabyName baby
+      ] [ H.text baby ]
+
 
 viewStopButton :: State -> Html Action
 viewStopButton state =
-    H.div [ A.className "btn-group", A.role "group" ]
-    [ H.h2 [] [ H.text $ "Baby monitor running for cute " <> state.babyName <> " ..." ]
-    , H.button [ A.className "btn btn-block btn-danger"
-                , A.type_ "button"
-                , E.onClick $ const $ StopBabyStation
-                ]
-      [ H.text "Stop Baby Monitor "
-      , H.span [A.className "glyphicon glyphicon-off"] []
+    H.div [A.className "container"]
+      [ H.div [ A.className "btn-group", A.role "group" ]
+        [ H.h3 [] [ H.text $ "Baby monitor running for cute " <> state.babyName <> " …"]
+        , H.button [ A.className "btn btn-block btn-danger"
+                   , A.style [ Tuple "margin-left" "0px" ]
+                   , A.type_ "button"
+                   , E.onClick $ const $ StopBabyStation
+                   ]
+          [ H.text "Stop Baby Monitor "
+          , H.span [A.className "glyphicon glyphicon-off"] []
+          ]
+        ]
       ]
-    ]
 
 viewStartButton :: State -> Html Action
 viewStartButton state =
-  H.div [ A.className "btn-group", A.role "group" ]
+  H.div []
   [
     H.button [ A.className "btn btn-block btn-info"
+             , A.style [ Tuple "margin-left" "0px" ]
              , A.disabled $ isNothing state.localStream
              , A.type_ "button"
              , E.onClick $ const $ StartBabyStation
@@ -308,9 +316,10 @@ viewStartButton state =
       then [ H.div [ A.className "alert alert-danger" ]
              [ H.p [] [ H.text "We need to enable your camera/microphone first." ]
              , H.button [ A.className "btn btn-block btn-default"
-                         , A.type_ "button"
-                         , E.onClick $ const $ GetUserMedia
-                         ]
+                        , A.style [ Tuple "margin-left" "0px" ]
+                        , A.type_ "button"
+                        , E.onClick $ const $ GetUserMedia
+                        ]
                [ H.text "Enable camera/microphone!" ]
              ]
            ]

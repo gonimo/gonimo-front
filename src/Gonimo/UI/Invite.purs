@@ -34,8 +34,9 @@ import Gonimo.WebAPI (postInvitationsOutbox, postInvitationsByFamilyId, postFami
 import Gonimo.WebAPI.Types (AuthData(AuthData))
 import Partial.Unsafe (unsafeCrashWith)
 import Pux (renderToDOM, fromSimple, start)
-import Pux.Html (button, i, input, p, h1, h2, h3, text, span, Html, img, div)
+import Pux.Html (a, button, br, i, input, p, h1, h2, h3, text, span, Html, img, div, small, li, ul, nav)
 import Pux.Html.Attributes (offset)
+import Pux.Html.Attributes.Aria as A
 import Servant.PureScript.Affjax (AjaxError)
 import Servant.PureScript.Settings (gDefaultEncodeURLPiece, defaultSettings, SPSettings_(SPSettings_))
 import Signal (constant, Signal)
@@ -114,29 +115,41 @@ handleSendInvitation = do
 --------------------------------------------------------------------------------
 
 view :: forall ps. Props ps -> State -> Html Action
-view props state = div []
-                   [ div [A.className "jumbotron"]
+view props state =
+    let invitationLink = makeInviteLink (props.baseURL) state.invitation
+     in div []
+                   [ div [A.className "page-header"]
                      [ div [A.className "container"]
-                       [ h3 [] [ text "Welcome to Gonimo!"]
-                       , p []  [ text "In order to add another device, you have to visit the following one-time link on another device."
+                       [ h3 [] [ text "Device Management"
+                               , br [] []
+                               , small []
+                                 [ text $ "Here you can add new devices to your"
+                                       <> " families, you only have to visit the"
+                                       <> " following one-time link on another device." ]
                                ]
                        ]
                      ]
-                   , div [A.className "jumbotron"]
-                     [ div [A.className "container"]
-                       [ p []
-                         [ text "Copy & Paste it in order to send it, e.g. with WhatsApp ..." ]
+                   , div [A.className "container"]
+                     [ h3 [] [text "copy & paste"]
+                     , div [A.className "jumbotron"]
+                       [ p [] [ text $ "You can either copy & paste it in to your"
+                                    <> " favourite messenger (e.g. WhatsApp) to"
+                                    <> " send it."
+                              ]
                        , div [ A.className "input-group" ]
                            [ span [ A.className "input-group-addon glyphicon glyphicon-copy", A.id_ "sdflkjsll291" ]
                              []
                            , input [ A.type_ "text", A.className "form-control", A.readOnly true
-                                   , A.value (makeInviteLink (props.baseURL) state.invitation) ] []
+                                   , A.value (makeInviteLink (props.baseURL) state.invitation)
+                                   ] []
                            ]
                        ]
                      ]
-                   , div [A.className "jumbotron"]
-                     [ div [A.className "container"]
-                       [ p []  [ text "Or you can send it via email ..." ]
+                   , div [A.className "container"]
+                     [ h3 [] [text "email"]
+                     , div [A.className "jumbotron"]
+                       [ p []  [ text "Or you can let us do the work send it via email …"
+                               ]
                        , div [ E.onKeyUp handleEnter ]
                          [ div [A.className "input-group"]
                            [ span [A.className "input-group-addon glyphicon glyphicon-envelope"] []
@@ -158,25 +171,43 @@ view props state = div []
                          ]
                        , if state.invitationSent
                          then div [ A.className "alert alert-success"]
-                              [ text "Invitation successfully sent"
+                              [ h3 [] [text $ "Invitation sent successfully to '"
+                                           <> state.email <> "'!"
+                                      , br [] []
+                                      , small [] [text $ "But don't forget to add"
+                                            <> " 'noreply@gonimo.com' to your adress book,"
+                                            <> " otherwise this invitation might end up in"
+                                            <> " your spam-folder!"]
+                                      ]
+                              , button [ A.className "btn btn-block btn-primary"
+                                       , A.style [Tuple "margin-left" "0px"] ]
+                                [ text $ "Oops … - sent the invitation to the wrong recepient."
+                                , br [] [] 
+                                , text "No problem just click me and then and then 'decline' to invalidate the link."
+                                , br [] []
+                                , br [] []
+                                , text "TODO: how to preserve the previous one time link?"
+                                ]
                               ]
                          else span [] []
                        ]
                      ]
-                   , div [ A.className "well well-lg"]
-                     [ p []
-                       [ text "Invitation successfully transmitted? Then go back to overview or make this device a baby station right away .... "
-                       ]
-                     , div [ A.className "btn-group btn-group-lg", A.role "group" ]
-                       [ button [ A.type_ "button", A.className "btn btn-primary"
-                                , E.onClick $ const $ GoToOverview
-                                ]
-                         [ text "Back to Overview" ]
-                       , button [ A.type_ "button", A.className "btn btn-primary"
-                                , E.onClick $ const $ GoToBabyStation
-                                ]
-                         [ text "I am a baby station"
-                         ]
+                   , div [A.className "container"]
+                       [ text "Invitation successfully transmitted? Then go back to overview or make this device a baby station right away .... " ]
+                   , nav []
+                     [ ul [ A.className "pager" ]
+                       [ li [ A.className "previous"
+                            , E.onClick $ const $ GoToOverview
+                            ] [a [] [ span [A.ariaHidden "true"] [text "← "]
+                                    , text "Back to Overview"
+                                    ]
+                              ]
+                       , li [ A.className "next"
+                            , E.onClick $ const $ GoToBabyStation
+                            ] [ a [] [ text "Make this device a baby station"
+                                     , span [A.ariaHidden "true"] [text " →"]
+                                     ]
+                              ]
                        ]
 
                      ]

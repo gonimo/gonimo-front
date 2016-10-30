@@ -45,3 +45,9 @@ input.funnyName {
     text-align: center;
     vertical-align: middle;
 }
+
+.video-container {
+    display: flex;
+    justify-content: center;
+    flex-direction: row;
+}
