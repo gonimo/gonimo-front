@@ -226,15 +226,18 @@ view props state = H.div []
 
 viewOffline :: forall ps. Props ps -> State -> Html Action
 viewOffline props state =
-    H.div [A.className "container"] [
-        H.div [A.className "jumbotron"]
+    H.div [A.className "jumbotron"] [
+        H.div [A.className "container"]
           [ H.div [A.style [ Tuple "margin" "0 auto"
-                           , Tuple "width" "640px"]]
+                           , Tuple "width" "80%"
+                           , Tuple "max-width" "640px"]]
             [ case state.streamURL of
                 Nothing -> H.span [] []
                 Just url -> H.video [ A.src url
                                     , A.autoPlay "true"
-                                    , A.controls true] []
+                                    , A.controls true
+                                    , A.width "100%"
+                                    ] []
           , viewStartButton state
           ]
         ]
@@ -252,27 +255,24 @@ viewBabyNameSelect props state =
                  $ props.family
 
    in
-    H.div [ A.className "container"]
-     [ H.div [ A.className "well", A.role "group" ]
-       [ H.h3 [] [ H.text "Select a name for your baby station"
-                 , H.br [][]
-                 , H.small [] [H.text "the last few names you used were:"]]
-       , H.div [ A.className "list-group", A.role "group" ]
-         $ (viewBabyButton state <$> lastBabies) <>
-         [ H.a [ A.className $ "list-group-item "
-                                    <> if state.newBabyName == state.babyName
-                                       then "active"
-                                       else "list-group-item-action"
-               , E.onClick $ const (SetBabyName state.newBabyName) ]
-             [ H.div [] [H.text "Or select a new name for this baby station "]
-             , H.input [ A.type_ "text", A.className "form-control", A.placeholder "New baby name"
-                   , E.onInput $ \ev -> SetNewBabyName ev.target.value
-                   , A.value state.newBabyName ] []
+         H.div [ A.className "well", A.role "group" ]
+           [ H.h3 [] [ H.text "Select a name for your baby station"
+                     , H.br [][]
+                     , H.small [] [H.text "the last few names you used were:"]]
+           , H.div [ A.className "list-group", A.role "group" ]
+             $ (viewBabyButton state <$> lastBabies) <>
+             [ H.a [ A.className $ "list-group-item "
+                                        <> if state.newBabyName == state.babyName
+                                           then "active"
+                                           else "list-group-item-action"
+                   , E.onClick $ const (SetBabyName state.newBabyName) ]
+                 [ H.div [] [H.text "Or select a new name for this baby station "]
+                 , H.input [ A.type_ "text", A.className "form-control", A.placeholder "New baby name"
+                       , E.onInput $ \ev -> SetNewBabyName ev.target.value
+                       , A.value state.newBabyName ] []
+                 ]
              ]
-         ]
-       ]
-     ]
-
+           ]
 viewBabyButton :: State -> String -> Html Action
 viewBabyButton state baby =
   H.a [ A.className $ "list-group-item " <> if baby == state.babyName
