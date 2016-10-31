@@ -119,7 +119,8 @@ view props state =
     let invitationLink = makeInviteLink (props.baseURL) state.invitation
      in div []
                    [ div [A.className "page-header"]
-                     [ div [A.className "container"]
+                     [ div [ A.className "container"
+                           , A.style [Tuple "width" "100%"]]
                        [ h3 [] [ text "Device Management"
                                , br [] []
                                , small []
@@ -129,7 +130,8 @@ view props state =
                                ]
                        ]
                      ]
-                   , div [A.className "container"]
+                   , div [ A.className "container"
+                         , A.style [Tuple "width" "100%"]]
                      [ h3 [] [text "copy & paste"]
                      , div [A.className "jumbotron"]
                        [ p [] [ text $ "You can either copy & paste it in to your"
@@ -145,7 +147,8 @@ view props state =
                            ]
                        ]
                      ]
-                   , div [A.className "container"]
+                   , div [A.className "container"
+                         , A.style [Tuple "width" "100%"]]
                      [ h3 [] [text "email"]
                      , div [A.className "jumbotron"]
                        [ p []  [ text "Or you can let us do the work send it via email …"
@@ -192,7 +195,8 @@ view props state =
                          else span [] []
                        ]
                      ]
-                   , div [A.className "container"]
+                   , div [ A.className "container"
+                         , A.style [Tuple "width" "100%"]]
                        [ text "Invitation successfully transmitted? Then go back to overview or make this device a baby station right away .... " ]
                    , nav []
                      [ ul [ A.className "pager" ]
@@ -212,16 +216,19 @@ view props state =
 
                      ]
                    , div [A.className "jumbotron"]
-                     [ p [] [ text "Want to add another device?" ]
-                     , button [ A.className "btn btn-block btn-info"
-                              , A.type_ "button"
-                              , E.onClick $ const $ MakeNewInvitation
-                              ]
-                       [ span [ A.className "glyphicon glyphicon-repeat"] []
-                       , text " Generate new one-time link "
-                       ]
-                     ]
-                   ]
+                      [ div [A.className "container"]
+                        [ p [] [ text "Want to add another device?" ]
+                        , button [ A.className "btn btn-block btn-info"
+                                 , A.style [Tuple "margin-left" "0px"]
+                                 , A.type_ "button"
+                                 , E.onClick $ const $ MakeNewInvitation
+                                 ]
+                          [ span [ A.className "glyphicon glyphicon-repeat"] []
+                          , text " Generate new one-time link "
+                          ]
+                        ]
+                      ]
+                    ]
   where
     handleEnter :: E.KeyboardEvent -> Action
     handleEnter ev = if ev.keyCode == 13 then SendInvitation else Nop
