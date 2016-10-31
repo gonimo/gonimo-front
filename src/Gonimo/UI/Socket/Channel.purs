@@ -185,25 +185,22 @@ handleCloseConnection = do
 
 
 view :: State -> Html Action
-view state = if state.isBabyStation
-             then text "There is no view currently for baby stations."
-             else viewParentStation state
+view state = viewVideo state
 
-viewParentStation :: State -> Html Action
-viewParentStation state =
-  case state.remoteStream of
-    Nothing -> text $ "Sorry - no video there yet, please check that your camera/microphone"
-                   <> "are enabled and your browser allows us to access it."
-    Just stream -> H.div []
-                   [ text $ "Got video, is enabled: "
-                          <> show ((unsafeCoerce stream.stream).enabled :: Boolean)
-                   , H.video [ A.className "thumbnail"
-                             , A.src stream.objectURL
-                             , A.autoPlay "true"
-                             , A.controls true] []
-                   ]
+viewVideo :: State -> Html Action
+viewVideo state =
+  H.div [ A.className "videoContainer" ]
+  [ case state.remoteStream of
+       Nothing -> H.text $ "Sorry - no video there yet, please check that your camera/microphone "
+                  <> "are enabled on the baby station and your browser allows us to access it."
+       Just stream ->
+         H.video [ A.src stream.objectURL
+                 , A.autoPlay "true"
+                 , A.controls true
+                 , A.width "100%"
+                 ] []
 
-
+  ]
 
 getSubscriptions :: forall m ps. (MonadReader Settings m) => Props ps -> m (Subscriptions Action)
 getSubscriptions props =

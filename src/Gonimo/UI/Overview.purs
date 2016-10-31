@@ -1,11 +1,14 @@
 module  Gonimo.UI.Overview where
 
 import Data.Array as Arr
+import Data.Array as Array
 import Data.Tuple as Tuple
+import Gonimo.UI.Socket as SocketC
 import Gonimo.UI.Socket.Types as SocketC
 import Pux.Html.Attributes as A
 import Pux.Html.Elements as H
 import Pux.Html.Events as E
+import Control.Monad.Eff (Eff)
 import Data.Array (concat, fromFoldable)
 import Data.Maybe (Maybe(Just, Nothing))
 import Data.Tuple (uncurry, snd, fst, Tuple(..))
@@ -54,10 +57,12 @@ update Nop               = noEffects
 
 view :: forall ps. Props ps -> State -> Html Action
 view props state = div []
-                   [
-                     button [ A.className "btn btn-lg"
-                            , E.onClick $ const GoToInviteView ]
-                     [ text "Add Device" ]
+                   [ viewConnectedBabies props state
+                   , div [ A.className "btn-group" ]
+                     [ button [ A.className "btn btn-lg btn-block"
+                              , E.onClick $ const GoToInviteView ]
+                       [ text "Add Device" ]
+                     ]
                    , viewAvailableBabies props state
                    ,
                      case props.onlineStatus of
@@ -70,6 +75,18 @@ type OnlineBaby =
   , deviceName :: String
   , deviceId :: Key Device
   }
+
+viewConnectedBabies :: forall ps. Props ps -> State -> Html Action
+viewConnectedBabies props state =
+  let
+    parentChannels = []
+  in
+   if Array.null parentChannels
+   then span [] []
+   else div [ ] []
+
+        
+
 
 viewAvailableBabies :: forall ps. Props ps -> State -> Html Action
 viewAvailableBabies props state =
