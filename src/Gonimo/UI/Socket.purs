@@ -234,7 +234,8 @@ viewOffline props state =
                 Nothing -> H.span [] []
                 Just url -> H.video [ A.src url
                                     , A.autoPlay "true"
-                                    , A.controls true] []
+                                    , A.controls true
+                                    , A.muted true ] []
           , viewStartButton state
           ]
         ]
@@ -252,35 +253,38 @@ viewBabyNameSelect props state =
                  $ props.family
 
    in
-    H.div [ A.className "container"]
-     [ H.div [ A.className "well", A.role "group" ]
-       [ H.h3 [] [ H.text "Select a name for your baby station"
-                 , H.br [][]
-                 , H.small [] [H.text "the last few names you used were:"]]
-       , H.div [ A.className "list-group", A.role "group" ]
-         $ (viewBabyButton state <$> lastBabies) <>
-         [ H.a [ A.className $ "list-group-item "
-                                    <> if state.newBabyName == state.babyName
-                                       then "active"
-                                       else "list-group-item-action"
-               , E.onClick $ const (SetBabyName state.newBabyName) ]
-             [ H.div [] [H.text "Or select a new name for this baby station "]
-             , H.input [ A.type_ "text", A.className "form-control", A.placeholder "New baby name"
-                   , E.onInput $ \ev -> SetNewBabyName ev.target.value
-                   , A.value state.newBabyName ] []
-             ]
-         ]
-       ]
-     ]
+    H.div [ A.className "panel panel-default", A.role "group" ]
+    [ H.div [ A.className "panel-heading" ]
+      [ H.text "Select a name for your baby station:"
+      ]
+    , H.div [ A.className "btn-group btn-group-justified", A.role "group"
+            , A.title "Most recently used names ..." ]
+      $ viewBabyButton state <$> lastBabies
+    , H.div [ A.className "btn-group btn-group-justified", A.role "group" ]
+      [ H.a [ A.className $ "btn btn-default "
+                   <> if state.newBabyName == state.babyName
+                      then "active"
+                      else "list-group-item-action"
+                 , E.onClick $ const (SetBabyName state.newBabyName)
+                 ]
+        [ H.div [] [H.text "Or give me a new one ..."]
+        , H.input [ A.type_ "text", A.className "form-control", A.placeholder "New baby name"
+                  , E.onInput $ \ev -> SetNewBabyName ev.target.value
+                  , A.value state.newBabyName ] []
+        ]
+      ]
+    ]
 
 viewBabyButton :: State -> String -> Html Action
 viewBabyButton state baby =
-  H.a [ A.className $ "list-group-item " <> if baby == state.babyName
-                                              then "active"
-                                              else "list-group-item-action"
-      , E.onClick $ const $ SetBabyName baby
-      ] [ H.text baby ]
-
+  H.div [ A.className "btn-group", A.role "group" ]
+  [
+    H.button [ A.className $ "btn btn-default" <> if baby == state.babyName then " active" else ""
+             , E.onClick $ const $ SetBabyName baby
+             , A.style [ Tuple "height" "2em" ]
+             ]
+    [ H.text baby ]
+  ]
 
 viewStopButton :: State -> Html Action
 viewStopButton state =

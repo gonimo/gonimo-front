@@ -294,7 +294,9 @@ viewHeader state =
               [ ul [ A.className "nav navbar-nav "]
                 [ li [A.className "dropdown"]
                   [ a [ A.className "dropdown-toggle" , A.href "#"
-                      , A.dataToggle "dropdown"       , A.role "button"]
+                      , A.dataToggle "dropdown"       , A.role "button"
+                      , A.type_ "button"
+                      ]
                     [ i [A.className "fa fa-users"] []
                     , text " "
                     , text "funky hedgehogs"
@@ -316,6 +318,7 @@ viewHeader state =
             , li [A.className "dropdown"]
               [ a [ A.className "dropdown-toggle" , A.href "#"
                   , A.dataToggle "dropdown"       , A.role "button"
+                  , A.type_ "button"
                   , A.style [Tuple "minWidth" "180px"]]
                 [ i [A.className "fa fa-user"] []
                 , text " "
@@ -343,7 +346,10 @@ viewHeader state =
   where
     viewCentralItem :: Tuple Boolean CentralReq -> Html Action
     viewCentralItem (Tuple active item) =
-      li [ A.className $ "nav navbar-nav" <> if active then " active" else "" ]
+      li [ A.className $ "nav navbar-nav" <> if active then " active" else ""
+         , A.type_ "button"
+         , A.role "button"
+         ]
       [ a [ E.onClick $ const $ RequestCentral item ]
         [ text (userShow item) ]
       ]
