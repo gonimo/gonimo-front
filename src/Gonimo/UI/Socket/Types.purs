@@ -42,6 +42,7 @@ type State =
   , isAvailable :: Boolean
   , localStream :: Maybe MediaStream
   , streamURL :: Maybe String
+  , previewEnabled :: Boolean
   , constraints :: MediaStreamConstraints
   }
 
@@ -78,6 +79,7 @@ instance ordChannelId :: Ord ChannelId where
 data Action = AcceptConnection ChannelId
             | GetUserMedia
             | StopUserMedia -- Only effective if not a active
+            | EnablePreview Boolean -- Enable local camera video even if connected.
             | AddChannel ChannelId ChannelC.State
             | ConnectToBaby (Key Device)
             | CloseChannel ChannelId
@@ -91,7 +93,7 @@ data Action = AcceptConnection ChannelId
             | StartBabyStation
             | InitBabyStation MediaStream
             | SetStreamURL (Maybe String)
-            | StopBabyStation 
+            | StopBabyStation
 
             | SetBabyName String
             | SetNewBabyName String

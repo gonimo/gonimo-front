@@ -56,6 +56,7 @@ init authData' = { authData : authData'
                  , babyName : "baby"
                  , newBabyName : "baby"
                  , constraints : MediaStreamConstraints { audio : true, video : true }
+                 , previewEnabled : false
                  }
 
 update :: forall ps. Update (Props ps) State Action
@@ -63,6 +64,7 @@ update action = case action of
   AcceptConnection channelId'                    -> handleAcceptConnection channelId'
   GetUserMedia                                   -> handleGetUserMedia
   StopUserMedia                                  -> handleStopUserMedia
+  EnablePreview onoff                            -> onlyModify $ _ { previewEnabled = onoff }
   AddChannel channelId' cState                   -> do channel channelId' .= Just cState
                                                        updateChannel channelId' ChannelC.InitConnection
   ChannelA channelId' (ChannelC.ReportError err) -> pure [pure $ ReportError err]
@@ -226,26 +228,53 @@ view props state = H.div []
 
 viewOffline :: forall ps. Props ps -> State -> Html Action
 viewOffline props state =
-    H.div [A.className "jumbotron"] [
-        H.div [A.className "container"]
-          [ H.div [A.style [ Tuple "margin" "0 auto"
-                           , Tuple "width" "80%"
-                           , Tuple "max-width" "640px"]]
-            [ case state.streamURL of
-                Nothing -> H.span [] []
-                Just url -> H.video [ A.src url
-                                    , A.autoPlay "true"
-                                    , A.controls true
-                                    , A.muted true
-                                    , A.width "100%"
-                                    ] []
-          , viewStartButton state
-          ]
-        ]
+    H.div [A.className "jumbotron"]
+    [ viewVideo props state
+    , H.div [ A.style videoContainerStyle ]
+      [ viewStartButton state
       ]
+    ]
 
 viewOnline :: forall ps. Props ps -> State -> Html Action
-viewOnline props = viewStopButton
+viewOnline props state =
+  H.div [ A.style videoContainerStyle ]
+  [ if state.previewEnabled
+    then H.div [ A.className "closableBox"]
+         [ H.a [ A.className "boxclose"
+                 , E.onClick $ const $ EnablePreview false
+               ] []
+         , viewVideo props state
+         ]
+    else H.div [ A.className "btn-group" ]
+         [ H.button [ A.className "btn btn-default btn-block"
+                    , E.onClick $ const $ EnablePreview true
+                    , A.type_ "button"
+                    ]
+           [ H.text "Adjust camera"
+           ]
+         ]
+    , viewStopButton state
+  ]
+
+viewVideo :: forall ps. Props ps -> State -> Html Action
+viewVideo props state =
+  H.div [ A.style videoContainerStyle ]
+  [ case state.streamURL of
+        Nothing -> H.span [] []
+        Just url -> H.video [ A.src url
+                            , A.autoPlay "true"
+                            , A.controls true
+                            , A.muted true
+                            , A.width "100%"
+                            ] []
+  ]
+
+videoContainerStyle :: Array (Tuple String String)
+videoContainerStyle =
+  [ Tuple "margin" "0 auto"
+  , Tuple "width" "80%"
+  , Tuple "max-width" "640px"
+  ]
 
 viewBabyNameSelect :: forall ps. Props ps -> State -> Html Action
 viewBabyNameSelect props state =
@@ -286,19 +315,17 @@ viewBabyButton state baby =
 
 viewStopButton :: State -> Html Action
 viewStopButton state =
-    H.div [A.className "container"]
-      [ H.div [ A.className "btn-group", A.role "group" ]
-        [ H.h3 [] [ H.text $ "Baby monitor running for cute " <> state.babyName <> " …"]
-        , H.button [ A.className "btn btn-block btn-danger"
-                   , A.style [ Tuple "margin-left" "0px" ]
-                   , A.type_ "button"
-                   , E.onClick $ const $ StopBabyStation
-                   ]
-          [ H.text "Stop Baby Monitor "
-          , H.span [A.className "glyphicon glyphicon-off"] []
-          ]
-        ]
-      ]
+  H.div [ A.className "btn-group", A.role "group" ]
+  [ H.h3 [] [ H.text $ "Baby monitor running for cute " <> state.babyName <> " …"]
+  , H.button [ A.className "btn btn-block btn-danger"
+              , A.style [ Tuple "margin-left" "0px" ]
+              , A.type_ "button"
+              , E.onClick $ const $ StopBabyStation
+              ]
+    [ H.text "Stop Baby Monitor "
+    , H.span [A.className "glyphicon glyphicon-off"] []
+    ]
+  ]
 
 viewStartButton :: State -> Html Action
 viewStartButton state =
@@ -327,6 +354,7 @@ viewStartButton state =
            ]
       else []
   ]
+
   --   case state.onlineStatus of
 --     Nothing -> text "Sorry - no video there yet!"
 --     Just station -> H.div []
