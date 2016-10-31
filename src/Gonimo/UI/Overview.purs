@@ -4,6 +4,7 @@ import Data.Array as Arr
 import Data.Array as Array
 import Data.Tuple as Tuple
 import Gonimo.UI.Socket as SocketC
+import Gonimo.UI.Socket.Channel.Types as ChannelC
 import Gonimo.UI.Socket.Types as SocketC
 import Pux.Html.Attributes as A
 import Pux.Html.Elements as H
@@ -30,6 +31,7 @@ type Props ps = { settings      :: Settings
                 , onlineStatus  :: DeviceType
                 , onlineDevices :: Array (Tuple (Key Device) DeviceType)
                 , deviceInfos   :: Array (Tuple (Key Device) DeviceInfo)
+                , socketS       :: SocketC.State
                 | ps }
 
 type State = { newBabyName :: String }
@@ -79,13 +81,19 @@ type OnlineBaby =
 viewConnectedBabies :: forall ps. Props ps -> State -> Html Action
 viewConnectedBabies props state =
   let
-    parentChannels = []
+    parentChannels = SocketC.getParentChannels props.socketS
   in
    if Array.null parentChannels
    then span [] []
-   else div [ ] []
+   else div [ A.className "overviewThumbnails"]
+        $ viewBabyThumbnail <$> parentChannels
 
-        
+viewBabyThumbnail :: Tuple SocketC.ChannelId ChannelC.State -> Html Action
+viewBabyThumbnail chan = div [ A.className "overviewThumbnail closableBox" ]
+                    [ H.a [ A.className "boxclose" ] []
+                    , SocketA <$> SocketC.viewParentChannelThumb chan
+                    ]
+
 
 
 viewAvailableBabies :: forall ps. Props ps -> State -> Html Action

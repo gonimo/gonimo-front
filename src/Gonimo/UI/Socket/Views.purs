@@ -1,4 +1,4 @@
-module Gonimo.UI.Socket.Views (view) where
+module Gonimo.UI.Socket.Views (view, viewParentChannelThumb) where
 
 import Prelude
 import Data.Array as Arr
@@ -175,13 +175,14 @@ viewStartButton state =
       else []
   ]
 
+viewParentChannelThumb :: Tuple ChannelId ChannelC.State -> Html Action
+viewParentChannelThumb (Tuple chanId state) = ChannelA chanId <$> ChannelC.view state
+
 viewParentChannels :: State -> Array (Html Action)
 viewParentChannels state = let
     channels = getParentChannels state
-    makeView :: Tuple ChannelId ChannelC.State -> Html Action
-    makeView (Tuple chanId state) = ChannelA chanId <$> ChannelC.view state
   in
-     makeView <$> channels
+     viewParentChannelThumb <$> channels
 
 getSubscriptions :: forall ps. Props ps -> State -> Subscriptions Action
 getSubscriptions props state =

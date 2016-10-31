@@ -215,6 +215,7 @@ doCleanup state cleanup action =
 getParentChannels :: State -> Array (Tuple ChannelId ChannelC.State)
 getParentChannels =  Arr.filter (not _.isBabyStation <<< snd ) <<< Arr.fromFoldable
                      <<< Map.toList <<< _.channels
+
 getSubscriptions :: forall ps. Props ps -> State -> Subscriptions Action
 getSubscriptions props state =
   let

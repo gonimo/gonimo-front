@@ -78,7 +78,7 @@ instance ordChannelId :: Ord ChannelId where
 
 data Action = AcceptConnection ChannelId
             | GetUserMedia
-            | StopUserMedia -- Only effective if not a active
+            | StopUserMedia -- Only effective if not active
             | EnablePreview Boolean -- Enable local camera video even if connected.
             | AddChannel ChannelId ChannelC.State
             | ConnectToBaby (Key Device)

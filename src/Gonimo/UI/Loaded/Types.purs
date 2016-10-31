@@ -49,6 +49,7 @@ type Props = { settings :: Settings
              , onlineDevices :: Array (Tuple (Key Device) DeviceType)
              , deviceInfos :: Array (Tuple (Key Device) DeviceInfo)
              , sendActionSocket :: SocketC.Action -> Eff () Unit
+             , socketS   :: SocketC.State
              }
 
 type InviteProps = InviteC.Props ()
@@ -90,6 +91,7 @@ mkProps state = { settings : mkSettings $ state^.authData
                 , onlineDevices : state.onlineDevices
                 , deviceInfos : state.deviceInfos
                 , sendActionSocket : lmap SocketA state.sendAction
+                , socketS : state.socketS
                 }
 
 mkInviteProps :: State -> Maybe InviteProps

@@ -81,3 +81,16 @@ a.boxclose{
     width: 80%;
     max-width: 640px;
 }
+
+.overviewThumbnails {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 100%;
+}
+
+.overviewThumbnail {
+    width: 45%;
+    margin: 1%;
+}
