@@ -89,10 +89,13 @@ viewConnectedBabies props state =
         $ viewBabyThumbnail <$> parentChannels
 
 viewBabyThumbnail :: Tuple SocketC.ChannelId ChannelC.State -> Html Action
-viewBabyThumbnail chan = div [ A.className "overviewThumbnail closableBox" ]
-                    [ H.a [ A.className "boxclose" ] []
-                    , SocketA <$> SocketC.viewParentChannelThumb chan
-                    ]
+viewBabyThumbnail chan@(Tuple chanId _) =
+  div [ A.className "overviewThumbnail closableBox" ]
+  [ H.a [ A.className "boxclose"
+        , E.onClick $ const $ SocketA (SocketC.CloseChannel chanId)
+        ] []
+  , SocketA <$> SocketC.viewParentChannelThumb chan
+  ]
 
 
 
