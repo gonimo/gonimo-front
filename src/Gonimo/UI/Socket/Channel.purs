@@ -189,8 +189,7 @@ view state = viewVideo state
 
 viewVideo :: State -> Html Action
 viewVideo state =
-  H.div [ A.className "videoContainer" ]
-  [ case state.remoteStream of
+   case state.remoteStream of
        Nothing -> H.text $ "Sorry - no video there yet, please check that your camera/microphone "
                   <> "are enabled on the baby station and your browser allows us to access it."
        Just stream ->
@@ -200,7 +199,7 @@ viewVideo state =
                  , A.width "100%"
                  ] []
 
-  ]
+  
 
 getSubscriptions :: forall m ps. (MonadReader Settings m) => Props ps -> m (Subscriptions Action)
 getSubscriptions props =
