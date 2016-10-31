@@ -75,3 +75,9 @@ a.boxclose{
     content: "×";
 
 }
+
+.videoContainer {
+    margin: 0 auto;
+    width: 80%;
+    max-width: 640px;
+}
