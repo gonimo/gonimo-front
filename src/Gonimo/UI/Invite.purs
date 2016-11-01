@@ -9,6 +9,7 @@ import Gonimo.Client.Types as Gonimo
 import Gonimo.UI.Html as Html
 import Gonimo.WebAPI.Types as WebAPI
 import Pux.Html.Attributes as A
+import Pux.Html.Attributes.Aria as A
 import Pux.Html.Elements as H
 import Pux.Html.Events as E
 import Browser.LocalStorage (STORAGE, localStorage)
@@ -24,7 +25,7 @@ import Data.Either (Either(Right, Left))
 import Data.Generic (gShow)
 import Data.Maybe (isJust, isNothing, Maybe(..))
 import Data.Tuple (uncurry, Tuple(Tuple))
-import Global (encodeURI)
+import Global (encodeURIComponent, encodeURI)
 import Gonimo.Client.Types (Settings, GonimoError, Gonimo, class ReportErrorAction)
 import Gonimo.Pux (noEffects, onlyModify, Update, runGonimo, class MonadComponent)
 import Gonimo.Server.DbEntities (Invitation(Invitation), Family(Family))
@@ -36,7 +37,6 @@ import Partial.Unsafe (unsafeCrashWith)
 import Pux (renderToDOM, fromSimple, start)
 import Pux.Html (a, button, br, i, input, p, h1, h2, h3, text, span, Html, img, div, small, li, ul, nav)
 import Pux.Html.Attributes (offset)
-import Pux.Html.Attributes.Aria as A
 import Servant.PureScript.Affjax (AjaxError)
 import Servant.PureScript.Settings (gDefaultEncodeURLPiece, defaultSettings, SPSettings_(SPSettings_))
 import Signal (constant, Signal)
@@ -117,6 +117,7 @@ handleSendInvitation = do
 view :: forall ps. Props ps -> State -> Html Action
 view props state =
     let invitationLink = makeInviteLink (props.baseURL) state.invitation
+        escapedLink = encodeURIComponent invitationLink
      in div []
                    [ div [A.className "page-header"]
                      [ div [ A.className "container"
@@ -155,10 +156,10 @@ view props state =
                               ]
                        , p []
                          [
-                           H.a [ A.href $ "whatsapp://send?text=" <> invitationLink
+                           H.a [ A.href $ "whatsapp://send?text=" <> escapedLink
                                ] [ H.text "Whatsapp" ]
                          , H.text " "
-                         , H.a [ A.href $ "tg://send?text=" <> invitationLink
+                         , H.a [ A.href $ "tg://send?text=" <> escapedLink
                                ] [ H.text "Telegram" ]
                          ]
                        ]
