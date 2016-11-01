@@ -274,7 +274,16 @@ viewHeader state =
       nav [ A.className "navbar navbar-default" ]
       [ div [ A.className "container"]
         [ div [ A.className "navbar-header"]
-          [ a [ A.className "navbar-brand navbar-left"]
+          [ button [ A.className "navbar-toggle collapsed"
+                   , A.dataToggle "collapse"
+                   , A.dataTarget "#navbarmenu"
+                   , A.type_ "button"
+                   ]
+            [ span [A.className "icon-bar"] []
+            , span [A.className "icon-bar"] []
+            , span [A.className "icon-bar"] []
+            ]
+          , a [ A.className "navbar-brand navbar-left"]
             [ img [ A.alt "gonimo"
                   , A.src "./pix/gonimo-logo-05.svg"
                   , A.width "35px"
@@ -282,7 +291,8 @@ viewHeader state =
             ]
           ]
 
-        , div [ A.className "collapse navbar-collapse"]
+        , div [ A.className "collapse navbar-collapse"
+              , A.id_ "navbarmenu"]
           [ ul [ A.className "nav navbar-nav"] $
             (viewCentralItem <$> getCentrals state) <>
             [ li []
