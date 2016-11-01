@@ -142,9 +142,25 @@ view props state =
                            [ span [ A.className "input-group-addon glyphicon glyphicon-copy", A.id_ "sdflkjsll291" ]
                              []
                            , input [ A.type_ "text", A.className "form-control", A.readOnly true
-                                   , A.value (makeInviteLink (props.baseURL) state.invitation)
+                                   , A.value invitationLink
                                    ] []
                            ]
+                       ]
+                     ]
+                   , div [ A.className "container"
+                         , A.style [Tuple "width" "100%"]]
+                     [ h3 [] [text "Share it"]
+                     , div [A.className "jumbotron"]
+                       [ p [] [ text $ "Or you can share it directly with WhatsApp, Telegram .."
+                              ]
+                       , p []
+                         [
+                           H.a [ A.href $ "whatsapp://send?text=" <> invitationLink
+                               ] [ H.text "Whatsapp" ]
+                         , H.text " "
+                         , H.a [ A.href $ "tg://send?text=" <> invitationLink
+                               ] [ H.text "Telegram" ]
+                         ]
                        ]
                      ]
                    , div [A.className "container"

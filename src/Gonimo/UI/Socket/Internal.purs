@@ -260,4 +260,5 @@ mkChannelProps props state channelId = { ourId : state ^. authData <<< to runAut
                                        , familyId : ChannelC.unsafeMakeFamilyId state.currentFamily
                                        , settings : props.settings
                                        , sendAction : lmap (ChannelA channelId) props.sendActionSocket
+                                       , onlineDevices : props.onlineDevices
                                        }

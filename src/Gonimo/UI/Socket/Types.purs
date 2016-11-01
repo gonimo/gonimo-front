@@ -30,6 +30,7 @@ import WebRTC.RTC (newRTCPeerConnection, RTCPeerConnection)
 
 type Props ps = { settings :: Settings
                 , sendActionSocket :: Action -> Eff () Unit
+                , onlineDevices :: Array (Tuple (Key Device) DeviceType)
                 , family :: Maybe Family
                 | ps }
 

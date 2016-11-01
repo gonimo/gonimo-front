@@ -4,8 +4,10 @@ import Control.Monad.Eff (Eff)
 import Control.Monad.IO (IO)
 import Data.Lens (lens, lens', LensP)
 import Data.Maybe (Maybe(Just, Nothing))
+import Data.Tuple (Tuple(Tuple))
 import Gonimo.Client.Types (class ReportErrorAction, GonimoError, Settings)
 import Gonimo.Server.DbEntities (Family(Family), Device(Device))
+import Gonimo.Server.Types (DeviceType)
 import Gonimo.Types (Secret(Secret), Key(Key))
 import Gonimo.UI.Socket.Message (Message)
 import Partial.Unsafe (unsafeCrashWith)
@@ -29,6 +31,7 @@ type Props ps =
   , ourId :: Key Device
   , familyId :: Key Family
   , sendAction :: Action -> Eff () Unit
+  , onlineDevices :: Array (Tuple (Key Device) DeviceType)
   }
 
 data Action = InitConnection
