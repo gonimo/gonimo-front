@@ -33,21 +33,69 @@ input.funnyName {
     width: 100%;
 }
 
-.btn-group {
-    width: 100%;
-}
- 
-.btn {
-    margin: 1em;
-}
-
 .centered {
     text-align: center;
     vertical-align: middle;
 }
 
-.video-container {
+.btn-group {
+    width: 100%;
+}
+
+.btn-with-margin {
+    margin: 1em;
+}
+
+.copy-link {
+    font-size: 130%;
+}
+
+.closableBox{
+    padding:20px;
+    border:2px solid #ccc;
+    -moz-border-radius: 20px;
+    -webkit-border-radius:20px;
+    -khtml-border-radius:20px;
+    -moz-box-shadow: 0 1px 5px #333;
+    -webkit-box-shadow: 0 1px 5px #333;
+    z-index:101;
+}
+a.boxclose{
+    float:right;
+    margin-top:-30px;
+    margin-right:-30px;
+    cursor:pointer;
+    color: #fff;
+    border: 1px solid #AEAEAE;
+    border-radius: 30px;
+    background: #605F61;
+    font-size: 31px;
+    font-weight: bold;
+    display: inline-block;
+    line-height: 0px;
+    padding: 11px 3px;
+}
+
+.boxclose:before {
+    content: "×";
+
+}
+
+.videoContainer {
+    margin: 0 auto;
+    width: 80%;
+    max-width: 640px;
+}
+
+.overviewThumbnails {
     display: flex;
-    justify-content: center;
     flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 100%;
+}
+
+.overviewThumbnail {
+    width: 45%;
+    margin: 1%;
 }
