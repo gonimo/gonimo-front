@@ -159,7 +159,7 @@ view props state =
                            H.a [ A.href $ "whatsapp://send?text=" <> escapedLink
                                ] [ H.text "Whatsapp" ]
                          , H.text " "
-                         , H.a [ A.href $ "tg://msg?text=" <> escapedLink
+                         , H.a [ A.href $ "https://telegram.me/share/url?url=" <> escapedLink
                                ] [ H.text "Telegram" ]
                          ]
                        ]
