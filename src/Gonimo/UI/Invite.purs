@@ -10,11 +10,13 @@ import Gonimo.UI.Html as Html
 import Gonimo.WebAPI.Types as WebAPI
 import Pux.Html.Attributes as A
 import Pux.Html.Attributes.Aria as A
+import Pux.Html.Attributes.Bootstrap as A
 import Pux.Html.Elements as H
 import Pux.Html.Events as E
 import Browser.LocalStorage (STORAGE, localStorage)
 import Control.Apply ((*>))
 import Control.Monad.Aff (Aff)
+import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Except.Trans (runExceptT)
 import Control.Monad.IO (IO)
@@ -27,7 +29,7 @@ import Data.Maybe (isJust, isNothing, Maybe(..))
 import Data.Tuple (uncurry, Tuple(Tuple))
 import Global (encodeURIComponent, encodeURI)
 import Gonimo.Client.Types (Settings, GonimoError, Gonimo, class ReportErrorAction)
-import Gonimo.Pux (noEffects, onlyModify, Update, runGonimo, class MonadComponent)
+import Gonimo.Pux (ComponentType, noEffects, onlyModify, Update, runGonimo, class MonadComponent)
 import Gonimo.Server.DbEntities (Invitation(Invitation), Family(Family))
 import Gonimo.Server.Types (InvitationDelivery(EmailInvitation), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (Key(Key), Secret(Secret))
@@ -74,6 +76,7 @@ data Action = SetEmail String
             | SetInvitationData (Key Invitation) Invitation
             | GoToOverview
             | GoToBabyStation
+            | CopyToClipboard String
             | Nop
 
 instance reportErrorActionAction :: ReportErrorAction Action where
@@ -88,6 +91,7 @@ update action = case action of
   SetInvitationData id' inv -> onlyModify $ \state -> state { invitationId = id', invitation = inv }
   GoToOverview              -> noEffects
   GoToBabyStation           -> noEffects
+  CopyToClipboard elemId    -> handleCopyToClipboard elemId
   ReportError err           -> noEffects
   Nop                       -> noEffects
 
@@ -112,6 +116,11 @@ handleSendInvitation = do
     postInvitationsOutbox $ WebAPI.SendInvitation state.invitationId (EmailInvitation state.email)
     pure InvitationSent
 
+handleCopyToClipboard :: forall ps. String -> ComponentType (Props ps) State Action
+handleCopyToClipboard elemId = pure [ do
+                                         liftEff $ copyTextFromId elemId
+                                         pure Nop
+                                    ]
 --------------------------------------------------------------------------------
 
 view :: forall ps. Props ps -> State -> Html Action
@@ -135,17 +144,21 @@ view props state =
                          , A.style [Tuple "width" "100%"]]
                      [ h3 [] [text "copy & paste"]
                      , div [A.className "jumbotron"]
-                       [ p [] [ text $ "You can either copy & paste it in to your"
-                                    <> " favourite messenger (e.g. WhatsApp) to"
-                                    <> " send it."
+                       [ p [] [ text $ "You can either copy & paste it to send it via any"
+                                    <> " means you desire."
                               ]
                        , div [ A.className "input-group" ]
-                           [ span [ A.className "input-group-addon glyphicon glyphicon-copy", A.id_ "sdflkjsll291" ]
-                             []
-                           , input [ A.type_ "text", A.className "form-control", A.readOnly true
+                           [ input [ A.type_ "text", A.className "form-control", A.readOnly true
                                    , A.value invitationLink
+                                   , A.id_ "invitationLinkUrlInput"
                                    ] []
                            ]
+                       , H.button [ A.className "btn glyphicon glyphicon-copy"
+                                  , A.role "button"
+                                  , A.type_ "button"
+                                  , E.onClick $ const $ CopyToClipboard "invitationLinkUrlInput"
+                                  ]
+                             []
                        ]
                      ]
                    , div [ A.className "container"
@@ -252,3 +265,5 @@ view props state =
 
 viewSent :: State -> Html Action
 viewSent state = viewLogo $ text "Invitation sucessfully sent!"
+
+foreign import copyTextFromId :: String -> Eff () Boolean

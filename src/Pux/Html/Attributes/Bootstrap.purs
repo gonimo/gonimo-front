@@ -16,6 +16,6 @@ dataPlacement = attr "data-placement"
 
 -- Non bootstrap:
 
-integrity :: forall a. String -> Attribute a
-integrity = attr "integrity"
+dataClipboardTarget :: forall a. String -> Attribute a
+dataClipboardTarget = attr "data-clipboard-target"
 
