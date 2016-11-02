@@ -135,122 +135,122 @@ view props state =
     let invitationLink = makeInviteLink (props.baseURL) state.invitation
         escapedLink = encodeURIComponent invitationLink
      in div []
-                   [ div [A.className "page-header"]
-                     [ div [ A.className "container"
-                           , A.style [Tuple "width" "100%"]]
-                       [ h3 [] [ text "Device Management"
-                               , br [] []
-                               , small []
-                                 [ text $ "Here you can add new devices to your"
-                                       <> " families, you only have to visit the"
-                                       <> " following one-time link on another device." ]
-                               ]
-                       ]
-                     ]
-                   , div [ A.className "container"
-                         , A.style [Tuple "width" "100%"]]
-                     [ h3 [] [text "copy & paste"]
-                     , div [A.className "jumbotron"]
-                       [ p [] [ text $ "You can either copy & paste it to send it via any"
-                                    <> " means you desire."
-                              ]
-                       , div [ A.className "input-group"
-                             , A.style [ Tuple "width" "100%" ]
-                             ]
-                         [ input [ A.type_ "text", A.className "form-control", A.readOnly true
-                                 , A.value invitationLink
-                                 , A.id_ "invitationLinkUrlInput"
-                                 ] []
-                         ]
-                       , H.button [ A.className "btn glyphicon glyphicon-copy"
-                                  , A.role "button"
-                                  , A.type_ "button"
-                                  , E.onClick $ const $ CopyToClipboard "invitationLinkUrlInput"
-                                  ]
-                             []
-                       ]
-                     ]
-                   , div [ A.className "container"
-                         , A.style [Tuple "width" "100%"]]
-                     [ h3 [] [text "Share it"]
-                     , div [A.className "jumbotron"]
-                       [ p [] [ text $ "Or you can share it directly with WhatsApp, Telegram .."
-                              ]
-                       , p []
-                         [
-                           H.a [ A.href $ "whatsapp://send?text=" <> escapedLink
-                               , onClickWithDefault $ const $ InvitationSent SentWhatsApp
-                               ] [ H.text "WhatsApp" ]
-                         , H.text " "
-                         -- , H.a [ A.href $ "https://telegram.me/share/url?url=" <> escapedLink
-                         , H.a [ A.href $ "tg://msg?text=" <> escapedLink
-                               , onClickWithDefault $ const $ InvitationSent SentTelegram
-                               ] [ H.text "Telegram" ]
-                         ]
-                       ]
-                     ]
-                   , div [A.className "container"
-                         , A.style [Tuple "width" "100%"]]
-                     [ h3 [] [text "email"]
-                     , div [A.className "jumbotron"]
-                       [ p []  [ text "Or you can let us do the work send it via email …"
-                               ]
-                       , div [ E.onKeyUp handleEnter ]
-                         [ div [A.className "input-group"]
-                           [ span [A.className "input-group-addon glyphicon glyphicon-envelope"] []
-                           , input [ A.type_ "text"
-                                   , A.className "form-control"
-                                   , A.placeholder "mail@example.com"
-                                   , E.onInput $ \ev -> SetEmail ev.target.value
-                                   , A.value state.email
-                                   ] []
-                           ]
-                         ]
-                       , button [ A.className "btn btn-block btn-info"
-                                 , A.style [Tuple "margin-left" "0px"]
-                                 , A.type_ "button"
-                                 , E.onClick $ const $ SendInvitation
-                                 ]
-                         [ text " Send Invitation! "
-                         , span [A.className "glyphicon glyphicon-send"] []
-                         ]
-                       , viewSent props state
-                       ]
-                     ]
-                   , div [ A.className "container"
-                         , A.style [Tuple "width" "100%"]]
-                       [ text "Invitation successfully transmitted? Then go back to overview or make this device a baby station right away .... " ]
-                   , nav []
-                     [ ul [ A.className "pager" ]
-                       [ li [ A.className "previous"
-                            , E.onClick $ const $ GoToOverview
-                            ] [a [] [ span [A.ariaHidden "true"] [text "← "]
-                                    , text "Back to Overview"
-                                    ]
-                              ]
-                       , li [ A.className "next"
-                            , E.onClick $ const $ GoToBabyStation
-                            ] [ a [] [ text "Make this device a baby station"
-                                     , span [A.ariaHidden "true"] [text " →"]
-                                     ]
-                              ]
-                       ]
-
-                     ]
-                   , div [A.className "jumbotron"]
-                      [ div [A.className "container"]
-                        [ p [] [ text "Want to add another device?" ]
-                        , button [ A.className "btn btn-block btn-info"
-                                 , A.style [Tuple "margin-left" "0px"]
-                                 , A.type_ "button"
-                                 , E.onClick $ const $ MakeNewInvitation
-                                 ]
-                          [ span [ A.className "glyphicon glyphicon-repeat"] []
-                          , text " Generate new one-time link "
-                          ]
-                        ]
-                      ]
+        [ div [A.className "page-header"]
+          [ div [ A.className "container"
+                , A.style [Tuple "width" "100%"]]
+            [ h3 [] [ text "Device Management"
+                    , br [] []
+                    , small []
+                      [ text $ "Here you can add new devices to your"
+                            <> " families, you only have to visit the"
+                            <> " following one-time link on another device." ]
                     ]
+            , div [ A.className "input-group"]
+              [ input [ A.type_ "text", A.className "form-control", A.readOnly true
+                      , A.value invitationLink
+                      , A.id_ "invitationLinkUrlInput"
+                      ] []
+              ,  H.span [ A.className "input-group-btn"]
+                [ button [ A.className "btn btn-default"
+                          , A.type_ "button"
+                          , A.title "Generate new link ..."
+                          , E.onClick $ const $ MakeNewInvitation
+                          ]
+                  [ span [ A.className "glyphicon glyphicon-repeat"] []
+                  ]
+                ]
+              ]
+            ]
+          ]
+        , div [ A.className "container"
+              , A.style [Tuple "width" "100%"]]
+          [ viewSent props state
+          , h3 [] [text "copy & paste or share directly"]
+          , div [A.className "jumbotron"]
+            [ p [] [ text $ "You can either copy & paste it to send it via some means"
+                        <> " or share it directly with WhatsApp or Telegram."
+                  ]
+            , H.div [ A.className "btn-group btn-group-justified" ]
+              [
+                H.div [ A.className "btn-group" ]
+                [
+                  H.button [ A.className "btn btn-default"
+                           , A.role "button"
+                           , A.type_ "button"
+                           , E.onClick $ const $ CopyToClipboard "invitationLinkUrlInput"
+                           ]
+                  [ H.span [ A.className "glyphicon glyphicon-copy"] []
+                  , H.text " Copy to Clipboard"
+                  ]
+                ]
+              , H.div [ A.className "btn-group" ]
+                [ H.a [ A.className "btn btn-default"
+                      , A.href $ "whatsapp://send?text=" <> escapedLink
+                      , A.role "button"
+                      , A.type_ "button"
+                      , onClickWithDefault $ const $ InvitationSent SentWhatsApp
+                      ]
+                  [
+                    -- H.img [ A.src "../static/pix/WhatsApp.svg", A.alt "WhatsApp" ] []
+                    H.text "WhatsApp"
+                  ]
+                ]
+              , H.div [ A.className "btn-group" ]
+                [ H.a [ A.className "btn btn-default"
+                      , A.href $ "tg://msg?text=" <> escapedLink -- "https://telegram.me/share/url?url=" <> escapedLink
+                      , A.role "button"
+                      , A.type_ "button"
+                      , onClickWithDefault $ const $ InvitationSent SentTelegram
+                      ]
+                  [ H.text "Telegram"
+                  ]
+                ]
+              ]
+            , br [] []
+            , p []  [ text "Or you can let us send it via email …"
+                    ]
+            , div [ E.onKeyUp handleEnter ]
+              [ div [A.className "input-group"]
+                [ span [A.className "input-group-addon glyphicon glyphicon-envelope"] []
+                , input [ A.type_ "text"
+                        , A.className "form-control"
+                        , A.placeholder "mail@example.com"
+                        , E.onInput $ \ev -> SetEmail ev.target.value
+                        , A.value state.email
+                        ] []
+                ]
+              ]
+            , button [ A.className "btn btn-block btn-info"
+                      , A.style [Tuple "margin-left" "0px"]
+                      , A.type_ "button"
+                      , E.onClick $ const $ SendInvitation
+                      ]
+              [ text " Send Invitation! "
+              , span [A.className "glyphicon glyphicon-send"] []
+              ]
+            ]
+          , div [ A.className "container"
+                , A.style [Tuple "width" "100%"]]
+              [ text "Invitation successfully transmitted? Then go back to overview or make this device a baby station right away .... " ]
+          , nav []
+            [ ul [ A.className "pager" ]
+              [ li [ A.className "previous"
+                    , E.onClick $ const $ GoToOverview
+                    ] [a [] [ span [A.ariaHidden "true"] [text "← "]
+                            , text "Back to Overview"
+                            ]
+                      ]
+              , li [ A.className "next"
+                    , E.onClick $ const $ GoToBabyStation
+                    ] [ a [] [ text "Make this device a baby station"
+                            , span [A.ariaHidden "true"] [text " →"]
+                            ]
+                      ]
+              ]
+
+            ]
+          ]
+        ]
   where
     handleEnter :: E.KeyboardEvent -> Action
     handleEnter ev = if ev.keyCode == 13 then SendInvitation else Nop
@@ -279,12 +279,12 @@ viewSentMethod sent = case sent.sentMethod of
                    , H.text "Now just paste it somewhere in order to transfer it to another device."
                    ]
   SentWhatsApp -> H.div []
-                   [ H.h3 [] [ text $ "Sent link to your WhatsApp!" ]
-                   , H.text "That did not work out? Just copy and paste the link yourself."
+                   [ H.h3 [] [ text $ "Sent link with WhatsApp!" ]
+                   , H.text "That did not work out? Just copy and paste the link yourself!"
                    ]
   SentTelegram -> H.div []
-                   [ H.h3 [] [ text $ "Sent link to your Telegram!" ]
-                   , H.text "That did not work out? Just copy and paste the link yourself."
+                   [ H.h3 [] [ text $ "Sent link with Telegram!" ]
+                   , H.text "That did not work out? Just copy and paste the link yourself!"
                    ]
   SentEmail addr -> H.div []
                    [ H.h3 [] [ text $ "Invitation successfully sent to '"  <> addr <> "'!" ]
