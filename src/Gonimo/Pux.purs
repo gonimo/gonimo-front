@@ -17,6 +17,7 @@ module Gonimo.Pux ( Props
                   , toParent
                   , toParentM
                   , class MonadComponent
+                  , onClickWithDefault
                   ) where
 
 import Prelude
@@ -34,6 +35,7 @@ import Control.Monad.State.Class (modify, put, get, state, class MonadState)
 import Control.Monad.State.Trans (runStateT, StateT(StateT))
 import Control.Monad.Trans (lift, class MonadTrans)
 import Data.Bifunctor (bimap, class Bifunctor)
+import Data.Function.Uncurried (runFn2, Fn2)
 import Data.Identity (runIdentity)
 import Data.Lens (SetterP, (.=), prism, (^?), TraversalP, (.~), (^.), LensP)
 import Data.Maybe (maybe, Maybe(Just, Nothing))
@@ -43,6 +45,8 @@ import Gonimo.Client.Types (Gonimo, Settings, class ReportErrorAction)
 import Gonimo.Util (fromMaybeM, runIOToSomeAff)
 import Partial.Unsafe (unsafeCrashWith)
 import Pux (noEffects, EffModel)
+import Pux.Html (Attribute)
+import Pux.Html.Events (MouseEvent)
 
 
 type Props ps = { settings :: Settings | ps }
@@ -207,3 +211,9 @@ instance monadStateStateComponent :: MonadState state (Component props state) wh
 
 
 foreign import differentObject :: forall a b. a -> b -> Boolean
+
+
+onClickWithDefault :: forall action. (MouseEvent -> action) -> Attribute action
+onClickWithDefault = runFn2 handlerWithDefault "onClick"
+
+foreign import handlerWithDefault :: forall ev a. Fn2 String (ev -> a) (Attribute a)

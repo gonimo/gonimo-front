@@ -29,7 +29,7 @@ import Data.Maybe (isJust, isNothing, Maybe(..))
 import Data.Tuple (uncurry, Tuple(Tuple))
 import Global (encodeURIComponent, encodeURI)
 import Gonimo.Client.Types (Settings, GonimoError, Gonimo, class ReportErrorAction)
-import Gonimo.Pux (ComponentType, noEffects, onlyModify, Update, runGonimo, class MonadComponent)
+import Gonimo.Pux (Component, ComponentType, noEffects, onlyModify, Update, runGonimo, class MonadComponent, onClickWithDefault)
 import Gonimo.Server.DbEntities (Invitation(Invitation), Family(Family))
 import Gonimo.Server.Types (InvitationDelivery(EmailInvitation), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (Key(Key), Secret(Secret))
@@ -38,7 +38,7 @@ import Gonimo.WebAPI.Types (AuthData(AuthData))
 import Partial.Unsafe (unsafeCrashWith)
 import Pux (renderToDOM, fromSimple, start)
 import Pux.Html (a, button, br, i, input, p, h1, h2, h3, text, span, Html, img, div, small, li, ul, nav)
-import Pux.Html.Attributes (offset)
+import Pux.Html.Attributes (letterSpacing, offset)
 import Servant.PureScript.Affjax (AjaxError)
 import Servant.PureScript.Settings (gDefaultEncodeURLPiece, defaultSettings, SPSettings_(SPSettings_))
 import Signal (constant, Signal)
@@ -53,16 +53,16 @@ type Props ps = { settings  :: Settings
 
 type State =
   { email          :: String
-  , invitationSent :: Boolean
   , invitationId   :: Key Invitation
-  , invitation   :: Invitation
+  , invitation     :: Invitation
+  , sentInvitation :: Maybe SentInvitation
   }
 
 -- | We take our props in init to ensure the caller takes care of providing proper props.
 --   Ensuring this on the first call to update is a tad to late.
 init :: forall ps. Tuple (Key Invitation) Invitation -> Props ps -> State
 init (Tuple invKey inv) _ = { email : ""
-                            , invitationSent : false
+                            , sentInvitation : Nothing
                             , invitationId : invKey
                             , invitation : inv
                             }
@@ -70,7 +70,7 @@ init (Tuple invKey inv) _ = { email : ""
 
 data Action = SetEmail String
             | SendInvitation
-            | InvitationSent
+            | InvitationSent SentMethod
             | ReportError GonimoError
             | MakeNewInvitation
             | SetInvitationData (Key Invitation) Invitation
@@ -79,13 +79,19 @@ data Action = SetEmail String
             | CopyToClipboard String
             | Nop
 
+type SentInvitation = { invitation :: Invitation
+                      , sentMethod :: SentMethod
+                      }
+
+data SentMethod = SentWhatsApp | SentTelegram | SentCopyPaste | SentEmail String
+
 instance reportErrorActionAction :: ReportErrorAction Action where
   reportError = ReportError
 
 update :: forall ps. Update (Props ps) State Action
 update action = case action of
-  (SetEmail email )         -> onlyModify $ _ { email = email, invitationSent = false }
-  InvitationSent            -> handleInvitationSent
+  (SetEmail email )         -> onlyModify $ _ { email = email, sentInvitation = Nothing :: Maybe SentInvitation }
+  InvitationSent sent       -> handleInvitationSent sent
   SendInvitation            -> handleSendInvitation
   MakeNewInvitation         -> handleMakeNewInvitation
   SetInvitationData id' inv -> onlyModify $ \state -> state { invitationId = id', invitation = inv }
@@ -99,9 +105,10 @@ makeInviteLink :: String -> Invitation -> String
 makeInviteLink baseURL (Invitation inv) = baseURL <> "?" <> "acceptInvitation="
                                           <> gDefaultEncodeURLPiece inv.invitationSecret
 
-handleInvitationSent :: forall m ps. (MonadComponent (Props ps) State m) => m (Array (IO Action))
-handleInvitationSent = do
-  modify $ _ { invitationSent = true }
+handleInvitationSent :: forall ps. SentMethod -> ComponentType (Props ps) State Action
+handleInvitationSent method = do
+  state <- get :: Component (Props ps) State State
+  modify $ _ { sentInvitation = Just $ { invitation : state.invitation , sentMethod : method } }
   pure [ pure MakeNewInvitation ] -- Prevent user from re-using the already sent invitation
 
 handleMakeNewInvitation :: forall m ps. (MonadComponent (Props ps) State m) => m (Array (IO Action))
@@ -114,12 +121,12 @@ handleSendInvitation = do
   state <- get
   runGonimo $ do
     postInvitationsOutbox $ WebAPI.SendInvitation state.invitationId (EmailInvitation state.email)
-    pure InvitationSent
+    pure $ InvitationSent (SentEmail state.email)
 
 handleCopyToClipboard :: forall ps. String -> ComponentType (Props ps) State Action
 handleCopyToClipboard elemId = pure [ do
                                          liftEff $ copyTextFromId elemId
-                                         pure Nop
+                                         pure $ InvitationSent SentCopyPaste
                                     ]
 --------------------------------------------------------------------------------
 
@@ -147,12 +154,14 @@ view props state =
                        [ p [] [ text $ "You can either copy & paste it to send it via any"
                                     <> " means you desire."
                               ]
-                       , div [ A.className "input-group" ]
-                           [ input [ A.type_ "text", A.className "form-control", A.readOnly true
-                                   , A.value invitationLink
-                                   , A.id_ "invitationLinkUrlInput"
-                                   ] []
-                           ]
+                       , div [ A.className "input-group"
+                             , A.style [ Tuple "width" "100%" ]
+                             ]
+                         [ input [ A.type_ "text", A.className "form-control", A.readOnly true
+                                 , A.value invitationLink
+                                 , A.id_ "invitationLinkUrlInput"
+                                 ] []
+                         ]
                        , H.button [ A.className "btn glyphicon glyphicon-copy"
                                   , A.role "button"
                                   , A.type_ "button"
@@ -170,9 +179,12 @@ view props state =
                        , p []
                          [
                            H.a [ A.href $ "whatsapp://send?text=" <> escapedLink
-                               ] [ H.text "Whatsapp" ]
+                               , onClickWithDefault $ const $ InvitationSent SentWhatsApp
+                               ] [ H.text "WhatsApp" ]
                          , H.text " "
-                         , H.a [ A.href $ "https://telegram.me/share/url?url=" <> escapedLink
+                         -- , H.a [ A.href $ "https://telegram.me/share/url?url=" <> escapedLink
+                         , H.a [ A.href $ "tg://msg?text=" <> escapedLink
+                               , onClickWithDefault $ const $ InvitationSent SentTelegram
                                ] [ H.text "Telegram" ]
                          ]
                        ]
@@ -202,27 +214,7 @@ view props state =
                          [ text " Send Invitation! "
                          , span [A.className "glyphicon glyphicon-send"] []
                          ]
-                       , if state.invitationSent
-                         then div [ A.className "alert alert-success"]
-                              [ h3 [] [text $ "Invitation sent successfully to '"
-                                           <> state.email <> "'!"
-                                      , br [] []
-                                      , small [] [text $ "But don't forget to add"
-                                            <> " 'noreply@gonimo.com' to your address book,"
-                                            <> " otherwise this invitation might end up in"
-                                            <> " your spam-folder!"]
-                                      ]
-                              , button [ A.className "btn btn-block btn-default"
-                                       , A.style [Tuple "margin-left" "0px"] ]
-                                [ text $ "Oops - Did you send the invitation to the wrong recipient?"
-                                , br [] [] 
-                                , text "No problem just click me and then and then 'decline' to invalidate the link."
-                                , br [] []
-                                , br [] []
-                                , text "TODO: how to preserve the previous one time link?"
-                                ]
-                              ]
-                         else span [] []
+                       , viewSent props state
                        ]
                      ]
                    , div [ A.className "container"
@@ -263,7 +255,40 @@ view props state =
     handleEnter :: E.KeyboardEvent -> Action
     handleEnter ev = if ev.keyCode == 13 then SendInvitation else Nop
 
-viewSent :: State -> Html Action
-viewSent state = viewLogo $ text "Invitation sucessfully sent!"
+viewSent :: forall ps. Props ps -> State -> Html Action
+viewSent props state =
+  case state.sentInvitation of
+    Nothing -> H.span [] []
+    Just sent ->
+      let
+        invLink = makeInviteLink (props.baseURL) sent.invitation
+      in
+        H.div [ A.className "alert alert-success"]
+        [ viewSentMethod sent
+        , H.a [ A.href invLink ]
+          [ H.text "Oops - Did you send the invitation to the wrong recipient?"
+          , br [] []
+          , H.text "No problem! Just click me and then press 'Decline' to invalidate the invitation."
+          ]
+        ]
+
+viewSentMethod :: SentInvitation -> Html Action
+viewSentMethod sent = case sent.sentMethod of
+  SentCopyPaste -> H.div []
+                   [ H.h3 [] [ text $ "Copied invitation link to clipboard!" ]
+                   , H.text "Now just paste it somewhere in order to transfer it to another device."
+                   ]
+  SentWhatsApp -> H.div []
+                   [ H.h3 [] [ text $ "Sent link to your WhatsApp!" ]
+                   , H.text "That did not work out? Just copy and paste the link yourself."
+                   ]
+  SentTelegram -> H.div []
+                   [ H.h3 [] [ text $ "Sent link to your Telegram!" ]
+                   , H.text "That did not work out? Just copy and paste the link yourself."
+                   ]
+  SentEmail addr -> H.div []
+                   [ H.h3 [] [ text $ "Invitation successfully sent to '"  <> addr <> "'!" ]
+                   , H.text "Did not receive the e-mail? Please check your spam folder!"
+                   ]
 
 foreign import copyTextFromId :: String -> Eff () Boolean
