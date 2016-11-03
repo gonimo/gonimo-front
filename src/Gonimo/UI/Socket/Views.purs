@@ -175,14 +175,16 @@ viewStartButton state =
       else []
   ]
 
-viewParentChannelThumb :: Tuple ChannelId ChannelC.State -> Html Action
-viewParentChannelThumb (Tuple chanId state) = ChannelA chanId <$> ChannelC.view state
+viewParentChannelThumb :: forall ps. Props ps -> State
+                          -> Tuple ChannelId ChannelC.State -> Html Action
+viewParentChannelThumb props state (Tuple chanId cState) =
+  ChannelA chanId <$> ChannelC.view (mkChannelProps props state chanId) cState
 
-viewParentChannels :: State -> Array (Html Action)
-viewParentChannels state = let
+viewParentChannels :: forall ps. Props ps -> State -> Array (Html Action)
+viewParentChannels props state = let
     channels = getParentChannels state
   in
-     viewParentChannelThumb <$> channels
+     viewParentChannelThumb props state <$> channels
 
 getSubscriptions :: forall ps. Props ps -> State -> Subscriptions Action
 getSubscriptions props state =

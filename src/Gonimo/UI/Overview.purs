@@ -32,6 +32,7 @@ type Props ps = { settings      :: Settings
                 , onlineDevices :: Array (Tuple (Key Device) DeviceType)
                 , deviceInfos   :: Array (Tuple (Key Device) DeviceInfo)
                 , socketS       :: SocketC.State
+                , sendActionSocket :: SocketC.Action -> Eff () Unit -- Needed for socket operations
                 | ps }
 
 type State = { newBabyName :: String }
@@ -86,15 +87,15 @@ viewConnectedBabies props state =
    if Array.null parentChannels
    then span [] []
    else div [ A.className "overviewThumbnails"]
-        $ viewBabyThumbnail <$> parentChannels
+        $ viewBabyThumbnail props <$> parentChannels
 
-viewBabyThumbnail :: Tuple SocketC.ChannelId ChannelC.State -> Html Action
-viewBabyThumbnail chan@(Tuple chanId _) =
+viewBabyThumbnail :: forall ps. Props ps -> Tuple SocketC.ChannelId ChannelC.State -> Html Action
+viewBabyThumbnail props chan@(Tuple chanId _) =
   div [ A.className "overviewThumbnail closableBox" ]
   [ H.a [ A.className "boxclose"
         , E.onClick $ const $ SocketA (SocketC.CloseChannel chanId)
         ] []
-  , SocketA <$> SocketC.viewParentChannelThumb chan
+  , SocketA <$> SocketC.viewParentChannelThumb props props.socketS chan
   ]
 
 

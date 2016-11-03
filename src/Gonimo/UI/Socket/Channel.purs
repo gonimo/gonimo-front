@@ -2,6 +2,7 @@ module Gonimo.UI.Socket.Channel where
 
 import Prelude
 import Data.Array as Arr
+import Data.Tuple as Tuple
 import Gonimo.UI.Socket.Message as Message
 import Pux.Html.Attributes as A
 import Pux.Html.Elements as H
@@ -18,11 +19,12 @@ import Control.Monad.Reader (runReaderT)
 import Control.Monad.Reader.Class (ask, class MonadReader)
 import Control.Monad.State.Class (get)
 import Data.Identity (runIdentity)
-import Data.Lens (lens, Lens, (.=))
+import Data.Lens ((^?), _Just, lens, Lens, (.=))
 import Data.Maybe (fromMaybe, isJust, maybe, Maybe(Nothing, Just))
 import Gonimo.Client.Types (toIO, Settings)
 import Gonimo.Pux (noEffects, runGonimo, Component, Update, onlyModify, ComponentType)
 import Gonimo.Server.DbEntities (Family(Family), Device(Device))
+import Gonimo.Server.Types.Lenses (_Baby)
 import Gonimo.Types (Secret(Secret), Key(Key))
 import Gonimo.UI.Socket.Channel.Types (Action, Action(..), State, Props)
 import Gonimo.UI.Socket.Lenses (mediaStream)
@@ -184,8 +186,19 @@ handleCloseConnection = do
   pure $ closeActions <> [ sendMessage Message.CloseConnection ]
 
 
-view :: State -> Html Action
-view state = viewVideo state
+view :: forall ps. Props ps -> State -> Html Action
+view props state =
+  let
+    mBabyDevice = Tuple.lookup props.theirId props.onlineDevices
+    babyName = fromMaybe "unknown baby" $ mBabyDevice ^? _Just <<< _Baby
+  in
+    H.div [ A.className "panel panel-default" ]
+            [ H.div [ A.className "panel-heading" ]
+              [
+                H.text babyName
+              ]
+            , viewVideo state
+            ]
 
 viewVideo :: State -> Html Action
 viewVideo state =
@@ -199,7 +212,7 @@ viewVideo state =
                  , A.width "100%"
                  ] []
 
-  
+
 
 getSubscriptions :: forall m ps. (MonadReader Settings m) => Props ps -> m (Subscriptions Action)
 getSubscriptions props =
