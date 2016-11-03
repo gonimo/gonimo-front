@@ -164,8 +164,7 @@ view props state =
           ]
         , div [ A.className "container"
               , A.style [Tuple "width" "100%"]]
-          [ viewSent props state
-          , h3 [] [text "copy & paste or share directly"]
+          [ h3 [] [text "copy & paste or share directly"]
           , div [A.className "jumbotron"]
             [ p [] [ text $ "You can either copy & paste it to send it via some means"
                         <> " or share it directly with WhatsApp or Telegram."
@@ -229,6 +228,7 @@ view props state =
               , span [A.className "glyphicon glyphicon-send"] []
               ]
             ]
+          , viewSent props state
           , div [ A.className "container"
                 , A.style [Tuple "width" "100%"]]
               [ text "Invitation successfully transmitted? Then go back to overview or make this device a baby station right away .... " ]
