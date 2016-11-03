@@ -273,80 +273,80 @@ viewHeader :: State -> Html Action
 viewHeader state =
       nav [ A.className "navbar navbar-default" ]
       [ div [ A.className "container"]
-        [ div [ A.className "navbar-header"]
-          [ button [ A.className "navbar-toggle collapsed"
-                   , A.dataToggle "collapse"
-                   , A.dataTarget "#navbarmenu"
-                   , A.type_ "button"
-                   ]
-            [ span [A.className "icon-bar"] []
-            , span [A.className "icon-bar"] []
-            , span [A.className "icon-bar"] []
+          [ div [ A.className "navbar-header"]
+            [ button [ A.className "navbar-toggle collapsed"
+                     , A.dataToggle "collapse"
+                     , A.dataTarget "#navbarmenu"
+                     , A.type_ "button"
+                     ]
+              [ span [A.className "icon-bar"] []
+              , span [A.className "icon-bar"] []
+              , span [A.className "icon-bar"] []
+              ]
+            , a [ A.className "navbar-brand navbar-left"]
+              [ img [ A.alt "gonimo"
+                    , A.src "./pix/gonimo-logo-05.svg"
+                    , A.width "35px"
+                    , A.height "35px"] []
+              ]
             ]
-          , a [ A.className "navbar-brand navbar-left"]
-            [ img [ A.alt "gonimo"
-                  , A.src "./pix/gonimo-logo-05.svg"
-                  , A.width "35px"
-                  , A.height "35px"] []
-            ]
-          ]
 
-        , div [ A.className "collapse navbar-collapse"
-              , A.id_ "navbarmenu"]
-          [ ul [ A.className "nav navbar-nav"] $
-            (viewCentralItem <$> getCentrals state) <>
-            [ li []
-              [ ul [ A.className "nav navbar-nav "]
-                [ li [A.className "dropdown"]
+          , div [ A.className "navbar-collapse collapse"
+                , A.id_ "navbarmenu"
+                , A.dataToggle "collapse"
+                , A.dataTarget "#navbarmenu"]
+            [ ul [ A.className "nav navbar-nav"] $
+              (viewCentralItem <$> getCentrals state) <>
+              [ li [A.className "dropdown"
+                   ,A.dataToggle "collapse"]
                   [ a [ A.className "dropdown-toggle" , A.href "#"
                       , A.dataToggle "dropdown"       , A.role "button"
                       , A.type_ "button"
                       ]
-                    [ i [A.className "fa fa-users"] []
+                    [ i [A.className "fa fa-fw fa-users"] []
                     , text " "
                     , text "funky hedgehogs"
                     , text " "
                     , span [A.className "caret"] [] ]
                   , ul [A.className "dropdown-menu"]
-                    [ li [] [div [A.className "navbar-text"] [text "Change family to"]]
+                    [ li [A.dataToggle "collapse"] [div [A.className "navbar-text"] [text "Change family to"]]
                     , li [] [a [] [text "wild frogs"]]
                     , li [] [a [] [text "funny cats"]]
                     , li [] [a [] [text "running dogs"]]
-                    , li [] [a [] [ text "funky hedgehogs"
-                                  , text " ✔"
-                                  ]
+                    , li [] [a [] [text "funky hedgehogs"
+                                                         ,text " ✔" ]
                             ]
+                    
                     ]
+                  , viewFamilyChooser state
                   ]
-                ]
-              ]
-            , li [A.className "dropdown"]
-              [ a [ A.className "dropdown-toggle" , A.href "#"
-                  , A.dataToggle "dropdown"       , A.role "button"
-                  , A.type_ "button"
-                  , A.style [Tuple "minWidth" "180px"]]
-                [ i [A.className "fa fa-user"] []
-                , text " "
-                , text "epsilonhalbe"
-                , text " "
-                , span [A.className "caret"] []
-                ]
-              , ul [A.className "dropdown-menu", A.style [Tuple "minWidth" "180px"]]
-                [ li [] [a [] [text " User settings "
-                              ,i [A.className "fa fa-cog pull-right"] []]]
-                , li [] [ a [] [ text "Change password "
-                               , i [A.className "fa fa-lock pull-right" ][]
-                               ]]
-                , li [A.className "divider", A.role "separator"] []
-                , li [] [a [] [ text "Log-Out "
-                              , i [A.className "fa fa-sign-out pull-right"] []
-                              ]]
+              , li [A.className "dropdown"]
+                [ a [ A.className "dropdown-toggle" , A.href "#"
+                    , A.dataToggle "dropdown"       , A.role "button"
+                    , A.type_ "button"
+                    , A.style [Tuple "minWidth" "180px"]]
+                  [ i [A.className "fa fa-fw fa-user"] []
+                  , text " "
+                  , text "epsilonhalbe"
+                  , text " "
+                  , span [A.className "caret"] []
+                  ]
+                , ul [A.className "dropdown-menu", A.style [Tuple "minWidth" "180px"]]
+                  [ li [] [a [] [text " User settings "
+                                ,i [A.className "fa fa-fw fa-cog pull-right"] []]]
+                  , li [] [ a [] [ text "Change password "
+                                 , i [A.className "fa fa-fw fa-lock pull-right" ][]
+                                 ]]
+                  , li [A.className "divider", A.role "separator"] []
+                  , li [] [a [] [ text "Log-Out "
+                                , i [A.className "fa fa-fw fa-sign-out pull-right"] []
+                                ]]
+                  ]
                 ]
               ]
             ]
           ]
-         ]
-       ]
+        ]
 
   where
     viewCentralItem :: Tuple Boolean CentralReq -> Html Action
@@ -392,7 +392,7 @@ viewHeader state =
 --             [
 --               ul [ A.className "nav navbar-nav" ]
 --               [ li []
---                 [ viewFamilyChooser state
+--                 [ 
 --                 ]
 --               ]
 --             , ul [ A.className "nav navbar-nav navbar-right" ]
@@ -460,27 +460,27 @@ viewOnlineDevices state = table [ A.className "table table-striped"]
                        , A.title "offline" ] []]
                        --, A.title "online" ] []]
                , td [A.className "centered"]
-                   [ i [ A.className ("fa fa-" <> "mobile")
+                   [ i [ A.className ("fa fa-fw fa-" <> "mobile")
                        , A.dataToggle "tooltip"
                        , A.dataPlacement "right"
                        , A.title "edit device name" ] []
                        ]
                , td [] [ text name ]
                , td [] [ text lastAccessed ]
-               , td [] [ i [ A.className "fa fa-pencil"
+               , td [] [ i [ A.className "fa fa-fw fa-pencil"
                        , A.dataToggle "tooltip"
                        , A.dataPlacement "right"
                        , A.title "edit device name" ] []
                        ]
-               , td [] [ i [ A.className "fa fa-trash"
+               , td [] [ i [ A.className "fa fa-fw fa-trash"
                        , A.dataToggle "tooltip"
                        , A.dataPlacement "right"
                        , A.title "delete device from family" ] []]
                ]
 
 viewFamilyChooser :: State -> Html Action
-viewFamilyChooser state = H.div []
-                          [ H.label [ A.htmlFor "familySelect" ] [ text "Family: " ]
+viewFamilyChooser state = H.ul [A.className "dropdown-menu"]
+                          [ H.label [ A.htmlFor "familySelect" ] [i [A.className "fa fa-fw fa-users"] []]
                           , H.select [ A.id_ "familySelect"
                                      , A.className "form-control"
                                      , E.onInput doSwitchFamily

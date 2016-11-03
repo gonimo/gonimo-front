@@ -14,6 +14,9 @@ body {
     display: flex;
     justify-content: center;
     flex-direction: column;
+    font-family: sans-serif;
+    max-width: 800px;
+    margin: auto;
 }
 
 #site {
@@ -99,3 +102,9 @@ a.boxclose{
     width: 45%;
     margin: 1%;
 }
+
+.navbar-nav {
+ margin: 0;
+ padding: 0.0px 0px;
+}
+

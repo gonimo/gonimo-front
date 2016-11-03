@@ -36,7 +36,7 @@ module.exports = {
       }
     }),
     new HtmlWebpackPlugin({
-      template: 'support/index.html',
+      template: 'support/prod.index.html',
       inject: 'body',
       filename: 'index.html'
     }),
