@@ -305,20 +305,10 @@ viewHeader state =
                       ]
                     [ i [A.className "fa fa-fw fa-users"] []
                     , text " "
-                    , text "funky hedgehogs"
+                    , text $ fromMaybe "" $ _.familyName <<< runFamily <$> (state.socketS.currentFamily >>= flip Map.lookup state.families)
                     , text " "
                     , span [A.className "caret"] [] ]
-                  , ul [A.className "dropdown-menu"]
-                    [ li [A.dataToggle "collapse"] [div [A.className "navbar-text"] [text "Change family to"]]
-                    , li [] [a [] [text "wild frogs"]]
-                    , li [] [a [] [text "funny cats"]]
-                    , li [] [a [] [text "running dogs"]]
-                    , li [] [a [] [text "funky hedgehogs"
-                                                         ,text " ✔" ]
-                            ]
-                    
-                    ]
-                  , viewFamilyChooser state
+                    , viewFamilyChooser state
                   ]
               , li [A.className "dropdown"]
                 [ a [ A.className "dropdown-toggle" , A.href "#"
@@ -479,24 +469,22 @@ viewOnlineDevices state = table [ A.className "table table-striped"]
                ]
 
 viewFamilyChooser :: State -> Html Action
-viewFamilyChooser state = H.ul [A.className "dropdown-menu"]
-                          [ H.label [ A.htmlFor "familySelect" ] [i [A.className "fa fa-fw fa-users"] []]
-                          , H.select [ A.id_ "familySelect"
-                                     , A.className "form-control"
-                                     , E.onInput doSwitchFamily
-                                     ]
-                            $ fromFoldable
-                            <<< map (uncurry makeOption)
-                            <<< Map.toList $ state.families
-                          ]
+viewFamilyChooser state =
+    H.ul [A.className "dropdown-menu"] $
+         [li [A.dataToggle "collapse"] [div [A.className "navbar-text"] [text "Change family to"]]]
+         <> (fromFoldable <<< map (uncurry (viewFamily state.socketS.currentFamily))
+                          <<< Map.toList $ state.families)
   where
-    doSwitchFamily :: FormEvent -> Action
-    doSwitchFamily ev = maybe Nop (SocketA <<< SocketC.SwitchFamily) $ fromString ev.target.value
+    doSwitchFamily :: Key Family -> Action
+    doSwitchFamily = SocketA <<< SocketC.SwitchFamily
 
-    makeOption :: Key Family -> Family -> Html Action
-    makeOption familyId (Family family) = H.option [ A.value (toString familyId) ]
-                                          [ text family.familyName ]
-
+    viewFamily :: Maybe (Key Family) -> Key Family -> Family -> Html Action
+    viewFamily currentFamilyId familyId (Family family) =
+        li [] [a [E.onClick $ const $ doSwitchFamily familyId ] $
+                 [text family.familyName] <> if Just familyId == currentFamilyId
+                                                then [text " ✔"]
+                                                else []
+              ]
 
 --------------------------------------------------------------------------------
 getSubscriptions :: State -> Subscriptions Action
