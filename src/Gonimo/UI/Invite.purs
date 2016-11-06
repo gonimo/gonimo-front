@@ -191,7 +191,8 @@ view props state =
                       ]
                   [
                     -- H.img [ A.src "../static/pix/WhatsApp.svg", A.alt "WhatsApp" ] []
-                    H.text "WhatsApp"
+                    H.i [A.className "fa fa-fw fa-whatsapp"] []
+                  , H.text "WhatsApp"
                   ]
                 ]
               , H.div [ A.className "btn-group" ]
@@ -201,7 +202,8 @@ view props state =
                       , A.type_ "button"
                       , onClickWithDefault $ const $ InvitationSent SentTelegram
                       ]
-                  [ H.text "Telegram"
+                  [ H.i [A.className "fa fa-fw fa-telegram"] []
+                  , H.text "Telegram"
                   ]
                 ]
               ]
