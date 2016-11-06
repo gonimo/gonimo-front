@@ -172,7 +172,7 @@ viewStartButton state =
     , H.span [A.className "glyphicon glyphicon-transfer"] []
     ]
   , H.div []
-    $ if isJust state.localStream
+    $ if isNothing state.localStream
       then [ H.div [ A.className "alert alert-danger" ]
              [ H.p [] [ H.text "We need to enable your camera/microphone first." ]
              , H.button [ A.className "btn btn-block btn-default"
