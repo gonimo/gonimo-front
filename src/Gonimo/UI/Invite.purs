@@ -172,14 +172,13 @@ view props state =
             , H.div [ A.className "btn-group btn-group-justified" ]
               [
                 H.div [ A.className "btn-group" ]
-                [
-                  H.button [ A.className "btn btn-default"
+                [ H.a [ A.className "btn btn-default"
                            , A.role "button"
                            , A.type_ "button"
                            , E.onClick $ const $ CopyToClipboard "invitationLinkUrlInput"
                            ]
                   [ H.span [ A.className "glyphicon glyphicon-copy"] []
-                  , H.text " Copy to Clipboard"
+                  , H.span [ A.className "hidden-xs"] [H.text " Copy to Clipboard"]
                   ]
                 ]
               , H.div [ A.className "btn-group" ]
@@ -192,7 +191,7 @@ view props state =
                   [
                     -- H.img [ A.src "../static/pix/WhatsApp.svg", A.alt "WhatsApp" ] []
                     H.i [A.className "fa fa-fw fa-whatsapp"] []
-                  , H.text "WhatsApp"
+                  , H.span [A.className "hidden-xs"] [H.text " WhatsApp"]
                   ]
                 ]
               , H.div [ A.className "btn-group" ]
@@ -203,7 +202,7 @@ view props state =
                       , onClickWithDefault $ const $ InvitationSent SentTelegram
                       ]
                   [ H.i [A.className "fa fa-fw fa-telegram"] []
-                  , H.text "Telegram"
+                  , H.span [A.className "hidden-xs"] [H.text " Telegram"]
                   ]
                 ]
               ]
@@ -239,14 +238,16 @@ view props state =
               [ li [ A.className "previous"
                     , E.onClick $ const $ GoToOverview
                     ] [a [] [ span [A.ariaHidden "true"] [text "← "]
-                            , text "Back to Overview"
+                            , span [A.className "hidden-xs"] [text "Back to "]
+                            , text "Overview"
                             ]
                       ]
               , li [ A.className "next"
                     , E.onClick $ const $ GoToBabyStation
-                    ] [ a [] [ text "Make this device a baby station"
-                            , span [A.ariaHidden "true"] [text " →"]
-                            ]
+                    ] [ a [] [ span [A.className "hidden-xs"] [text "Make this device a "]
+                             , text "Baby Station"
+                             , span [A.ariaHidden "true"] [text " →"]
+                             ]
                       ]
               ]
 
