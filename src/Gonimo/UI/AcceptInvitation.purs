@@ -33,7 +33,7 @@ import Gonimo.WebAPI (deleteInvitationsByInvitationSecret, putInvitationsInfoByI
 import Gonimo.WebAPI.Types (InvitationReply(InvitationReject, InvitationAccept), InvitationReply(InvitationReject, InvitationAccept), InvitationInfo(InvitationInfo), AuthData(AuthData))
 import Partial.Unsafe (unsafeCrashWith)
 import Pux (renderToDOM, fromSimple, start)
-import Pux.Html (em, button, input, p, h1, text, span, Html, img, div)
+import Pux.Html (br, em, button, input, p, h3, i, text, span, Html, img, div)
 import Pux.Html.Attributes (offset)
 import Servant.PureScript.Affjax (AjaxError)
 import Servant.PureScript.Settings (defaultSettings, SPSettings_(SPSettings_))
@@ -121,41 +121,51 @@ view (Just state) = case state.accepted of
 viewAskUser :: InvitationInfo -> Html Action
 viewAskUser (InvitationInfo invitation) =
     div []
-        [ h1 []
-             [ text "Gonimo Family Invitation!"]
-        , p []
+        [ h3 [] [ text "Gonimo Family Invitation!"]
+        , div [A.className "jumbotron"]
+          [ div [A.className "container"]
             [ text $ "You received an invitation to join family: "
             , em [] [ text invitation.invitationInfoFamily ]
             , text "!"
-            ]
-        , p []
-            [ text $ "You got invited by a device answering to the name: "
+            , br [] []
+            , text $ "You got invited by a device answering to the name: "
             , em [] [ text invitation.invitationInfoSendingDevice ]
             , text "."
             ]
+          ]
 
         , div [ E.onKeyUp handleEnter ]
-              [ p []
-                  [ text $ "Do you really want to join the almighty family \""
-                    <> invitation.invitationInfoFamily <> "\"?"
-                  ]
-              , p []
-                  [ text $ "Pick wisely! Gonimo is the most awesome baby monitor on the planet, but only with the right family!"
-                  ]
-              , p []
-                [ button [ A.title "Hello my dear family!"
-                          , E.onClick $ const $ Accept
-                          ]
-                          [ text "Accept" ]
-                ]
-              , p []
-                  [ button [ A.title "... of this bloody stalker!"
-                          , E.onClick $ const $ Decline
-                          ]
-                          [ text "Decline this generous offer"]
-                  ]
+          [ p [] [ text $ "Do you really want to join the family \""
+                <> invitation.invitationInfoFamily <> "\"?"
+                 ]
+          , p []
+              [ text $ "Pick wisely! Gonimo is the most awesome baby monitor on the planet, but only with the right family!"
               ]
+          , div [ A.className "btn-group btn-group-justified"
+                , A.role "group"]
+            [ div [ A.className "btn-group"
+                  , A.role "group"]
+              [ button [ A.className "btn btn-block btn-danger"
+                       , A.type_ "button"
+                       , E.onClick $ const $ Decline
+                       ] [ text "Decline "
+                         , i [A.className "fa fa-fw fa-times"] []
+                         ]
+              ]
+            , div [ A.className "btn-group"
+                  , A.role "group"]
+              [ button [ A.title "Hello my dear family!"
+                       , E.onClick $ const $ Accept
+                       , A.className "btn btn-block btn-success"
+                       , A.type_ "button"
+                       ] [ text "Accept "
+                         , span [A.className "hidden-xs"] [text "this generous offer "]
+                         , i [A.className "fa fa-fw fa-check"] []
+                         ]
+              ]
+            ]
           ]
+        ]
   where
     handleEnter :: E.KeyboardEvent -> Action
     handleEnter ev = if ev.keyCode == 13 then Accept else Nop

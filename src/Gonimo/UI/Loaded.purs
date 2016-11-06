@@ -24,6 +24,7 @@ import Gonimo.WebAPI.Subscriber as Sub
 import Pux.Html as H
 import Pux.Html.Attributes as A
 import Pux.Html.Attributes.Bootstrap as A
+import Pux.Html.Attributes.Aria as A
 import Pux.Html.Events as E
 import Servant.Subscriber as Sub
 import Servant.Subscriber.Connection as Sub
@@ -273,136 +274,85 @@ viewHeader :: State -> Html Action
 viewHeader state =
       nav [ A.className "navbar navbar-default" ]
       [ div [ A.className "container"]
+    -- Brand and toggle get grouped for better mobile display --
           [ div [ A.className "navbar-header"]
-            [ button [ A.className "navbar-toggle collapsed"
-                     , A.dataToggle "collapse"
-                     , A.dataTarget "#navbarmenu"
-                     , A.type_ "button"
-                     ]
-              [ span [A.className "icon-bar"] []
-              , span [A.className "icon-bar"] []
-              , span [A.className "icon-bar"] []
-              ]
-            , a [ A.className "navbar-brand navbar-left"]
+            [ burgerButton
+            , a [ A.className "navbar-brand"]
               [ img [ A.alt "gonimo"
-                    , A.src "./pix/gonimo-logo-05.svg"
-                    , A.width "35px"
-                    , A.height "35px"] []
+                    , A.src "./pix/gonimo-brand-01.svg"
+                    , A.width "45px"
+                    , A.height "45px"
+                    , A.style [Tuple "padding" "5px 7.5px 0px 7.5px"]
+                    ] []
               ]
             ]
 
-          , div [ A.className "navbar-collapse collapse"
+    -- Collect the nav links, forms, and other content for toggling --
+          , div [ A.className "collapse navbar-collapse"
                 , A.id_ "navbarmenu"
+                , A.style [Tuple "width" "100%"]
                 , A.dataToggle "collapse"
-                , A.dataTarget "#navbarmenu"]
-            [ ul [ A.className "nav navbar-nav"] $
-              (viewCentralItem <$> getCentrals state) <>
-              [ li [A.className "dropdown"
-                   ,A.dataToggle "collapse"]
-                  [ a [ A.className "dropdown-toggle" , A.href "#"
-                      , A.dataToggle "dropdown"       , A.role "button"
-                      , A.type_ "button"
-                      ]
-                    [ i [A.className "fa fa-fw fa-users"] []
-                    , text " "
-                    , text $ fromMaybe "" $ _.familyName <<< runFamily <$> (state.socketS.currentFamily >>= flip Map.lookup state.families)
-                    , text " "
-                    , span [A.className "caret"] [] ]
-                    , viewFamilyChooser state
-                  ]
-              , li [A.className "dropdown"]
-                [ a [ A.className "dropdown-toggle" , A.href "#"
-                    , A.dataToggle "dropdown"       , A.role "button"
-                    , A.type_ "button"
-                    , A.style [Tuple "minWidth" "180px"]]
-                  [ i [A.className "fa fa-fw fa-user"] []
-                  , text " "
-                  , text "epsilonhalbe"
-                  , text " "
-                  , span [A.className "caret"] []
-                  ]
-                , ul [A.className "dropdown-menu", A.style [Tuple "minWidth" "180px"]]
-                  [ li [] [a [] [text " User settings "
-                                ,i [A.className "fa fa-fw fa-cog pull-right"] []]]
-                  , li [] [ a [] [ text "Change password "
-                                 , i [A.className "fa fa-fw fa-lock pull-right" ][]
-                                 ]]
-                  , li [A.className "divider", A.role "separator"] []
-                  , li [] [a [] [ text "Log-Out "
-                                , i [A.className "fa fa-fw fa-sign-out pull-right"] []
-                                ]]
-                  ]
+                , A.dataTarget ".navbar-collapse.in"
                 ]
+            [ ul [ A.className "nav navbar-nav"] $ (viewCentralItem <$> getCentrals state) <>
+              [ viewFamilyChooser state
+              , viewUserSettings
               ]
             ]
           ]
         ]
 
   where
+    burgerButton :: Html Action
+    burgerButton = button [ A.type_ "button"
+                          , A.className "navbar-toggle collapsed"
+                          , A.dataToggle "collapse"
+                          , A.dataTarget "#navbarmenu"
+                          , A.ariaExpanded "false"
+                          ]
+                   [ span [A.className "sr-only"] [text "Toggle navigation"]
+                   , span [A.className "icon-bar"] []
+                   , span [A.className "icon-bar"] []
+                   , span [A.className "icon-bar"] []
+                   ]
     viewCentralItem :: Tuple Boolean CentralReq -> Html Action
     viewCentralItem (Tuple active item) =
-      li [ A.className $ "nav navbar-nav" <> if active then " active" else ""
-         , A.type_ "button"
-         , A.role "button"
+      li (if active then [ A.className "active" ] else []
+          <>    [ A.dataToggle "collapse"
+                , A.dataTarget ".navbar-collapse.in"]
+         )
+         [ a [ E.onClick <<< const $ RequestCentral item ]
+           [ text $ userShow item ]
          ]
-      [ a [ E.onClick $ const $ RequestCentral item ]
-        [ text (userShow item) ]
+
+viewUserSettings :: Html Action
+viewUserSettings =
+  li [A.className "dropdown navbar-right"]
+  [ a [ A.className "dropdown-toggle"
+      , A.href "#"
+      , A.role "button"
+      , A.dataToggle "dropdown"
+      , A.type_ "button"
       ]
-
-
--- viewNavbar :: State -> Html Action
--- viewNavbar state =
---        nav [ A.className "navbar navbar-default" ]
---         [ div [ A.className "container-fluid" ]
---           [ -- Brand and toggle get grouped for better mobile display
---             div [ A.className "navbar-header" ]
---             [ button [ A.type_ "button"
---                      , A.className "navbar-toggle collapsed"
---                      , A.dataToggle "collapse"
---                      , A.dataTarget "navbar-collapse-1"
---                      ]
---               [ span [ A.className "sr-only" ] [ text "Toggle navigation" ]
---               , span [ A.className "icon-bar" ] []
---               , span [ A.className "icon-bar" ] []
---               , span [ A.className "icon-bar" ] []
---               ]
---             , a [ A.className "navbar-brand"
---                 , A.role "button"
---                 , E.onClick $ const $ SetCentral centralOverview
---                 ]
---                 [ text "Overview" ]
---             , a [ A.className "navbar-brand"
---                 , A.role "button"
---                 , E.onClick $ const $ SetCentral CentralInvite
---                 ]
---               [ text "Invite" ]
---             ]
---           , -- Collect the nav links, forms, and other content for toggling
---             div [ A.className "collapse navbar-collapse", A.id_ "navbar-collapse-1" ]
---             [
---               ul [ A.className "nav navbar-nav" ]
---               [ li []
---                 [ 
---                 ]
---               ]
---             , ul [ A.className "nav navbar-nav navbar-right" ]
---               [ li [ A.className "dropdown" ]
---                 [ a [ A.className "dropdown-toggle"
---                          , A.dataToggle "dropdown"
---                          , A.role "button"
---                          ]
---                   [ text "Account" , span [ A.className "caret" ] [] ]
---                   , ul [ A.className "dropdown-menu" ]
---                     [ li [] [ a [ A.href "#" ] [ text "Configure User Details" ] ]
---                     , li [] [ a [ A.href "#" ] [ text "change password" ] ]
---                     , li [ A.role "separator",  A.className "divider" ] []
---                     , li [] [ a [ A.href "#" ] [ text "Log out" ] ]
---                     ]
---                   ]
---                 ]
---               ]
---             ]
---           ]
+    [ i [A.className "fa fa-fw fa-user"] []
+    , text " "
+    , text "Max Mustermann"
+    , text " "
+    , span [A.className "caret"] []
+    ]
+  , ul [A.className "dropdown-menu", A.style [Tuple "minWidth" "180px"]]
+    [ li [A.dataToggle "collapse"] [div [A.className "dropdown-header"] [text "Change user settings (WIP)"]]
+    , li [A.className "disabled"] [a [] [text " User settings "
+                  ,i [A.className "fa fa-fw fa-cog pull-right"] []]]
+    , li [A.className "disabled"] [ a [] [ text "Change password "
+                   , i [A.className "fa fa-fw fa-lock pull-right" ][]
+                   ]]
+    , li [A.className "divider", A.role "separator"] []
+    , li [A.className "disabled"] [a [] [ text "Log-Out "
+                  , i [A.className "fa fa-fw fa-sign-out pull-right"] []
+                  ]]
+    ]
+  ]
 
 viewCentral :: State -> Html Action
 viewCentral state =
@@ -470,10 +420,26 @@ viewOnlineDevices state = table [ A.className "table table-striped"]
 
 viewFamilyChooser :: State -> Html Action
 viewFamilyChooser state =
-    H.ul [A.className "dropdown-menu"] $
-         [li [A.dataToggle "collapse"] [div [A.className "navbar-text"] [text "Change family to"]]]
-         <> (fromFoldable <<< map (uncurry (viewFamily state.socketS.currentFamily))
-                          <<< Map.toList $ state.families)
+  li [ A.className "dropdown"
+     , A.dataToggle "collapse"
+     ]
+  [ a [ A.className "dropdown-toggle"
+      , A.href "#"
+      , A.role "button"
+      , A.dataToggle "dropdown"
+      , A.type_ "button"
+      ]
+    [ i [A.className "fa fa-fw fa-users"] []
+    , text " "
+    , text $ fromMaybe "" $ _.familyName <<< runFamily <$> (state.socketS.currentFamily >>= flip Map.lookup state.families)
+    {--, span [] [text $ fromMaybe "" $ _.familyName <<< runFamily <$> (state.socketS.currentFamily >>= flip Map.lookup state.families)]--}
+    , text " "
+    , span [A.className "caret"] [] ]
+    , H.ul [A.className "dropdown-menu"] $
+        [li [A.dataToggle "collapse"] [div [A.className "dropdown-header"] [text "Change family to"]]]
+        <> (fromFoldable <<< map (uncurry (viewFamily state.socketS.currentFamily))
+                         <<< Map.toList $ state.families)
+  ]
   where
     doSwitchFamily :: Key Family -> Action
     doSwitchFamily = SocketA <<< SocketC.SwitchFamily

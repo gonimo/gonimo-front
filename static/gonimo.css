@@ -5,9 +5,11 @@
     position: relative;
 }
 
-#main {
+#app{
     height: 90%;
-    width: 800px;
+    max-width: 800px;
+    margin: auto;
+    padding: 0 0 0 0;
 }
 
 body {
@@ -15,7 +17,6 @@ body {
     justify-content: center;
     flex-direction: column;
     font-family: sans-serif;
-    max-width: 800px;
     margin: auto;
 }
 
@@ -103,8 +104,22 @@ a.boxclose{
     margin: 1%;
 }
 
+.navbar-nav > li > a {
+    padding-left: 7.5px;
+    padding-right: 7.5px;
+}
 .navbar-nav {
  margin: 0;
- padding: 0.0px 0px;
+ padding: 7.5px -15px;
+}
+
+.navbar-collapse{
+ padding-left: 0;
+ padding-right: 0;
+}
+
+.navbar-brand {
+ margin: 0;
+ padding: 0;
 }
 

@@ -46,42 +46,51 @@ import WebRTC.MediaStream (mediaStreamToBlob, createObjectURL, stopStream, Media
 import WebRTC.RTC (RTCPeerConnection)
 
 view :: forall ps. Props ps -> State -> Html Action
-view props state = H.div [ A.className "jumbotron" ]
-       [ if state.isAvailable
+view props state =
+    H.div [ A.className "container"
+          , A.style [Tuple "width" "100%"]]
+      [ H.h3 [] [ H.text "Baby Station Management"
+                , H.br [] []
+                , H.small []
+                  [ H.text $ "Here you can promote a device to a baby station,"
+                          <> " which means that this device can send video and"
+                          <> " audio data, (if enabled) otherwise you need to"
+                          <> " allow your browser to access the hardware."
+                  ]
+                ]
+      , if state.isAvailable
          then viewOnline props state
          else viewOffline props state
-       ]
+      ]
 
 viewOffline :: forall ps. Props ps -> State -> Html Action
 viewOffline props state =
     H.div []
     [ viewVideo props state
-    , H.div [ A.className "videoContainer" ]
-      [ viewStartButton state
-      ]
+    , H.div [ A.className "videoContainer" ] [ viewStartButton state ]
     , viewBabyNameSelect props state
     ]
 
 viewOnline :: forall ps. Props ps -> State -> Html Action
 viewOnline props state =
-  H.div [ A.className "videoContainer" ]
-  [ if state.previewEnabled
-    then H.div [ A.className "closableBox"]
-         [ H.a [ A.className "boxclose"
-                 , E.onClick $ const $ EnablePreview false
-               ] []
-         , viewVideo props state
-         ]
-    else H.div [ A.className "btn-group" ]
-         [ H.button [ A.className "btn btn-default btn-block"
-                    , E.onClick $ const $ EnablePreview true
-                    , A.type_ "button"
-                    ]
-           [ H.text "Adjust camera"
-           ]
-         ]
-    , viewStopButton state
-  ]
+  H.div []
+    [ H.div [ A.className "videoContainer" ]
+      [ if state.previewEnabled
+        then H.div [ A.className "closableBox"]
+             [ H.a [ A.className "boxclose"
+                     , E.onClick $ const $ EnablePreview false
+                   ] []
+             , viewVideo props state
+             ]
+        else H.div [ A.className "btn-group" ]
+             [ H.button [ A.className "btn btn-default btn-block"
+                        , E.onClick $ const $ EnablePreview true
+                        , A.type_ "button" ]
+               [ H.text "Adjust camera" ]
+             ]
+      ]
+      , viewStopButton state
+    ]
 
 viewVideo :: forall ps. Props ps -> State -> Html Action
 viewVideo props state =
@@ -109,7 +118,7 @@ viewBabyNameSelect props state =
        [ H.h3 [] [ H.text "Select a name for your baby station"
                  , H.br [][]
                  , H.small [] [H.text "the last few names you used were:"]]
-       , H.div [ A.className "list-group", A.role "group" ]
+       , H.div [ A.className "videoContainer list-group", A.role "group" ]
          $ (viewBabyButton state <$> lastBabies) <>
          [ H.a [ A.className $ "list-group-item "
                                    <> if state.newBabyName == state.babyName
@@ -135,15 +144,17 @@ viewBabyButton state baby =
 
 viewStopButton :: State -> Html Action
 viewStopButton state =
-  H.div [ A.className "btn-group", A.role "group" ]
+  H.div []
   [ H.h3 [] [ H.text $ "Baby monitor running for cute " <> state.babyName <> " …"]
-  , H.button [ A.className "btn btn-block btn-danger"
+  , H.div [A.className "videoContainer"]
+    [ H.button [ A.className "btn btn-block btn-danger"
               , A.style [ Tuple "margin-left" "0px" ]
               , A.type_ "button"
               , E.onClick $ const $ StopBabyStation
               ]
-    [ H.text "Stop Baby Monitor "
-    , H.span [A.className "glyphicon glyphicon-off"] []
+      [ H.text "Stop Baby Monitor "
+      , H.span [A.className "glyphicon glyphicon-off"] []
+      ]
     ]
   ]
 
