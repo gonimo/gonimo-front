@@ -1,6 +1,6 @@
-module Gonimo.Server.DbEntities.Helpers where
+module Gonimo.Server.Db.Entities.Helpers where
 
 
-import Gonimo.Server.DbEntities as Exports
+import Gonimo.Server.Db.Entities as Exports
 
 runFamily (Exports.Family f) = f
