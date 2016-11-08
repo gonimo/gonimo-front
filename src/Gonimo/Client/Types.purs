@@ -46,7 +46,7 @@ instance reportErrorActionReportParent :: ReportErrorAction (ReportParent action
 
 newtype Gonimo a = Gonimo (ReaderT Settings (ExceptT GonimoError IO) a)
 
--- We have unwrapGonimo in Gonimo.Pux, so call it unwrap
+-- We have runGonimo in Gonimo.Pux, so call it unwrap
 unwrapGonimo :: forall a. Gonimo a -> (ReaderT Settings (ExceptT GonimoError IO) a)
 unwrapGonimo (Gonimo m) = m
 
