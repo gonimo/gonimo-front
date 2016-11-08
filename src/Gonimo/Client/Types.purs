@@ -31,6 +31,7 @@ import WebSocket (WEBSOCKET)
 type Settings = SPSettings_ SPParams_
 
 data GonimoError = AjaxError Affjax.AjaxError
+                 | RegisterSessionFailed Affjax.AjaxError
                  | UnexpectedAction String
 
 -- | Action type to use when errors should be handled by the parent component.
