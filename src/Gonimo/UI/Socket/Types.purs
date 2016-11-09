@@ -38,6 +38,7 @@ type Props ps = { settings :: Settings
 
 type State =
   { authData :: AuthData
+  , sessionId :: Maybe SessionId
   , currentFamily :: Maybe (Key Family)
   , channels :: Map ChannelId ChannelC.State
   , babyName :: String
@@ -93,10 +94,12 @@ data Action = AcceptConnection ChannelId
             | SwitchFamily (Key Family)
             | ServerFamilyGoOffline (Key Family) -- | A bit of a hack - for reliably switching families
             | SetAuthData AuthData
+            | SetSessionId (Maybe SessionId)
             | StartBabyStation
             | InitBabyStation MediaStream
             | SetStreamURL (Maybe String)
             | StopBabyStation
+            | HandleSubscriber Notification
 
             | SetBabyName String
             | SetNewBabyName String

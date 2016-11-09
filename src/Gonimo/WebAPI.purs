@@ -12,7 +12,8 @@ import Data.Maybe (Maybe, Maybe(..))
 import Data.Nullable (Nullable(), toNullable)
 import Data.Tuple (Tuple)
 import Global (encodeURIComponent)
-import Gonimo.Server.DbEntities (Account, Device, Family, Invitation)
+import Gonimo.Server.Db.Entities (Account, Device, Family, Invitation)
+import Gonimo.Server.State.Types (SessionId)
 import Gonimo.Server.Types (AuthToken, Coffee, DeviceType)
 import Gonimo.Types (Key, Secret)
 import Gonimo.WebAPI.Types (AuthData, DeviceInfo, InvitationInfo, InvitationReply, SendInvitation)
@@ -342,19 +343,19 @@ receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId familyId fromDevice
   affResp <- affjax affReq
   getResult affReq decodeJson affResp
   
-postOnlineStatusByFamilyId :: forall eff m.
-                              (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-                              => Tuple (Key Device) DeviceType -> Key Family
-                              -> m Unit
-postOnlineStatusByFamilyId reqBody familyId = do
+postSessionByFamilyIdByDeviceId :: forall eff m.
+                                   (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
+                                   => DeviceType -> Key Family -> Key Device
+                                   -> m SessionId
+postSessionByFamilyIdByDeviceId reqBody familyId deviceId = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
   let authorization = spParams_.authorization
   let baseURL = spParams_.baseURL
   let httpMethod = "POST"
-  let reqUrl = baseURL <> "onlineStatus"
-        <> "/" <> encodeURLPiece spOpts_' familyId
+  let reqUrl = baseURL <> "session" <> "/" <> encodeURLPiece spOpts_' familyId
+        <> "/" <> encodeURLPiece spOpts_' deviceId
   let reqHeaders =
         [{ field : "Authorization" , value : encodeHeader spOpts_' authorization
          }]
@@ -367,20 +368,22 @@ postOnlineStatusByFamilyId reqBody familyId = do
   affResp <- affjax affReq
   getResult affReq decodeJson affResp
   
-putOnlineStatusByFamilyIdByDeviceId :: forall eff m.
-                                       (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-                                       => DeviceType -> Key Family -> Key Device
-                                       -> m Unit
-putOnlineStatusByFamilyIdByDeviceId reqBody familyId deviceId = do
+putSessionByFamilyIdByDeviceIdBySessionId :: forall eff m.
+                                             (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
+                                             => DeviceType -> Key Family
+                                             -> Key Device -> SessionId
+                                             -> m Unit
+putSessionByFamilyIdByDeviceIdBySessionId reqBody familyId deviceId
+                                          sessionId = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
   let authorization = spParams_.authorization
   let baseURL = spParams_.baseURL
   let httpMethod = "PUT"
-  let reqUrl = baseURL <> "onlineStatus"
-        <> "/" <> encodeURLPiece spOpts_' familyId
+  let reqUrl = baseURL <> "session" <> "/" <> encodeURLPiece spOpts_' familyId
         <> "/" <> encodeURLPiece spOpts_' deviceId
+        <> "/" <> encodeURLPiece spOpts_' sessionId
   let reqHeaders =
         [{ field : "Authorization" , value : encodeHeader spOpts_' authorization
          }]
@@ -393,19 +396,20 @@ putOnlineStatusByFamilyIdByDeviceId reqBody familyId deviceId = do
   affResp <- affjax affReq
   getResult affReq decodeJson affResp
   
-deleteOnlineStatusByFamilyIdByDeviceId :: forall eff m.
-                                          (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-                                          => Key Family -> Key Device -> m Unit
-deleteOnlineStatusByFamilyIdByDeviceId familyId deviceId = do
+deleteSessionByFamilyIdByDeviceIdBySessionId :: forall eff m.
+                                                (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
+                                                => Key Family -> Key Device
+                                                -> SessionId -> m Unit
+deleteSessionByFamilyIdByDeviceIdBySessionId familyId deviceId sessionId = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
   let authorization = spParams_.authorization
   let baseURL = spParams_.baseURL
   let httpMethod = "DELETE"
-  let reqUrl = baseURL <> "onlineStatus"
-        <> "/" <> encodeURLPiece spOpts_' familyId
+  let reqUrl = baseURL <> "session" <> "/" <> encodeURLPiece spOpts_' familyId
         <> "/" <> encodeURLPiece spOpts_' deviceId
+        <> "/" <> encodeURLPiece spOpts_' sessionId
   let reqHeaders =
         [{ field : "Authorization" , value : encodeHeader spOpts_' authorization
          }]
@@ -417,19 +421,18 @@ deleteOnlineStatusByFamilyIdByDeviceId familyId deviceId = do
   affResp <- affjax affReq
   getResult affReq decodeJson affResp
   
-getOnlineStatusByFamilyId :: forall eff m.
-                             (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-                             => Key Family
-                             -> m (Array (Tuple (Key Device) DeviceType))
-getOnlineStatusByFamilyId familyId = do
+getSessionByFamilyId :: forall eff m.
+                        (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
+                        => Key Family
+                        -> m (Array (Tuple (Key Device) DeviceType))
+getSessionByFamilyId familyId = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
   let authorization = spParams_.authorization
   let baseURL = spParams_.baseURL
   let httpMethod = "GET"
-  let reqUrl = baseURL <> "onlineStatus"
-        <> "/" <> encodeURLPiece spOpts_' familyId
+  let reqUrl = baseURL <> "session" <> "/" <> encodeURLPiece spOpts_' familyId
   let reqHeaders =
         [{ field : "Authorization" , value : encodeHeader spOpts_' authorization
          }]

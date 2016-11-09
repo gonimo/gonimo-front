@@ -3,8 +3,8 @@ module Gonimo.UI.Loaded.Types where
 import Prelude
 import Data.Map as Map
 import Gonimo.UI.AcceptInvitation as AcceptC
-import Gonimo.UI.Overview as OverviewC
 import Gonimo.UI.Invite as InviteC
+import Gonimo.UI.Overview as OverviewC
 import Gonimo.UI.Socket.Lenses as SocketC
 import Gonimo.UI.Socket.Types as SocketC
 import Control.Monad.Eff (Eff)

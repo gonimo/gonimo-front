@@ -19,12 +19,12 @@ import Control.Monad.State.Class (modify, class MonadState)
 import Data.Either (Either(Left, Right), either)
 import Data.Generic (gShow)
 import Data.Maybe (fromMaybe, maybe, Maybe(Just, Nothing))
-import Gonimo.Client.Types (GonimoError(AjaxError, UnexpectedAction))
+import Gonimo.Client.Types (GonimoError(RegisterSessionFailed, AjaxError, UnexpectedAction))
 import Gonimo.Server.Error (ServerError)
 import Pux.Html (div, button, p, h1, text, Html)
 import Pux.Html.Attributes (offset)
 import Servant.PureScript.Affjax (requestToString, ErrorDescription(ConnectionError), responseToString, unsafeToString, ErrorDescription(DecodingError, ParsingError, UnexpectedHTTPStatus))
-import Servant.Subscriber.Connection (Notification(HttpRequestFailed, ParseError, WebSocketClosed, WebSocketError))
+import Servant.Subscriber.Connection (Notification(HttpRequestFailed, ParseError, WebSocketClosed, WebSocketOpened, WebSocketError))
 import Servant.Subscriber.Internal (doDecode)
 import Servant.Subscriber.Request (HttpRequest)
 import Servant.Subscriber.Response (HttpResponse(HttpResponse))
@@ -53,6 +53,7 @@ handleError :: forall eff r m action. ( ErrorAction action, MonadState (State r)
                => GonimoError -> m (Array (IO action))
 handleError err = case err of
   UnexpectedAction msg -> logError "An unexpected action occurred: " msg
+  RegisterSessionFailed err -> handleAjaxError err
   AjaxError err -> handleAjaxError err
 
 handleAjaxError :: forall r m action. ( ErrorAction action, MonadState (State r) m )
@@ -72,6 +73,7 @@ handleSubscriber :: forall r m action. ( ErrorAction action, MonadState (State r
 handleSubscriber notification =
   case notification of
     WebSocketError msg           -> logError "A websocket error occurred: " msg
+    WebSocketOpened              -> logError "WebSocket connection established!" ""
     WebSocketClosed msg          -> logError "The websocket connection got closed: " msg
     ParseError msg               -> logError "A parsing error occurred: " msg
     HttpRequestFailed req' resp' -> handleFailedHttpRequest req' resp'

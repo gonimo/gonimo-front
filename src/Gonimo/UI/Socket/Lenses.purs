@@ -12,6 +12,9 @@ settings = Lens.lens _."settings" (_ { "settings" = _ })
 authData :: forall a b r. Lens.Lens { "authData" :: a | r } { "authData" :: b | r } a b
 authData = Lens.lens _."authData" (_ { "authData" = _ })
 
+sessionId :: forall a b r. Lens.Lens { "sessionId" :: a | r } { "sessionId" :: b | r } a b
+sessionId = Lens.lens _."sessionId" (_ { "sessionId" = _ })
+
 currentFamily :: forall a b r. Lens.Lens { "currentFamily" :: a | r } { "currentFamily" :: b | r } a b
 currentFamily = Lens.lens _."currentFamily" (_ { "currentFamily" = _ })
 
