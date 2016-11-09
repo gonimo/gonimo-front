@@ -31,6 +31,7 @@ import WebSocket (WEBSOCKET)
 type Settings = SPSettings_ SPParams_
 
 data GonimoError = AjaxError Affjax.AjaxError
+                 | RegisterSessionFailed Affjax.AjaxError
                  | UnexpectedAction String
 
 -- | Action type to use when errors should be handled by the parent component.
@@ -46,7 +47,7 @@ instance reportErrorActionReportParent :: ReportErrorAction (ReportParent action
 
 newtype Gonimo a = Gonimo (ReaderT Settings (ExceptT GonimoError IO) a)
 
--- We have unwrapGonimo in Gonimo.Pux, so call it unwrap
+-- We have runGonimo in Gonimo.Pux, so call it unwrap
 unwrapGonimo :: forall a. Gonimo a -> (ReaderT Settings (ExceptT GonimoError IO) a)
 unwrapGonimo (Gonimo m) = m
 

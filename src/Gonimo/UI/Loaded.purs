@@ -23,9 +23,10 @@ import Gonimo.WebAPI.MakeRequests as Reqs
 import Gonimo.WebAPI.Subscriber as Sub
 import Pux.Html as H
 import Pux.Html.Attributes as A
-import Pux.Html.Attributes.Bootstrap as A
 import Pux.Html.Attributes.Aria as A
+import Pux.Html.Attributes.Bootstrap as A
 import Pux.Html.Events as E
+import Servant.PureScript.Affjax as Affjax
 import Servant.Subscriber as Sub
 import Servant.Subscriber.Connection as Sub
 import Browser.LocalStorage (STORAGE, localStorage)
@@ -33,6 +34,7 @@ import Control.Alt ((<|>))
 import Control.Monad.Aff (Aff)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
+import Control.Monad.Error.Class (throwError, catchError)
 import Control.Monad.Except.Trans (runExceptT)
 import Control.Monad.Reader (runReader)
 import Control.Monad.Reader.Class (class MonadReader)
@@ -55,18 +57,19 @@ import Data.String (takeWhile)
 import Data.Traversable (traverse)
 import Data.Tuple (uncurry, fst, Tuple(Tuple))
 import Debug.Trace (trace)
-import Gonimo.Client.Types (toIO, Settings, GonimoError, class ReportErrorAction, Gonimo)
+import Gonimo.Client.Types (toIO, Settings, GonimoError(AjaxError, RegisterSessionFailed), class ReportErrorAction, Gonimo)
 import Gonimo.Pux (noEffects, Component, toParent, runGonimo, liftChild, ComponentType, makeChildData, ToChild, onlyModify, Update, wrapAction)
-import Gonimo.Server.DbEntities (Device(Device), Family(Family))
-import Gonimo.Server.DbEntities.Helpers (runFamily)
+import Gonimo.Server.Db.Entities (Device(Device), Family(Family))
+import Gonimo.Server.Db.Entities.Helpers (runFamily)
 import Gonimo.Server.Error (ServerError(InvalidAuthToken))
 import Gonimo.Server.Types (DeviceType(Baby, NoBaby), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (dateToString, Key(Key), Secret(Secret))
-import Gonimo.UI.Error (viewError, class ErrorAction, UserError(NoError, DeviceInvalid), handleSubscriber, handleError)
+import Gonimo.UI.Error (handleError, viewError, class ErrorAction, UserError(NoError, DeviceInvalid))
 import Gonimo.UI.Loaded.Central (getCentrals)
 import Gonimo.UI.Loaded.Types (mkInviteProps', CentralReq(..), mkInviteProps, mkSettings, mkProps, central, familyIds, authData, currentFamily, socketS, overviewS, Props, acceptS, inviteS, State, Action(..), Central(..), InviteProps)
+import Gonimo.UI.Socket.Lenses (sessionId)
 import Gonimo.Util (userShow, toString, fromString)
-import Gonimo.WebAPI (postInvitationsByFamilyId, postFamilies, getFamiliesByFamilyId, postFunnyName, deleteOnlineStatusByFamilyIdByDeviceId, SPParams_(SPParams_), postAccounts)
+import Gonimo.WebAPI (postSessionByFamilyIdByDeviceId, postInvitationsByFamilyId, postFamilies, getFamiliesByFamilyId, postFunnyName, SPParams_(SPParams_), postAccounts)
 import Gonimo.WebAPI.Types (DeviceInfo(DeviceInfo), AuthData(AuthData))
 import Gonimo.WebAPI.Types.Helpers (runAuthData)
 import Partial.Unsafe (unsafeCrashWith)
@@ -75,10 +78,10 @@ import Pux.Html (text, small, script, li, i, a, nav, h3, h2, td, tbody, th, tr, 
 import Pux.Html.Attributes (offset, letterSpacing)
 import Pux.Html.Events (FormEvent, FocusEvent)
 import Pux.Router (navigateTo)
-import Servant.PureScript.Affjax (AjaxError)
+import Servant.PureScript.Affjax (ErrorDescription(ConnectionError), errorToString, AjaxError)
 import Servant.PureScript.Settings (defaultSettings, SPSettings_(SPSettings_))
 import Servant.Subscriber (Subscriber)
-import Servant.Subscriber.Connection (Notification(HttpRequestFailed, ParseError, WebSocketClosed, WebSocketError))
+import Servant.Subscriber.Connection (Notification(WebSocketOpened, HttpRequestFailed, ParseError, WebSocketClosed, WebSocketError))
 import Servant.Subscriber.Internal (doDecode, coerceEffects)
 import Servant.Subscriber.Request (HttpRequest(HttpRequest))
 import Servant.Subscriber.Response (HttpResponse(HttpResponse))
@@ -97,7 +100,7 @@ update (InviteA _ (InviteC.ReportError err))   = handleError err
 update (InviteA mProps action)                 = updateInvite mProps action
 update (AcceptA (AcceptC.ReportError err))     = handleError err
 update (AcceptA action)                        = updateAccept action
-update (SocketA (SocketC.ReportError err))     = handleError err
+update (SocketA a@(SocketC.ReportError err))   = append <$> handleError err <*> updateSocket a
 update (SocketA action)                        = updateSocket action
 update (OverviewA (OverviewC.SocketA socketA)) = updateSocket socketA
 update (OverviewA OverviewC.GoToInviteView)    = handleRequestCentral ReqCentralInvite
@@ -165,6 +168,12 @@ updateSocket action = do
 
 inviteEffect :: forall m. Monad m => Secret -> m Action
 inviteEffect = pure <<< AcceptA <<< AcceptC.LoadInvitation
+
+handleSubscriber :: Notification -> ComponentType Unit State Action
+handleSubscriber notification = do
+  append <$> Error.handleSubscriber notification
+         <*> updateSocket (SocketC.HandleSubscriber notification)
+
 
 handleResetDevice :: ComponentType Unit State Action
 handleResetDevice = do
@@ -457,7 +466,7 @@ getSubscriptions :: State -> Subscriptions Action
 getSubscriptions state =
   let
     familyId = state^?currentFamily
-
+    sessionId' = state^.socketS<<<sessionId
     --subscribeGetFamily :: forall m. MonadReader Settings m => Key Family -> m (Subscriptions Action)
     subscribeGetFamily familyId' =
       Sub.getFamiliesByFamilyId (maybe Nop (UpdateFamily familyId')) familyId'
@@ -467,8 +476,9 @@ getSubscriptions state =
       [ [ Sub.getAccountsByAccountIdFamilies (maybe Nop SetFamilyIds)
                                           (runAuthData $ state^.authData).accountId
         ]
-      , fromFoldable $
-        Sub.getOnlineStatusByFamilyId (maybe Nop SetOnlineDevices) <$> familyId
+      , fromFoldable $ do
+           _ <- sessionId' -- Avoid error message `FamilyNotOnline` when not yet ready.
+           Sub.getSessionByFamilyId (maybe Nop SetOnlineDevices) <$> familyId
       , fromFoldable $
         Sub.getFamiliesByFamilyIdDeviceInfos (maybe Nop SetDeviceInfos) <$> familyId
       , map subscribeGetFamily state.familyIds
@@ -483,21 +493,32 @@ getPongRequest state =
   let
     deviceId = (runAuthData $ state^.authData).deviceId
     onlineStatus' = state ^. socketS <<< to SocketC.toDeviceType
-    deviceData = Tuple deviceId onlineStatus'
+    sessionId'    = state ^. socketS <<< to _.sessionId
     familyId = state^?currentFamily
   in
    case state.userError of
-     NoError -> flip runReader (mkSettings $ state^.authData) <<< Reqs.postOnlineStatusByFamilyId deviceData <$> familyId
-     _ -> Nothing
+     NoError -> flip runReader (mkSettings $ state^.authData) <$>
+                ( Reqs.putSessionByFamilyIdByDeviceIdBySessionId onlineStatus'
+                  <$> familyId
+                  <*> pure deviceId
+                  <*> sessionId'
+                )
+     _       -> Nothing
 
 getCloseRequest :: State -> Maybe HttpRequest
 getCloseRequest state =
   let
     deviceId = (runAuthData $ state^.authData).deviceId
     familyId = state^?currentFamily
+    sessionId' = state ^. socketS <<< to _.sessionId
   in
    case state.userError of
-     NoError -> flip runReader (mkSettings $ state^.authData) <<< flip Reqs.deleteOnlineStatusByFamilyIdByDeviceId deviceId <$> familyId
+     NoError -> flip runReader (mkSettings $ state^.authData) <$>
+                ( Reqs.deleteSessionByFamilyIdByDeviceIdBySessionId
+                  <$> familyId
+                  <*> pure deviceId
+                  <*> sessionId'
+                )
      _ -> Nothing
 
 

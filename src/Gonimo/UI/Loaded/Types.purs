@@ -3,8 +3,8 @@ module Gonimo.UI.Loaded.Types where
 import Prelude
 import Data.Map as Map
 import Gonimo.UI.AcceptInvitation as AcceptC
-import Gonimo.UI.Overview as OverviewC
 import Gonimo.UI.Invite as InviteC
+import Gonimo.UI.Overview as OverviewC
 import Gonimo.UI.Socket.Lenses as SocketC
 import Gonimo.UI.Socket.Types as SocketC
 import Control.Monad.Eff (Eff)
@@ -17,7 +17,7 @@ import Data.Maybe (Maybe)
 import Data.Profunctor (lmap)
 import Data.Tuple (Tuple(Tuple))
 import Gonimo.Client.Types (Settings, class ReportErrorAction, GonimoError)
-import Gonimo.Server.DbEntities (Device(Device), Family(Family))
+import Gonimo.Server.Db.Entities (Device(Device), Family(Family))
 import Gonimo.Server.Types (DeviceType)
 import Gonimo.Types (Secret(Secret), Key(Key))
 import Gonimo.UI.Error (class ErrorAction, UserError)

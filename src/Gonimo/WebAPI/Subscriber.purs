@@ -12,7 +12,7 @@ import Data.Maybe (Maybe, Maybe(..))
 import Data.Nullable (Nullable(), toNullable)
 import Data.Tuple (Tuple, Tuple(..))
 import Global (encodeURIComponent)
-import Gonimo.Server.DbEntities (Account, Device, Family)
+import Gonimo.Server.Db.Entities (Account, Device, Family)
 import Gonimo.Server.Types (AuthToken, DeviceType)
 import Gonimo.Types (Key, Secret)
 import Gonimo.WebAPI (SPParams_(..))
@@ -80,11 +80,10 @@ receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId spToUser_ familyId
                                                                                  channelId
   pure $ makeSubscriptions spReq (toUserType spToUser_)
 
-getOnlineStatusByFamilyId :: forall m a. MonadReader (SPSettings_ SPParams_) m
-                             =>
-                             TypedToUser (Array (Tuple (Key Device) DeviceType)) a
-                             -> Key Family -> m (Subscriptions a)
-getOnlineStatusByFamilyId spToUser_ familyId = do
-  spReq <- MakeRequests.getOnlineStatusByFamilyId familyId
+getSessionByFamilyId :: forall m a. MonadReader (SPSettings_ SPParams_) m =>
+                        TypedToUser (Array (Tuple (Key Device) DeviceType)) a
+                        -> Key Family -> m (Subscriptions a)
+getSessionByFamilyId spToUser_ familyId = do
+  spReq <- MakeRequests.getSessionByFamilyId familyId
   pure $ makeSubscriptions spReq (toUserType spToUser_)
 

@@ -17,13 +17,15 @@ import Data.Monoid (mempty)
 import Data.Tuple (uncurry, snd, Tuple(Tuple))
 import Gonimo.Client.Types (GonimoError, class ReportErrorAction, Settings)
 import Gonimo.Pux (noEffects)
-import Gonimo.Server.DbEntities (Family(Family), Device(Device))
+import Gonimo.Server.Db.Entities (Family(Family), Device(Device))
+import Gonimo.Server.State.Types (SessionId(SessionId))
 import Gonimo.Server.Types (DeviceType(Baby, NoBaby))
 import Gonimo.Types (Secret(Secret), Key(Key))
 import Gonimo.UI.Socket.Message (Message)
 import Gonimo.WebAPI.Subscriber (receiveSocketByFamilyIdByToDevice, receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
 import Gonimo.WebAPI.Types (AuthData(AuthData))
 import Servant.Subscriber (Subscriptions)
+import Servant.Subscriber.Connection (Notification)
 import Signal.Channel (Channel)
 import WebRTC.MediaStream (MediaStreamConstraints(MediaStreamConstraints), MediaStream)
 import WebRTC.RTC (newRTCPeerConnection, RTCPeerConnection)
@@ -36,6 +38,7 @@ type Props ps = { settings :: Settings
 
 type State =
   { authData :: AuthData
+  , sessionId :: Maybe SessionId
   , currentFamily :: Maybe (Key Family)
   , channels :: Map ChannelId ChannelC.State
   , babyName :: String
@@ -91,10 +94,12 @@ data Action = AcceptConnection ChannelId
             | SwitchFamily (Key Family)
             | ServerFamilyGoOffline (Key Family) -- | A bit of a hack - for reliably switching families
             | SetAuthData AuthData
+            | SetSessionId (Maybe SessionId)
             | StartBabyStation
             | InitBabyStation MediaStream
             | SetStreamURL (Maybe String)
             | StopBabyStation
+            | HandleSubscriber Notification
 
             | SetBabyName String
             | SetNewBabyName String

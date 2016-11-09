@@ -9,9 +9,11 @@ import Gonimo.UI.Socket.Channel.Types as ChannelC
 import Pux.Html.Attributes as A
 import Pux.Html.Elements as H
 import Pux.Html.Events as E
+import Servant.PureScript.Affjax as Affjax
 import WebRTC.MediaStream.Track as Track
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff.Class (liftEff)
+import Control.Monad.Error.Class (throwError, catchError)
 import Control.Monad.IO (IO)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader (ask, runReader)
@@ -24,28 +26,32 @@ import Data.Map (Map)
 import Data.Maybe (isNothing, isJust, maybe, fromMaybe, Maybe(Nothing, Just))
 import Data.Monoid (mempty)
 import Data.Profunctor (lmap)
-import Data.Traversable (traverse_)
+import Data.Traversable (traverse, traverse_)
 import Data.Tuple (uncurry, snd, Tuple(Tuple))
-import Gonimo.Client.Types (toIO, Settings)
+import Gonimo.Client.Types (GonimoError(RegisterSessionFailed, AjaxError), toIO, Settings)
 import Gonimo.Pux (wrapAction, noEffects, runGonimo, Component, liftChild, toParent, ComponentType, makeChildData, ToChild, onlyModify, Update, class MonadComponent)
-import Gonimo.Server.DbEntities (Family(Family), Device(Device))
-import Gonimo.Server.DbEntities.Helpers (runFamily)
+import Gonimo.Server.Db.Entities (Family(Family), Device(Device))
+import Gonimo.Server.Db.Entities.Helpers (runFamily)
+import Gonimo.Server.State.Types (SessionId(SessionId))
 import Gonimo.Types (Secret(Secret), Key(Key))
-import Gonimo.UI.Socket.Lenses (streamURL, isAvailable, mediaStream, babyName, currentFamily, localStream, authData, newBabyName)
+import Gonimo.UI.Socket.Lenses (sessionId, streamURL, isAvailable, mediaStream, babyName, currentFamily, localStream, authData, newBabyName)
 import Gonimo.UI.Socket.Message (decodeFromString)
-import Gonimo.UI.Socket.Types (makeChannelId, toCSecret, toTheirId, ChannelId(ChannelId), channel, Props, State, Action(..))
-import Gonimo.WebAPI (postSocketByFamilyIdByToDevice, deleteOnlineStatusByFamilyIdByDeviceId)
+import Gonimo.UI.Socket.Types (toDeviceType, makeChannelId, toCSecret, toTheirId, ChannelId(ChannelId), channel, Props, State, Action(..))
+import Gonimo.WebAPI (postSessionByFamilyIdByDeviceId, postSocketByFamilyIdByToDevice, deleteSessionByFamilyIdByDeviceIdBySessionId)
 import Gonimo.WebAPI.Lenses (deviceId, _AuthData)
 import Gonimo.WebAPI.Subscriber (receiveSocketByFamilyIdByToDevice, receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
 import Gonimo.WebAPI.Types (AuthData(AuthData))
 import Gonimo.WebAPI.Types.Helpers (runAuthData)
 import Pux.Html (Html)
+import Servant.PureScript.Affjax (ErrorDescription(ConnectionError))
 import Servant.Subscriber (Subscriptions)
+import Servant.Subscriber.Connection (Notification(WebSocketClosed))
 import WebRTC.MediaStream (mediaStreamToBlob, createObjectURL, stopStream, MediaStreamConstraints(MediaStreamConstraints), getUserMedia, MediaStream, getTracks)
 import WebRTC.RTC (RTCPeerConnection)
 
 init :: AuthData-> State
-init authData' = { authData : authData'
+init authData' = { authData : authData' -- FIXME: Does this really have to be here? And if so shouldn't we move other stuff from loaded here too? Like subscriptions? Family member list?
+                 , sessionId : Nothing 
                  , currentFamily : Nothing
                  , channels : Map.empty
                  , isAvailable : false
@@ -80,20 +86,22 @@ update action = case action of
   SwitchFamily familyId'                       -> handleFamilySwitch familyId'
   ServerFamilyGoOffline familyId               -> handleServerFamilyGoOffline familyId
   SetAuthData auth                             -> handleSetAuthData auth
+  SetSessionId sessionId'                      -> sessionId .= sessionId' *> pure []
   StartBabyStation                             -> handleStartBabyStation
   InitBabyStation stream                       -> handleInitBabyStation stream
   SetStreamURL url                             -> streamURL .= url -- TODO: On Nothing we should free the url.
                                                   *> pure []
 
-  SetBabyName name                               -> babyName .= name *> pure []
-  SetNewBabyName name                            -> do
+  HandleSubscriber msg                         -> handleSubscriber msg
+  SetBabyName name                             -> babyName .= name *> pure []
+  SetNewBabyName name                          -> do
     newBabyName .= name
     babyName .= name
     pure []
   ConnectToBaby babyId                         -> handleConnectToBaby babyId
-  StopBabyStation                                -> handleStopBabyStation
-  ReportError _                                -> noEffects
-  Nop                                            -> noEffects
+  StopBabyStation                              -> handleStopBabyStation
+  ReportError err                              -> handleError err
+  Nop                                          -> noEffects
 
 
 
@@ -117,15 +125,15 @@ handleGetUserMedia = do
 handleStopUserMedia :: forall ps. ComponentType (Props ps) State Action
 handleStopUserMedia = do
   state <- get :: Component (Props ps) State State
-  let stream' = if state.isAvailable
+  let mStream = if state.isAvailable
                 then Nothing
                 else state.localStream
-  case stream' of
+  case mStream of
     Nothing -> pure []
-    Just stream' -> do
+    Just stream -> do
       localStream .= Nothing :: (Maybe MediaStream)
       pure [ do
-                liftEff $ stopStream stream'
+                liftEff $ stopStream stream
                 pure Nop
            ]
 
@@ -154,6 +162,11 @@ handleAcceptConnection channelId' = do
     then pure [ AddChannel channelId' <$> ChannelC.init state.localStream ]
     else pure []
 
+handleSubscriber :: forall ps. Notification -> ComponentType (Props ps) State Action
+handleSubscriber notification = do
+  case notification of
+    WebSocketClosed _ -> registerSession -- Ok fine with me, just get a new session.
+    _                 -> pure []
 
 handleFamilySwitch :: forall ps. Key Family -> ComponentType (Props ps) State Action
 handleFamilySwitch familyId' = do
@@ -163,7 +176,31 @@ handleFamilySwitch familyId' = do
     let action = fromFoldable
                  $ pure <<< ServerFamilyGoOffline
                  <$> oldFamily
-    pure $ doCleanup state CloseChannel action
+    sessionId .= Nothing :: (Maybe SessionId) -- The current session is now invalid!
+    registerAction <- registerSession
+    pure $ doCleanup state CloseChannel ( action <> registerAction  )
+
+registerSession :: forall ps. ComponentType (Props ps) State Action
+registerSession = do
+  state <- get
+  let
+    deviceId = (runAuthData $ state^.authData).deviceId
+    onlineStatus' = state ^. to toDeviceType
+    familyId = state^.currentFamily
+  runGonimo $ do
+    let createSession = flip (postSessionByFamilyIdByDeviceId onlineStatus') deviceId
+    catchError (SetSessionId <$> traverse createSession familyId) $ \ e ->
+      case e of
+        AjaxError err@(Affjax.AjaxError { description : ConnectionError _
+                                        , request     : _
+                                        }) -> throwError $ RegisterSessionFailed err
+        _                                  -> throwError e
+
+handleError :: forall ps. GonimoError -> ComponentType (Props ps) State Action
+handleError err = do
+  case err of
+    RegisterSessionFailed err -> registerSession -- Let's try again!
+    _                         -> pure []
 
 handleSetAuthData :: forall ps. AuthData -> ComponentType (Props ps) State Action
 handleSetAuthData auth = do
@@ -180,10 +217,10 @@ handleStopBabyStation = do
 
 handleServerFamilyGoOffline :: forall ps. Key Family -> ComponentType (Props ps) State Action
 handleServerFamilyGoOffline familyId = do
-    state <- get
+    state <- get :: Component (Props ps) State State
     let deviceId = (runAuthData state.authData).deviceId
     runGonimo $ do
-      deleteOnlineStatusByFamilyIdByDeviceId familyId deviceId
+      traverse (deleteSessionByFamilyIdByDeviceIdBySessionId familyId deviceId) state.sessionId
       pure Nop
 
 handleConnectToBaby :: forall ps. Key Device -> ComponentType (Props ps) State Action

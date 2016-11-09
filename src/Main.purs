@@ -244,7 +244,6 @@ deploySubscriptions getSubscriber (LoadedS s) = do
       Console.log "Setting pong and close requests ..."
       liftEff $ traverse_ (flip Sub.setPongRequest  (Sub.getConnection subscriber')) $ LoadedC.getPongRequest s
       liftEff $ traverse_ (flip Sub.setCloseRequest (Sub.getConnection subscriber')) $ LoadedC.getCloseRequest s
-      Console.log $ "Deploying " <> show (Sub.size subscriptions) <> " subscriptions!"
       liftEff $ Sub.deploy subscriptions subscriber'
       Console.log $ "Deployed " <> show (Sub.size subscriptions) <> " subscriptions!"
 
