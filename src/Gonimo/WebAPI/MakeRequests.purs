@@ -12,7 +12,8 @@ import Data.Maybe (Maybe, Maybe(..))
 import Data.Nullable (Nullable(), toNullable)
 import Data.Tuple (Tuple, Tuple(..))
 import Global (encodeURIComponent)
-import Gonimo.Server.DbEntities (Account, Device, Family, Invitation)
+import Gonimo.Server.Db.Entities (Account, Device, Family, Invitation)
+import Gonimo.Server.State.Types (SessionId)
 import Gonimo.Server.Types (AuthToken, Coffee, DeviceType)
 import Gonimo.Types (Key, Secret)
 import Gonimo.WebAPI (SPParams_(..))
@@ -352,17 +353,19 @@ receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId familyId fromDevice
                 }
   pure spReq
 
-postOnlineStatusByFamilyId :: forall m. MonadReader (SPSettings_ SPParams_) m =>
-                              Tuple (Key Device) DeviceType -> Key Family
-                              -> m HttpRequest
-postOnlineStatusByFamilyId reqBody familyId = do
+postSessionByFamilyIdByDeviceId :: forall m.
+                                   MonadReader (SPSettings_ SPParams_) m =>
+                                   DeviceType -> Key Family -> Key Device
+                                   -> m HttpRequest
+postSessionByFamilyIdByDeviceId reqBody familyId deviceId = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
   let authorization = spParams_.authorization
   let baseURL = spParams_.baseURL
   let httpMethod = "POST"
-  let reqPath = Path ["onlineStatus" , gDefaultToURLPiece familyId]
+  let reqPath = Path ["session" , gDefaultToURLPiece familyId
+        , gDefaultToURLPiece deviceId]
   let reqHeaders =
         [Tuple "Authorization" (gDefaultToURLPiece authorization)]
   let reqQuery =
@@ -376,19 +379,21 @@ postOnlineStatusByFamilyId reqBody familyId = do
                 }
   pure spReq
 
-putOnlineStatusByFamilyIdByDeviceId :: forall m.
-                                       MonadReader (SPSettings_ SPParams_) m =>
-                                       DeviceType -> Key Family -> Key Device
-                                       -> m HttpRequest
-putOnlineStatusByFamilyIdByDeviceId reqBody familyId deviceId = do
+putSessionByFamilyIdByDeviceIdBySessionId :: forall m.
+                                             MonadReader (SPSettings_ SPParams_) m
+                                             => DeviceType -> Key Family
+                                             -> Key Device -> SessionId
+                                             -> m HttpRequest
+putSessionByFamilyIdByDeviceIdBySessionId reqBody familyId deviceId
+                                          sessionId = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
   let authorization = spParams_.authorization
   let baseURL = spParams_.baseURL
   let httpMethod = "PUT"
-  let reqPath = Path ["onlineStatus" , gDefaultToURLPiece familyId
-        , gDefaultToURLPiece deviceId]
+  let reqPath = Path ["session" , gDefaultToURLPiece familyId
+        , gDefaultToURLPiece deviceId , gDefaultToURLPiece sessionId]
   let reqHeaders =
         [Tuple "Authorization" (gDefaultToURLPiece authorization)]
   let reqQuery =
@@ -402,19 +407,19 @@ putOnlineStatusByFamilyIdByDeviceId reqBody familyId deviceId = do
                 }
   pure spReq
 
-deleteOnlineStatusByFamilyIdByDeviceId :: forall m.
-                                          MonadReader (SPSettings_ SPParams_) m
-                                          => Key Family -> Key Device
-                                          -> m HttpRequest
-deleteOnlineStatusByFamilyIdByDeviceId familyId deviceId = do
+deleteSessionByFamilyIdByDeviceIdBySessionId :: forall m.
+                                                MonadReader (SPSettings_ SPParams_) m
+                                                => Key Family -> Key Device
+                                                -> SessionId -> m HttpRequest
+deleteSessionByFamilyIdByDeviceIdBySessionId familyId deviceId sessionId = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
   let authorization = spParams_.authorization
   let baseURL = spParams_.baseURL
   let httpMethod = "DELETE"
-  let reqPath = Path ["onlineStatus" , gDefaultToURLPiece familyId
-        , gDefaultToURLPiece deviceId]
+  let reqPath = Path ["session" , gDefaultToURLPiece familyId
+        , gDefaultToURLPiece deviceId , gDefaultToURLPiece sessionId]
   let reqHeaders =
         [Tuple "Authorization" (gDefaultToURLPiece authorization)]
   let reqQuery =
@@ -428,16 +433,16 @@ deleteOnlineStatusByFamilyIdByDeviceId familyId deviceId = do
                 }
   pure spReq
 
-getOnlineStatusByFamilyId :: forall m. MonadReader (SPSettings_ SPParams_) m =>
-                             Key Family -> m HttpRequest
-getOnlineStatusByFamilyId familyId = do
+getSessionByFamilyId :: forall m. MonadReader (SPSettings_ SPParams_) m =>
+                        Key Family -> m HttpRequest
+getSessionByFamilyId familyId = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
   let authorization = spParams_.authorization
   let baseURL = spParams_.baseURL
   let httpMethod = "GET"
-  let reqPath = Path ["onlineStatus" , gDefaultToURLPiece familyId]
+  let reqPath = Path ["session" , gDefaultToURLPiece familyId]
   let reqHeaders =
         [Tuple "Authorization" (gDefaultToURLPiece authorization)]
   let reqQuery =

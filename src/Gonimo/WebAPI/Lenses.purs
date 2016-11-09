@@ -5,7 +5,7 @@ import Data.Either as Either
 import Data.Lens as Lens
 import Prelude as Prelude
 import Data.Maybe (Maybe)
-import Gonimo.Server.DbEntities (Device(Device), Account(Account))
+import Gonimo.Server.Db.Entities (Device(Device), Account(Account))
 import Gonimo.Server.Types (AuthToken)
 import Gonimo.Types (Date, Key(Key))
 
