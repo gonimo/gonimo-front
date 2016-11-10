@@ -43,7 +43,7 @@ import WebRTC.RTC (MediaStreamEvent, setLocalDescription, createAnswer, iceEvent
 
 init :: Maybe MediaStream -> IO State
 init stream = do
-  rtcConnection <- liftEff (newRTCPeerConnection { iceServers : [ {url : "stun:gonimo.com:3478"} ] })
+  rtcConnection <- liftEff (newRTCPeerConnection { iceServers : [ {url : "turn:gonimo.com:3478"} ] })
   ourStream <- runMaybeT $ do
     origStream <- MaybeT <<< pure $ stream
     liftEff $ MediaStream.clone origStream
