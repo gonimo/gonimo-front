@@ -1,3 +1,4 @@
+-- TODO: Encapsulation between Loaded and Socket is very very weak! Some parts are here, some parts are there- this should be fixed!
 -- | Loaded application ui logic
 module Gonimo.UI.Loaded where
 
