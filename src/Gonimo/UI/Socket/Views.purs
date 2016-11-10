@@ -65,7 +65,7 @@ view props state =
 viewOffline :: forall ps. Props ps -> State -> Html Action
 viewOffline props state =
     H.div []
-    [ viewVideo props state
+    [ viewPreviewVideo props state
     , H.div [ A.className "videoContainer" ] [ viewStartButton state ]
     , viewBabyNameSelect props state
     ]
@@ -73,23 +73,27 @@ viewOffline props state =
 viewOnline :: forall ps. Props ps -> State -> Html Action
 viewOnline props state =
   H.div []
-    [ H.div [ A.className "videoContainer" ]
-      [ if state.previewEnabled
-        then H.div [ A.className "closableBox"]
-             [ H.a [ A.className "boxclose"
-                     , E.onClick $ const $ EnablePreview false
-                   ] []
-             , viewVideo props state
-             ]
-        else H.div [ A.className "btn-group" ]
-             [ H.button [ A.className "btn btn-default btn-block"
-                        , E.onClick $ const $ EnablePreview true
-                        , A.type_ "button" ]
-               [ H.text "Adjust camera" ]
-             ]
-      ]
-      , viewStopButton state
+    [ viewPreviewVideo props state
+    , viewStopButton state
     ]
+
+viewPreviewVideo :: forall ps. Props ps -> State -> Html Action
+viewPreviewVideo props state =
+  H.div [ A.className "videoContainer" ]
+        [ if state.previewEnabled
+          then H.div [ A.className "closableBox"]
+              [ H.a [ A.className "boxclose"
+                      , E.onClick $ const $ EnablePreview false
+                    ] []
+              , viewVideo props state
+              ]
+          else H.div [ A.className "btn-group" ]
+              [ H.button [ A.className "btn btn-default btn-block"
+                          , E.onClick $ const $ EnablePreview true
+                          , A.type_ "button" ]
+                [ H.text "Adjust camera" ]
+              ]
+        ]
 
 viewVideo :: forall ps. Props ps -> State -> Html Action
 viewVideo props state =

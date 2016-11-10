@@ -34,7 +34,7 @@ import Gonimo.Server.Db.Entities (Family(Family), Device(Device))
 import Gonimo.Server.Db.Entities.Helpers (runFamily)
 import Gonimo.Server.State.Types (SessionId(SessionId))
 import Gonimo.Types (Secret(Secret), Key(Key))
-import Gonimo.UI.Socket.Lenses (sessionId, streamURL, isAvailable, mediaStream, babyName, currentFamily, localStream, authData, newBabyName)
+import Gonimo.UI.Socket.Lenses (sessionId, streamURL, isAvailable, mediaStream, babyName, currentFamily, localStream, authData, newBabyName, previewEnabled)
 import Gonimo.UI.Socket.Message (decodeFromString)
 import Gonimo.UI.Socket.Types (toDeviceType, makeChannelId, toCSecret, toTheirId, ChannelId(ChannelId), channel, Props, State, Action(..))
 import Gonimo.WebAPI (postSocketByFamilyIdByToDevice, deleteSessionByFamilyIdByDeviceIdBySessionId)
@@ -60,7 +60,7 @@ init authData' = { authData : authData' -- FIXME: Does this really have to be he
                  , babyName : "baby"
                  , newBabyName : "baby"
                  , constraints : MediaStreamConstraints { audio : true, video : true }
-                 , previewEnabled : true
+                 , previewEnabled : false
                  }
 
 update :: forall ps. Update (Props ps) State Action
@@ -141,7 +141,9 @@ handleStartBabyStation :: forall ps. ComponentType (Props ps) State Action
 handleStartBabyStation = do
   state <- get :: Component (Props ps) State State
   if isJust state.localStream
-    then isAvailable .= true
+    then do
+    isAvailable .= true
+    previewEnabled .= true
     else isAvailable .= false
   noEffects
 
@@ -183,6 +185,7 @@ handleStopBabyStation = do
   state <- get :: Component (Props ps) State State
   props <- ask :: Component (Props ps) State (Props ps)
   isAvailable .= false
+  previewEnabled .= false
   pure $ doCleanup state CloseBabyChannel []
 
 handleServerFamilyGoOffline :: forall ps. Key Family -> SessionId -> ComponentType (Props ps) State Action

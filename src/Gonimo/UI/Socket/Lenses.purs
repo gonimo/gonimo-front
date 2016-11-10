@@ -33,6 +33,9 @@ newBabyName = Lens.lens _."newBabyName" (_ { "newBabyName" = _ })
 mediaStream :: forall a b r. Lens.Lens { "mediaStream" :: a | r } { "mediaStream" :: b | r } a b
 mediaStream = Lens.lens _."mediaStream" (_ { "mediaStream" = _ })
 
+previewEnabled :: forall a b r. Lens.Lens { "previewEnabled" :: a | r } { "previewEnabled" :: b | r } a b
+previewEnabled = Lens.lens _."previewEnabled" (_ { "previewEnabled" = _ })
+
 localStream :: forall a b r. Lens.Lens { "localStream" :: a | r } { "localStream" :: b | r } a b
 localStream = Lens.lens _."localStream" (_ { "localStream" = _ })
 
