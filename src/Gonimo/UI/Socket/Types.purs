@@ -92,7 +92,7 @@ data Action = AcceptConnection ChannelId
               -- Channel actions for a given sender and channel id
             | ChannelA ChannelId ChannelC.Action
             | SwitchFamily (Key Family)
-            | ServerFamilyGoOffline (Key Family) -- | A bit of a hack - for reliably switching families
+            | ServerFamilyGoOffline (Key Family) SessionId -- | A bit of a hack - for reliably switching families
             | SetAuthData AuthData
             | SetSessionId (Maybe SessionId)
             | StartBabyStation

@@ -37,9 +37,9 @@ import Gonimo.Types (Secret(Secret), Key(Key))
 import Gonimo.UI.Socket.Lenses (sessionId, streamURL, isAvailable, mediaStream, babyName, currentFamily, localStream, authData, newBabyName)
 import Gonimo.UI.Socket.Message (decodeFromString)
 import Gonimo.UI.Socket.Types (toDeviceType, makeChannelId, toCSecret, toTheirId, ChannelId(ChannelId), channel, Props, State, Action(..))
-import Gonimo.WebAPI (postSessionByFamilyIdByDeviceId, postSocketByFamilyIdByToDevice, deleteSessionByFamilyIdByDeviceIdBySessionId)
+import Gonimo.WebAPI (postSocketByFamilyIdByToDevice, deleteSessionByFamilyIdByDeviceIdBySessionId)
 import Gonimo.WebAPI.Lenses (deviceId, _AuthData)
-import Gonimo.WebAPI.Subscriber (receiveSocketByFamilyIdByToDevice, receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
+import Gonimo.WebAPI.Subscriber (postSessionByFamilyIdByDeviceId, receiveSocketByFamilyIdByToDevice, receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
 import Gonimo.WebAPI.Types (AuthData(AuthData))
 import Gonimo.WebAPI.Types.Helpers (runAuthData)
 import Pux.Html (Html)
@@ -84,7 +84,7 @@ update action = case action of
   RemoveChannel channelId'                       -> channel channelId' .= Nothing
                                                     *> pure []
   SwitchFamily familyId'                       -> handleFamilySwitch familyId'
-  ServerFamilyGoOffline familyId               -> handleServerFamilyGoOffline familyId
+  ServerFamilyGoOffline familyId sessionId     -> handleServerFamilyGoOffline familyId sessionId
   SetAuthData auth                             -> handleSetAuthData auth
   SetSessionId sessionId'                      -> sessionId .= sessionId' *> pure []
   StartBabyStation                             -> handleStartBabyStation
@@ -92,7 +92,7 @@ update action = case action of
   SetStreamURL url                             -> streamURL .= url -- TODO: On Nothing we should free the url.
                                                   *> pure []
 
-  HandleSubscriber msg                         -> handleSubscriber msg
+  HandleSubscriber msg                         -> pure []
   SetBabyName name                             -> babyName .= name *> pure []
   SetNewBabyName name                          -> do
     newBabyName .= name
@@ -100,7 +100,7 @@ update action = case action of
     pure []
   ConnectToBaby babyId                         -> handleConnectToBaby babyId
   StopBabyStation                              -> handleStopBabyStation
-  ReportError err                              -> handleError err
+  ReportError err                              -> noEffects
   Nop                                          -> noEffects
 
 
@@ -162,45 +162,15 @@ handleAcceptConnection channelId' = do
     then pure [ AddChannel channelId' <$> ChannelC.init state.localStream ]
     else pure []
 
-handleSubscriber :: forall ps. Notification -> ComponentType (Props ps) State Action
-handleSubscriber notification = do
-  case notification of
-    WebSocketClosed _ -> registerSession -- Ok fine with me, just get a new session.
-    _                 -> pure []
-
 handleFamilySwitch :: forall ps. Key Family -> ComponentType (Props ps) State Action
 handleFamilySwitch familyId' = do
     state <- get :: Component (Props ps) State State
     let oldFamily = state.currentFamily
     modify $ _ { currentFamily = Just familyId' }
     let action = fromFoldable
-                 $ pure <<< ServerFamilyGoOffline
-                 <$> oldFamily
-    sessionId .= Nothing :: (Maybe SessionId) -- The current session is now invalid!
-    registerAction <- registerSession
-    pure $ doCleanup state CloseChannel ( action <> registerAction  )
-
-registerSession :: forall ps. ComponentType (Props ps) State Action
-registerSession = do
-  state <- get
-  let
-    deviceId = (runAuthData $ state^.authData).deviceId
-    onlineStatus' = state ^. to toDeviceType
-    familyId = state^.currentFamily
-  runGonimo $ do
-    let createSession = flip (postSessionByFamilyIdByDeviceId onlineStatus') deviceId
-    catchError (SetSessionId <$> traverse createSession familyId) $ \ e ->
-      case e of
-        AjaxError err@(Affjax.AjaxError { description : ConnectionError _
-                                        , request     : _
-                                        }) -> throwError $ RegisterSessionFailed err
-        _                                  -> throwError e
-
-handleError :: forall ps. GonimoError -> ComponentType (Props ps) State Action
-handleError err = do
-  case err of
-    RegisterSessionFailed err -> registerSession -- Let's try again!
-    _                         -> pure []
+                 $ ServerFamilyGoOffline
+                 <$> oldFamily <*> state.sessionId
+    pure $ doCleanup state CloseChannel (pure <$> action)
 
 handleSetAuthData :: forall ps. AuthData -> ComponentType (Props ps) State Action
 handleSetAuthData auth = do
@@ -215,12 +185,12 @@ handleStopBabyStation = do
   isAvailable .= false
   pure $ doCleanup state CloseBabyChannel []
 
-handleServerFamilyGoOffline :: forall ps. Key Family -> ComponentType (Props ps) State Action
-handleServerFamilyGoOffline familyId = do
+handleServerFamilyGoOffline :: forall ps. Key Family -> SessionId -> ComponentType (Props ps) State Action
+handleServerFamilyGoOffline familyId sessionId = do
     state <- get :: Component (Props ps) State State
     let deviceId = (runAuthData state.authData).deviceId
     runGonimo $ do
-      traverse (deleteSessionByFamilyIdByDeviceIdBySessionId familyId deviceId) state.sessionId
+      deleteSessionByFamilyIdByDeviceIdBySessionId familyId deviceId sessionId
       pure Nop
 
 handleConnectToBaby :: forall ps. Key Device -> ComponentType (Props ps) State Action
@@ -286,8 +256,12 @@ getSubscriptions props state =
                                pure $ receiveAChannel authData'.deviceId familyId''
                      else []
                    )
+                <> (fromFoldable
+                    $ postSessionByFamilyIdByDeviceId (maybe Nop (SetSessionId <<< Just))
+                    <$> pure (toDeviceType state) <*> familyId' <*> pure authData'.deviceId
+                   )
   in
-     foldl append mempty subArray
+      foldl append mempty subArray
 
 
 mkChannelProps :: forall ps. Props ps -> State -> ChannelId -> ChannelC.Props {}

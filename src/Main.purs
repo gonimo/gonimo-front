@@ -241,11 +241,9 @@ deploySubscriptions getSubscriber (LoadedS s) = do
   case subscriber of
     Nothing -> Console.log "Not deploying - no subscriber yet!"
     Just subscriber' -> do
-      Console.log "Setting pong and close requests ..."
       liftEff $ traverse_ (flip Sub.setPongRequest  (Sub.getConnection subscriber')) $ LoadedC.getPongRequest s
       liftEff $ traverse_ (flip Sub.setCloseRequest (Sub.getConnection subscriber')) $ LoadedC.getCloseRequest s
       liftEff $ Sub.deploy subscriptions subscriber'
-      Console.log $ "Deployed " <> show (Sub.size subscriptions) <> " subscriptions!"
 
 -- | Don't use a foldp instead of Ref - you will build up an endless thunk of actions in memory.
 renewSubscriber :: Channel Action -> Ref (Maybe MySubscriber)
@@ -256,9 +254,6 @@ renewSubscriber controlChan subscriberRef state = do
     let newUrl = case state of
           LoadedS lState -> Just lState.subscriberUrl
           _ -> Nothing
-    Console.log $ "Old url: " <> show oldUrl
-    Console.log $ "New url: " <> show newUrl
-    Console.log $ "Is different: " <> show (newUrl /= oldUrl)
     if (newUrl /= oldUrl)
       then do
         Console.log $ "Closing old subscriber ..."
@@ -294,7 +289,7 @@ main = do
   let subscriberSignal = map (renewSubscriber controlChan subscriberRef) app.state
   let subscribeSignal = deploySubscriptions <$> subscriberSignal <*> app.state
   runSignal $ coerceEffects <<< map (const unit) <<< launchAff <<< runIO <$> subscribeSignal
-  runSignal $ map (\_ -> Console.log "State changed!") app.state
+  -- runSignal $ map (\_ -> Console.log "State changed!") app.state
   runSignal $ Console.log <$> urlSignal
   renderToDOM "#app" app.html
   pure app
@@ -316,7 +311,7 @@ debug = do
   let subscriberSignal = map (renewSubscriber controlChan subscriberRef) app.state
   let subscribeSignal = deploySubscriptions <$> subscriberSignal <*> app.state
   runSignal $ coerceEffects <<< map (const unit) <<< launchAff <<< runIO <$> subscribeSignal
-  runSignal $ map (\_ -> Console.log "State changed!") app.state
+  -- runSignal $ map (\_ -> Console.log "State changed!") app.state
   runSignal $ Console.log <$> urlSignal
   renderToDOM "#app" app.html
   pure app

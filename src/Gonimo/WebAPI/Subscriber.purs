@@ -13,6 +13,7 @@ import Data.Nullable (Nullable(), toNullable)
 import Data.Tuple (Tuple, Tuple(..))
 import Global (encodeURIComponent)
 import Gonimo.Server.Db.Entities (Account, Device, Family)
+import Gonimo.Server.State.Types (SessionId)
 import Gonimo.Server.Types (AuthToken, DeviceType)
 import Gonimo.Types (Key, Secret)
 import Gonimo.WebAPI (SPParams_(..))
@@ -78,6 +79,16 @@ receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId spToUser_ familyId
                                                                                  fromDevice
                                                                                  toDevice
                                                                                  channelId
+  pure $ makeSubscriptions spReq (toUserType spToUser_)
+
+postSessionByFamilyIdByDeviceId :: forall m a.
+                                   MonadReader (SPSettings_ SPParams_) m =>
+                                   TypedToUser SessionId a -> DeviceType
+                                   -> Key Family -> Key Device
+                                   -> m (Subscriptions a)
+postSessionByFamilyIdByDeviceId spToUser_ reqBody familyId deviceId = do
+  spReq <- MakeRequests.postSessionByFamilyIdByDeviceId reqBody familyId
+                                                        deviceId
   pure $ makeSubscriptions spReq (toUserType spToUser_)
 
 getSessionByFamilyId :: forall m a. MonadReader (SPSettings_ SPParams_) m =>

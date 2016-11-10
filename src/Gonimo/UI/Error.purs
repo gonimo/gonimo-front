@@ -189,13 +189,13 @@ logError prefix msg = pure [ do
 
 fromServerError :: ServerError -> Maybe UserError
 fromServerError err = case err of
-    Server.InvalidAuthToken -> Just DeviceInvalid
-    Server.AlreadyFamilyMember -> Just AlreadyFamilyMember
-    Server.NoSuchFamily _ -> Just NoSuchFamily
-    Server.FamilyNotOnline _ -> Just FamilyNotOnline
+    Server.InvalidAuthToken         -> Just DeviceInvalid
+    Server.AlreadyFamilyMember      -> Just AlreadyFamilyMember
+    Server.NoSuchFamily _           -> Just NoSuchFamily
+    Server.FamilyNotOnline _        -> Just FamilyNotOnline
     Server.InvitationAlreadyClaimed -> Just InvitationAlreadyClaimed
-    Server.NoSuchInvitation -> Just NoSuchInvitation
-    _ -> Nothing
+    Server.NoSuchInvitation         -> Just NoSuchInvitation
+    _                               -> Nothing
 
 -- | Sets userError in state but only if it was NoError before. (Does not overwrite an existing error)
 setError :: forall r. UserError -> (State r) -> (State r)
