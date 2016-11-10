@@ -51,7 +51,7 @@ import WebRTC.RTC (RTCPeerConnection)
 
 init :: AuthData-> State
 init authData' = { authData : authData' -- FIXME: Does this really have to be here? And if so shouldn't we move other stuff from loaded here too? Like subscriptions? Family member list?
-                 , sessionId : Nothing 
+                 , sessionId : Nothing
                  , currentFamily : Nothing
                  , channels : Map.empty
                  , isAvailable : false
@@ -60,7 +60,7 @@ init authData' = { authData : authData' -- FIXME: Does this really have to be he
                  , babyName : "baby"
                  , newBabyName : "baby"
                  , constraints : MediaStreamConstraints { audio : true, video : true }
-                 , previewEnabled : false
+                 , previewEnabled : true
                  }
 
 update :: forall ps. Update (Props ps) State Action
