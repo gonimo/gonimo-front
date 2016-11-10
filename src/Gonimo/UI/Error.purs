@@ -47,6 +47,7 @@ data UserError = NoError
                | NoSuchInvitation
                | InvitationAlreadyClaimed
                | ConnectionFailed
+               | SessionStolen
 
 
 handleError :: forall eff r m action. ( ErrorAction action, MonadState (State r) m )
@@ -158,6 +159,12 @@ viewError state = case state.userError of
       , p [] [ text $ "Please send a new invitation from a device already in the family you were about to join."
              ]
       ]
+  SessionStolen -> errorView (Just clearError) "Are you online in another browser tab?"
+    $ div []
+      [ p [] [ text "It seems you started gonimo twice in the same browser. This is not supported." ]
+      , p [] [ text $ "Please close one tab and reload the other. Pressing 'Proceed' currently fixes nothing - yeah I have to fix that! :-)"
+             ]
+      ]
 
 errorView :: forall action. ErrorAction action
              => Maybe action -> String -> Html action -> Html action
@@ -195,6 +202,7 @@ fromServerError err = case err of
     Server.FamilyNotOnline _        -> Just FamilyNotOnline
     Server.InvitationAlreadyClaimed -> Just InvitationAlreadyClaimed
     Server.NoSuchInvitation         -> Just NoSuchInvitation
+    Server.SessionInvalid           -> Just SessionStolen
     _                               -> Nothing
 
 -- | Sets userError in state but only if it was NoError before. (Does not overwrite an existing error)
