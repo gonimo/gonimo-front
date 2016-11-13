@@ -165,7 +165,7 @@ viewStartButton :: State -> Html Action
 viewStartButton state =
   H.div []
   [
-    H.button [ A.className "btn btn-block btn-info"
+    H.button [ A.className "btn btn-block btn-success"
              , A.style [ Tuple "margin-left" "0px" ]
              , A.disabled $ isNothing state.localStream
              , A.type_ "button"
