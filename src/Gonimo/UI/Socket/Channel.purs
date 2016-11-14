@@ -39,7 +39,7 @@ import Pux.Html.Attributes (offset)
 import Servant.Subscriber (Subscriptions)
 import Unsafe.Coerce (unsafeCoerce)
 import WebRTC.MediaStream (createObjectURL, mediaStreamToBlob, stopStream, getUserMedia, MediaStreamConstraints(MediaStreamConstraints), MediaStream)
-import WebRTC.RTC (MediaStreamEvent, setLocalDescription, createAnswer, iceEventCandidate, IceEvent, onicecandidate, onaddstream, addIceCandidate, setRemoteDescription, fromRTCSessionDescription, createOffer, addStream, RTCIceCandidateInit, RTCPeerConnection, Ice, newRTCPeerConnection)
+import WebRTC.RTC (closeRTCPeerConnection, MediaStreamEvent, setLocalDescription, createAnswer, iceEventCandidate, IceEvent, onicecandidate, onaddstream, addIceCandidate, setRemoteDescription, fromRTCSessionDescription, createOffer, addStream, RTCIceCandidateInit, RTCPeerConnection, Ice, newRTCPeerConnection)
 
 
 
@@ -64,7 +64,7 @@ update action = case action of
   InitConnection                     -> handleInit -- Things we can't do in init already.
   StartStreaming constraints         -> handleStartStreaming constraints
   SetMediaStream stream              -> handleSetMediaStream stream
-  StopStreaming                      -> closeStream
+  StopStreaming                      -> closeConnection
   CloseConnection                    -> handleCloseConnection
   AcceptMessage num message          -> handleAcceptMessage num message
   OnIceCandidate iceEvent            -> handleOnIceCandidate iceEvent
@@ -178,15 +178,17 @@ handleAcceptMessage msgNumber msg = do
                     Just c -> liftAff $ addIceCandidate (runMaybeIceCandidate candidate) state.rtcConnection
                   pure Nop
               ]
-        Message.CloseConnection -> closeStream
+        Message.CloseConnection -> closeConnection
 
-closeStream :: forall ps. ComponentType (Props ps) State Action
-closeStream = do
+closeConnection :: forall ps. ComponentType (Props ps) State Action
+closeConnection = do
   state <- get
+  let conn = state.rtcConnection
   pure $ fromMaybe [] $ do
     stream <- state.mediaStream
     pure [ liftEff $ do
               stopStream stream
+              closeRTCPeerConnection conn
               pure Nop
          ]
 
@@ -194,7 +196,7 @@ closeStream = do
 handleCloseConnection :: forall ps. ComponentType (Props ps) State Action
 handleCloseConnection = do
   sendMessage <- getSendMessage
-  closeActions <- closeStream
+  closeActions <- closeConnection
   pure $ closeActions <> [ sendMessage Message.CloseConnection ]
 
 
