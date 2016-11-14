@@ -39,7 +39,7 @@ import Pux.Html.Attributes (offset)
 import Servant.Subscriber (Subscriptions)
 import Unsafe.Coerce (unsafeCoerce)
 import WebRTC.MediaStream (createObjectURL, mediaStreamToBlob, stopStream, getUserMedia, MediaStreamConstraints(MediaStreamConstraints), MediaStream)
-import WebRTC.RTC (closeRTCPeerConnection, MediaStreamEvent, setLocalDescription, createAnswer, iceEventCandidate, IceEvent, onicecandidate, onaddstream, addIceCandidate, setRemoteDescription, fromRTCSessionDescription, createOffer, addStream, RTCIceCandidateInit, RTCPeerConnection, Ice, newRTCPeerConnection)
+import WebRTC.RTC (onnegotiationneeded, closeRTCPeerConnection, MediaStreamEvent, setLocalDescription, createAnswer, iceEventCandidate, IceEvent, onicecandidate, onaddstream, addIceCandidate, setRemoteDescription, fromRTCSessionDescription, createOffer, addStream, RTCIceCandidateInit, RTCPeerConnection, Ice, newRTCPeerConnection)
 
 
 
@@ -63,6 +63,7 @@ update :: forall ps. Update (Props ps) State Action
 update action = case action of
   InitConnection                     -> handleInit -- Things we can't do in init already.
   StartStreaming constraints         -> handleStartStreaming constraints
+  StartNegotiation                   -> handleStartNegotiation
   SetMediaStream stream              -> handleSetMediaStream stream
   StopStreaming                      -> closeConnection
   CloseConnection                    -> handleCloseConnection
@@ -82,6 +83,7 @@ handleInit = do
     [ do
          liftEff $ onaddstream (coerceEffects <<< props.sendAction <<< OnAddStream ) state.rtcConnection
          liftEff $ onicecandidate (coerceEffects <<< props.sendAction <<< OnIceCandidate ) state.rtcConnection
+         liftEff $ onnegotiationneeded (coerceEffects <<< props.sendAction $ StartNegotiation) state.rtcConnection
          if state.isBabyStation
            then pure Nop
            else sendMessage Message.StartStreaming
@@ -109,6 +111,14 @@ startStreaming stream = do
   sendMessage <- getSendMessage
   pure [ do
             liftEff $ addStream stream state.rtcConnection
+            pure Nop
+       ]
+
+handleStartNegotiation :: forall ps. ComponentType (Props ps) State Action
+handleStartNegotiation = do
+  state <- get
+  sendMessage <- getSendMessage
+  pure [ do
             offer <- liftAff $ createOffer state.rtcConnection
             liftAff $ setLocalDescription offer state.rtcConnection
             sendMessage $ Message.SessionDescriptionOffer offer

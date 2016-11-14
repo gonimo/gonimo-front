@@ -38,6 +38,7 @@ type Props ps =
 data Action = InitConnection
             | AcceptMessage MessageNumber Message
             | StartStreaming MediaStreamConstraints
+            | StartNegotiation
             | StopStreaming
             | SetMediaStream MediaStream
             | CloseConnection -- Say bye and tear down all connections!
