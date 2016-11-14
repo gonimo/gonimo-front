@@ -36,7 +36,6 @@ import Gonimo.UI.Socket.Lenses (streamURL, isAvailable, mediaStream, babyName, c
 import Gonimo.UI.Socket.Message (decodeFromString)
 import Gonimo.UI.Socket.Types (makeChannelId, toCSecret, toTheirId, ChannelId(ChannelId), channel, Props, State, Action(..))
 import Gonimo.WebAPI.Lenses (deviceId, _AuthData)
-import Gonimo.WebAPI.Subscriber (receiveSocketByFamilyIdByToDevice, receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
 import Gonimo.WebAPI.Types (AuthData(AuthData))
 import Gonimo.WebAPI.Types.Helpers (runAuthData)
 import Pux.Html (Html)
@@ -199,39 +198,3 @@ viewParentChannels props state = let
     channels = getParentChannels state
   in
      viewParentChannelThumb props state <$> channels
-
-getSubscriptions :: forall ps. Props ps -> State -> Subscriptions Action
-getSubscriptions props state =
-  let
-    authData' = state ^. authData <<< to runAuthData
-    familyId' = state ^. currentFamily
-    receiveAChannel deviceId' familyId'' =
-      receiveSocketByFamilyIdByToDevice
-        (maybe Nop (AcceptConnection <<< uncurry makeChannelId ) <<< join)
-        familyId''
-        deviceId'
-
-    getChannelSubscriptions :: forall m. (MonadReader Settings m)
-                                  => ChannelId -> m (Subscriptions Action)
-    getChannelSubscriptions channelId' =
-      let
-        cProps = mkChannelProps props state channelId'
-      in
-      map (ChannelA channelId') <$> ChannelC.getSubscriptions cProps
-
-    getChannelsSubscriptions :: forall m. (MonadReader Settings m)
-                                => Map ChannelId ChannelC.State
-                                -> Array (m (Subscriptions Action))
-    getChannelsSubscriptions = Arr.fromFoldable <<< map getChannelSubscriptions <<< Map.keys
-
-    subArray :: Array (Subscriptions Action)
-    subArray = map (flip runReader props.settings)
-                $ getChannelsSubscriptions state.channels
-                <> ( if state.isAvailable
-                     then fromFoldable $ do
-                               familyId'' <- familyId'
-                               pure $ receiveAChannel authData'.deviceId familyId''
-                     else []
-                   )
-  in
-     foldl append mempty subArray

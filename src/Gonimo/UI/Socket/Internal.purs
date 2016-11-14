@@ -16,9 +16,11 @@ import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Error.Class (throwError, catchError)
 import Control.Monad.IO (IO)
 import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Maybe.Trans (MaybeT(MaybeT), runMaybeT)
 import Control.Monad.Reader (ask, runReader)
 import Control.Monad.Reader.Class (class MonadReader, ask)
 import Control.Monad.State.Class (gets, modify, put, get, class MonadState)
+import Control.Monad.Trans (lift)
 import Data.Array (concat, fromFoldable)
 import Data.Foldable (foldl)
 import Data.Lens (use, to, (^?), (^.), _Just, (.=))
@@ -37,9 +39,9 @@ import Gonimo.Types (Secret(Secret), Key(Key))
 import Gonimo.UI.Socket.Lenses (sessionId, streamURL, isAvailable, mediaStream, babyName, currentFamily, localStream, authData, newBabyName, previewEnabled)
 import Gonimo.UI.Socket.Message (decodeFromString)
 import Gonimo.UI.Socket.Types (toDeviceType, makeChannelId, toCSecret, toTheirId, ChannelId(ChannelId), channel, Props, State, Action(..))
-import Gonimo.WebAPI (postSocketByFamilyIdByToDevice, deleteSessionByFamilyIdByDeviceIdBySessionId)
+import Gonimo.WebAPI (deleteSocketByFamilyIdByToDeviceByFromDeviceByChannelId, postSocketByFamilyIdByToDevice, deleteSessionByFamilyIdByDeviceIdBySessionId)
 import Gonimo.WebAPI.Lenses (deviceId, _AuthData)
-import Gonimo.WebAPI.Subscriber (postSessionByFamilyIdByDeviceId, receiveSocketByFamilyIdByToDevice, receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
+import Gonimo.WebAPI.Subscriber (postSessionByFamilyIdByDeviceId, getSocketByFamilyIdByToDevice, getSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
 import Gonimo.WebAPI.Types (AuthData(AuthData))
 import Gonimo.WebAPI.Types.Helpers (runAuthData)
 import Pux.Html (Html)
@@ -157,11 +159,17 @@ handleInitBabyStation stream = do
             pure $ SetStreamURL (Just url)
        ]
 
-handleAcceptConnection :: forall ps. ChannelId -> ComponentType (Props ps) State  Action
-handleAcceptConnection channelId' = do
-  state <- get
+handleAcceptConnection :: forall ps. ChannelId -> ComponentType (Props ps) State Action
+handleAcceptConnection channelId'@(ChannelId theirId secret) = do
+  state <- get :: Component (Props ps) State State
   if state.isAvailable
-    then pure [ AddChannel channelId' <$> ChannelC.init state.localStream ]
+    then map (fromMaybe []) <<< runMaybeT $ do
+          familyId' :: Key Family <- MaybeT <<< pure $ state.currentFamily
+          let ourId = state ^. authData <<< to runAuthData <<< deviceId
+
+          lift $ runGonimo $  do
+            deleteSocketByFamilyIdByToDeviceByFromDeviceByChannelId familyId' ourId theirId secret
+            AddChannel channelId' <$> liftIO (ChannelC.init state.localStream)
     else pure []
 
 handleFamilySwitch :: forall ps. Key Family -> ComponentType (Props ps) State Action
@@ -232,7 +240,7 @@ getSubscriptions props state =
     authData' = state ^. authData <<< to runAuthData
     familyId' = state ^. currentFamily
     receiveAChannel deviceId' familyId'' =
-      receiveSocketByFamilyIdByToDevice
+      getSocketByFamilyIdByToDevice
         (maybe Nop (AcceptConnection <<< uncurry makeChannelId ) <<< join)
         familyId''
         deviceId'

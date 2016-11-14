@@ -11,3 +11,8 @@ data SessionId =
 
 derive instance genericSessionId :: Generic SessionId
 
+data MessageNumber =
+    MessageNumber Int
+
+derive instance genericMessageNumber :: Generic MessageNumber
+

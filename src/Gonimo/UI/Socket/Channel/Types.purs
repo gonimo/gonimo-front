@@ -7,6 +7,7 @@ import Data.Maybe (Maybe(Just, Nothing))
 import Data.Tuple (Tuple(Tuple))
 import Gonimo.Client.Types (class ReportErrorAction, GonimoError, Settings)
 import Gonimo.Server.Db.Entities (Family(Family), Device(Device))
+import Gonimo.Server.State.Types (MessageNumber(MessageNumber))
 import Gonimo.Server.Types (DeviceType)
 import Gonimo.Types (Secret(Secret), Key(Key))
 import Gonimo.UI.Socket.Message (Message)
@@ -35,7 +36,7 @@ type Props ps =
   }
 
 data Action = InitConnection
-            | AcceptMessage Message
+            | AcceptMessage MessageNumber Message
             | StartStreaming MediaStreamConstraints
             | StopStreaming
             | SetMediaStream MediaStream

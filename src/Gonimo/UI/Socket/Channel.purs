@@ -21,17 +21,19 @@ import Control.Monad.State.Class (get)
 import Data.Identity (runIdentity)
 import Data.Lens ((^?), _Just, lens, Lens, (.=))
 import Data.Maybe (fromMaybe, isJust, maybe, Maybe(Nothing, Just))
+import Data.Tuple (Tuple(Tuple))
 import Gonimo.Client.Types (toIO, Settings)
 import Gonimo.Pux (noEffects, runGonimo, Component, Update, onlyModify, ComponentType)
 import Gonimo.Server.Db.Entities (Family(Family), Device(Device))
+import Gonimo.Server.State.Types (MessageNumber(MessageNumber))
 import Gonimo.Server.Types.Lenses (_Baby)
 import Gonimo.Types (Secret(Secret), Key(Key))
 import Gonimo.UI.Socket.Channel.Types (Action, Action(..), State, Props)
 import Gonimo.UI.Socket.Lenses (mediaStream)
 import Gonimo.UI.Socket.Message (runMaybeIceCandidate, MaybeIceCandidate(JustIceCandidate, NoIceCandidate), encodeToString, decodeFromString, Message)
 import Gonimo.Util (coerceEffects)
-import Gonimo.WebAPI (putSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
-import Gonimo.WebAPI.Subscriber (receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
+import Gonimo.WebAPI (deleteSocketByFamilyIdByFromDeviceByToDeviceByChannelIdMessagesByMessageNumber, putSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
+import Gonimo.WebAPI.Subscriber (getSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
 import Pux.Html (text, Html)
 import Pux.Html.Attributes (offset)
 import Servant.Subscriber (Subscriptions)
@@ -64,7 +66,7 @@ update action = case action of
   SetMediaStream stream              -> handleSetMediaStream stream
   StopStreaming                      -> closeStream
   CloseConnection                    -> handleCloseConnection
-  AcceptMessage message              -> handleAcceptMessage message
+  AcceptMessage num message          -> handleAcceptMessage num message
   OnIceCandidate iceEvent            -> handleOnIceCandidate iceEvent
   OnAddStream streamEvent            -> handleOnAddStream streamEvent
   SetRemoteStream stream             -> remoteStream .= Just stream *> pure []
@@ -140,33 +142,43 @@ getSendMessage = do
     sendString strMsg familyId' fromDevice' toDevice' channelId'
     pure Nop)
 
-handleAcceptMessage :: forall ps. Message -> ComponentType (Props ps) State Action
-handleAcceptMessage msg = do
-  state <- get
-  sendMessage <- getSendMessage
-  case msg of
-    Message.StartStreaming -> fromMaybe (pure []) $ startStreaming <$> state.mediaStream
-    Message.SessionDescriptionOffer description ->
-      pure [ do
-              liftAff $ setRemoteDescription description state.rtcConnection
-              answer <- liftAff $ createAnswer state.rtcConnection
-              liftAff $ setLocalDescription answer state.rtcConnection
-              sendMessage $ Message.SessionDescriptionAnswer answer
-           ]
-    Message.SessionDescriptionAnswer description ->
-      pure [ do
-              liftAff $ setRemoteDescription description state.rtcConnection
-              pure Nop
-           ]
-    Message.IceCandidate candidate ->
-      pure [ do
-               let test = runMaybeIceCandidate candidate
-               case test of
-                 Nothing -> pure unit -- let's see whether this helps
-                 Just c -> liftAff $ addIceCandidate (runMaybeIceCandidate candidate) state.rtcConnection
-               pure Nop
-           ]
-    Message.CloseConnection -> closeStream
+handleAcceptMessage :: forall ps. MessageNumber -> Message -> ComponentType (Props ps) State Action
+handleAcceptMessage msgNumber msg = do
+    props <- ask
+    actions <- handleMessage
+    let deleteMessage = deleteSocketByFamilyIdByFromDeviceByToDeviceByChannelIdMessagesByMessageNumber
+    deleteActions <- runGonimo $ do
+      deleteMessage props.familyId props.theirId props.ourId props.cSecret msgNumber
+      pure Nop
+    pure $ deleteActions <> actions
+  where
+    handleMessage :: ComponentType (Props ps) State Action
+    handleMessage = do
+      state <- get
+      sendMessage <- getSendMessage
+      case msg of
+        Message.StartStreaming -> fromMaybe (pure []) $ startStreaming <$> state.mediaStream
+        Message.SessionDescriptionOffer description ->
+          pure [ do
+                  liftAff $ setRemoteDescription description state.rtcConnection
+                  answer <- liftAff $ createAnswer state.rtcConnection
+                  liftAff $ setLocalDescription answer state.rtcConnection
+                  sendMessage $ Message.SessionDescriptionAnswer answer
+              ]
+        Message.SessionDescriptionAnswer description ->
+          pure [ do
+                  liftAff $ setRemoteDescription description state.rtcConnection
+                  pure Nop
+              ]
+        Message.IceCandidate candidate ->
+          pure [ do
+                  let test = runMaybeIceCandidate candidate
+                  case test of
+                    Nothing -> pure unit -- let's see whether this helps
+                    Just c -> liftAff $ addIceCandidate (runMaybeIceCandidate candidate) state.rtcConnection
+                  pure Nop
+              ]
+        Message.CloseConnection -> closeStream
 
 closeStream :: forall ps. ComponentType (Props ps) State Action
 closeStream = do
@@ -217,9 +229,10 @@ viewVideo state =
 getSubscriptions :: forall m ps. (MonadReader Settings m) => Props ps -> m (Subscriptions Action)
 getSubscriptions props =
   let
-    receiveMessage = receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId
-                      doDecode
-    doDecode :: Maybe (Maybe String) -> Action
-    doDecode = maybe Nop AcceptMessage <<< (\mv -> decodeFromString =<< join mv)
+    receiveMessage = getSocketByFamilyIdByFromDeviceByToDeviceByChannelId doDecode
+    doDecode :: Maybe (Maybe (Tuple MessageNumber String)) -> Action
+    doDecode (Just (Just (Tuple num msg))) = fromMaybe Nop
+                                             $ AcceptMessage num <$> decodeFromString msg
+    doDecode _                             = Nop
   in
     receiveMessage props.familyId props.theirId props.ourId props.cSecret
