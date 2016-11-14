@@ -13,7 +13,7 @@ import Data.Nullable (Nullable(), toNullable)
 import Data.Tuple (Tuple, Tuple(..))
 import Global (encodeURIComponent)
 import Gonimo.Server.Db.Entities (Account, Device, Family, Invitation)
-import Gonimo.Server.State.Types (SessionId)
+import Gonimo.Server.State.Types (MessageNumber, SessionId)
 import Gonimo.Server.Types (AuthToken, Coffee, DeviceType)
 import Gonimo.Types (Key, Secret)
 import Gonimo.WebAPI (SPParams_(..))
@@ -267,18 +267,49 @@ postSocketByFamilyIdByToDevice reqBody familyId toDevice = do
                 }
   pure spReq
 
-receiveSocketByFamilyIdByToDevice :: forall m.
-                                     MonadReader (SPSettings_ SPParams_) m =>
-                                     Key Family -> Key Device -> m HttpRequest
-receiveSocketByFamilyIdByToDevice familyId toDevice = do
+getSocketByFamilyIdByToDevice :: forall m. MonadReader (SPSettings_ SPParams_) m
+                                 => Key Family -> Key Device -> m HttpRequest
+getSocketByFamilyIdByToDevice familyId toDevice = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
   let authorization = spParams_.authorization
   let baseURL = spParams_.baseURL
-  let httpMethod = "RECEIVE"
+  let httpMethod = "GET"
   let reqPath = Path ["socket" , gDefaultToURLPiece familyId
         , gDefaultToURLPiece toDevice]
+  let reqHeaders =
+        [Tuple "Authorization" (gDefaultToURLPiece authorization)]
+  let reqQuery =
+        []
+  let spReq = HttpRequest
+                { httpMethod: httpMethod
+                , httpPath: reqPath
+                , httpHeaders: reqHeaders
+                , httpQuery: reqQuery
+                , httpBody: ""
+                }
+  pure spReq
+
+deleteSocketByFamilyIdByToDeviceByFromDeviceByChannelId :: forall m.
+                                                           MonadReader (SPSettings_ SPParams_) m
+                                                           => Key Family
+                                                           -> Key Device
+                                                           -> Key Device
+                                                           -> Secret
+                                                           -> m HttpRequest
+deleteSocketByFamilyIdByToDeviceByFromDeviceByChannelId familyId toDevice
+                                                        fromDevice
+                                                        channelId = do
+  spOpts_' <- ask
+  let spOpts_ = case spOpts_' of SPSettings_ o -> o
+  let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
+  let authorization = spParams_.authorization
+  let baseURL = spParams_.baseURL
+  let httpMethod = "DELETE"
+  let reqPath = Path ["socket" , gDefaultToURLPiece familyId
+        , gDefaultToURLPiece toDevice , gDefaultToURLPiece fromDevice
+        , gDefaultToURLPiece channelId]
   let reqHeaders =
         [Tuple "Authorization" (gDefaultToURLPiece authorization)]
   let reqQuery =
@@ -322,24 +353,60 @@ putSocketByFamilyIdByFromDeviceByToDeviceByChannelId reqBody familyId fromDevice
                 }
   pure spReq
 
-receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId :: forall m.
-                                                            MonadReader (SPSettings_ SPParams_) m
-                                                            => Key Family
-                                                            -> Key Device
-                                                            -> Key Device
-                                                            -> Secret
-                                                            -> m HttpRequest
-receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId familyId fromDevice
-                                                         toDevice channelId = do
+getSocketByFamilyIdByFromDeviceByToDeviceByChannelId :: forall m.
+                                                        MonadReader (SPSettings_ SPParams_) m
+                                                        => Key Family
+                                                        -> Key Device
+                                                        -> Key Device -> Secret
+                                                        -> m HttpRequest
+getSocketByFamilyIdByFromDeviceByToDeviceByChannelId familyId fromDevice
+                                                     toDevice channelId = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
   let authorization = spParams_.authorization
   let baseURL = spParams_.baseURL
-  let httpMethod = "RECEIVE"
+  let httpMethod = "GET"
   let reqPath = Path ["socket" , gDefaultToURLPiece familyId
         , gDefaultToURLPiece fromDevice , gDefaultToURLPiece toDevice
         , gDefaultToURLPiece channelId]
+  let reqHeaders =
+        [Tuple "Authorization" (gDefaultToURLPiece authorization)]
+  let reqQuery =
+        []
+  let spReq = HttpRequest
+                { httpMethod: httpMethod
+                , httpPath: reqPath
+                , httpHeaders: reqHeaders
+                , httpQuery: reqQuery
+                , httpBody: ""
+                }
+  pure spReq
+
+deleteSocketByFamilyIdByFromDeviceByToDeviceByChannelIdMessagesByMessageNumber :: forall m.
+                                                                                  MonadReader (SPSettings_ SPParams_) m
+                                                                                  =>
+                                                                                  Key Family
+                                                                                  -> Key Device
+                                                                                  -> Key Device
+                                                                                  -> Secret
+                                                                                  -> MessageNumber
+                                                                                  -> m HttpRequest
+deleteSocketByFamilyIdByFromDeviceByToDeviceByChannelIdMessagesByMessageNumber familyId
+                                                                               fromDevice
+                                                                               toDevice
+                                                                               channelId
+                                                                               messageNumber = do
+  spOpts_' <- ask
+  let spOpts_ = case spOpts_' of SPSettings_ o -> o
+  let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
+  let authorization = spParams_.authorization
+  let baseURL = spParams_.baseURL
+  let httpMethod = "DELETE"
+  let reqPath = Path ["socket" , gDefaultToURLPiece familyId
+        , gDefaultToURLPiece fromDevice , gDefaultToURLPiece toDevice
+        , gDefaultToURLPiece channelId , "messages"
+        , gDefaultToURLPiece messageNumber]
   let reqHeaders =
         [Tuple "Authorization" (gDefaultToURLPiece authorization)]
   let reqQuery =

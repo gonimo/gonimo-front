@@ -13,7 +13,7 @@ import Data.Nullable (Nullable(), toNullable)
 import Data.Tuple (Tuple, Tuple(..))
 import Global (encodeURIComponent)
 import Gonimo.Server.Db.Entities (Account, Device, Family)
-import Gonimo.Server.State.Types (SessionId)
+import Gonimo.Server.State.Types (MessageNumber, SessionId)
 import Gonimo.Server.Types (AuthToken, DeviceType)
 import Gonimo.Types (Key, Secret)
 import Gonimo.WebAPI (SPParams_(..))
@@ -54,31 +54,30 @@ getFamiliesByFamilyIdDeviceInfos spToUser_ familyId = do
   spReq <- MakeRequests.getFamiliesByFamilyIdDeviceInfos familyId
   pure $ makeSubscriptions spReq (toUserType spToUser_)
 
-receiveSocketByFamilyIdByToDevice :: forall m a.
-                                     MonadReader (SPSettings_ SPParams_) m =>
-                                     TypedToUser (Maybe (Tuple (Key Device) Secret)) a
-                                     -> Key Family -> Key Device
-                                     -> m (Subscriptions a)
-receiveSocketByFamilyIdByToDevice spToUser_ familyId toDevice = do
-  spReq <- MakeRequests.receiveSocketByFamilyIdByToDevice familyId toDevice
+getSocketByFamilyIdByToDevice :: forall m a.
+                                 MonadReader (SPSettings_ SPParams_) m =>
+                                 TypedToUser (Maybe (Tuple (Key Device) Secret)) a
+                                 -> Key Family -> Key Device
+                                 -> m (Subscriptions a)
+getSocketByFamilyIdByToDevice spToUser_ familyId toDevice = do
+  spReq <- MakeRequests.getSocketByFamilyIdByToDevice familyId toDevice
   pure $ makeSubscriptions spReq (toUserType spToUser_)
 
-receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId :: forall m a.
-                                                            MonadReader (SPSettings_ SPParams_) m
-                                                            =>
-                                                            TypedToUser (Maybe String) a
-                                                            -> Key Family
-                                                            -> Key Device
-                                                            -> Key Device
-                                                            -> Secret
-                                                            -> m (Subscriptions a)
-receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId spToUser_ familyId
-                                                         fromDevice toDevice
-                                                         channelId = do
-  spReq <- MakeRequests.receiveSocketByFamilyIdByFromDeviceByToDeviceByChannelId familyId
-                                                                                 fromDevice
-                                                                                 toDevice
-                                                                                 channelId
+getSocketByFamilyIdByFromDeviceByToDeviceByChannelId :: forall m a.
+                                                        MonadReader (SPSettings_ SPParams_) m
+                                                        =>
+                                                        TypedToUser (Maybe (Tuple MessageNumber String)) a
+                                                        -> Key Family
+                                                        -> Key Device
+                                                        -> Key Device -> Secret
+                                                        -> m (Subscriptions a)
+getSocketByFamilyIdByFromDeviceByToDeviceByChannelId spToUser_ familyId
+                                                     fromDevice toDevice
+                                                     channelId = do
+  spReq <- MakeRequests.getSocketByFamilyIdByFromDeviceByToDeviceByChannelId familyId
+                                                                             fromDevice
+                                                                             toDevice
+                                                                             channelId
   pure $ makeSubscriptions spReq (toUserType spToUser_)
 
 postSessionByFamilyIdByDeviceId :: forall m a.
