@@ -105,7 +105,13 @@ viewAvailableBabies props state =
     H.div [ A.className "jumbotron" ]
     [ H.div [ A.className "container" ]
       $ [ H.h2 [] [ text "Connect to baby: " ] ]
-      <> map viewOnlineBaby onlineBabies
+      <> if Arr.null onlineBabies
+         then
+           [ H.p []
+             [ H.text "Sorry no baby stations online." ]
+           ]
+         else
+            map viewOnlineBaby onlineBabies
     ]
   where
     makeOnlineBaby :: Key Device -> String -> String -> OnlineBaby
