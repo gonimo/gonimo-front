@@ -45,7 +45,14 @@ import WebRTC.RTC (onnegotiationneeded, closeRTCPeerConnection, MediaStreamEvent
 
 init :: Maybe MediaStream -> IO State
 init stream = do
-  rtcConnection <- liftEff (newRTCPeerConnection { iceServers : [ {url : "turn:gonimo.com:3478"} ] })
+  rtcConnection <- liftEff (newRTCPeerConnection { iceServers : [ { urls : [ "turn:gonimo.com:3478" ]
+                                                                  , username : "gonimo"
+                                                                  , credential : "Aeloh5chai2eil1"
+                                                                  , credentialType : "password"
+                                                                  }
+                                                                ]
+                                                 }
+                           )
   ourStream <- runMaybeT $ do
     origStream <- MaybeT <<< pure $ stream
     liftEff $ MediaStream.clone origStream
