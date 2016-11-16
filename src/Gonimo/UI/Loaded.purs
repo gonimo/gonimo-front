@@ -331,7 +331,8 @@ viewHeader state =
           <>    [ A.dataToggle "collapse"
                 , A.dataTarget ".navbar-collapse.in"]
          )
-         [ a [ E.onClick <<< const $ RequestCentral item ]
+         [ a [ E.onClick <<< const $ RequestCentral item
+             , A.type_ "button", A.role "button"]
            [ text $ userShow item ]
          ]
 
