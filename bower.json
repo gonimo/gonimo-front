@@ -21,7 +21,8 @@
     "purescript-servant-support": "~5.0.0",
     "purescript-subscriber": "#master",
     "purescript-unfoldable": "~1.1.0",
-    "purescript-webrtc": "git@github.com:eskimor/purescript-webrtc#gonimo"
+    "purescript-webrtc": "git@github.com:eskimor/purescript-webrtc#gonimo",
+    "purescript-catenable-lists": "^3.0.1"
   },
   "devDependencies": {
     "purescript-debug": "1.0.0",

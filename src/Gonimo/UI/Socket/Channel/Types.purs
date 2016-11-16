@@ -2,7 +2,7 @@ module Gonimo.UI.Socket.Channel.Types where
 
 import Control.Monad.Eff (Eff)
 import Control.Monad.IO (IO)
-import Data.Lens (lens, lens', LensP)
+import Data.Lens (lens, lens', LensP, Lens)
 import Data.Maybe (Maybe(Just, Nothing))
 import Data.Tuple (Tuple(Tuple))
 import Gonimo.Client.Types (class ReportErrorAction, GonimoError, Settings)
@@ -16,13 +16,18 @@ import Prelude (Unit)
 import Signal.Channel (Channel)
 import WebRTC.MediaStream (MediaStream, MediaStreamConstraints(MediaStreamConstraints))
 import WebRTC.RTC (MediaStreamEvent, IceEvent, RTCPeerConnection)
+import Data.CatQueue (CatQueue)
 
+maxMessagesInFlight :: Int
+maxMessagesInFlight = 2 -- Offers some performance advantage and hopefull is low enough to not cause dead locks on regular use.
 
 type State =
   { mediaStream :: Maybe MediaStream
   , remoteStream :: Maybe RemoteStream
   , rtcConnection :: RTCPeerConnection
   , isBabyStation :: Boolean
+  , messageQueue  :: CatQueue (IO Action)
+  , messagesInFlight :: Int
   }
 
 type Props ps =
@@ -38,6 +43,8 @@ type Props ps =
 data Action = InitConnection
             | AcceptMessage MessageNumber Message
             | StartStreaming MediaStreamConstraints
+            | EnqueueMessage (IO Action)
+            | MessageSent Action -- Notification that the ajax call for sending a message returned.
             | StartNegotiation
             | StopStreaming
             | SetMediaStream MediaStream
@@ -61,3 +68,9 @@ unsafeMakeFamilyId (Just familyId') = familyId'
 
 remoteStream :: LensP State (Maybe RemoteStream)
 remoteStream = lens _.remoteStream (_ { remoteStream = _})
+
+messagesInFlight :: forall a b r. Lens { "messagesInFlight" :: a | r } { "messagesInFlight" :: b | r } a b
+messagesInFlight = lens _."messagesInFlight" (_ { "messagesInFlight" = _ })
+
+messageQueue :: forall a b r. Lens { "messageQueue" :: a | r } { "messageQueue" :: b | r } a b
+messageQueue = lens _."messageQueue" (_ { "messageQueue" = _ })

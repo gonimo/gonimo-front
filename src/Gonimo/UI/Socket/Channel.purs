@@ -2,6 +2,7 @@ module Gonimo.UI.Socket.Channel where
 
 import Prelude
 import Data.Array as Arr
+import Data.CatQueue as Q
 import Data.Tuple as Tuple
 import Gonimo.UI.Socket.Message as Message
 import Pux.Html.Attributes as A
@@ -19,7 +20,7 @@ import Control.Monad.Reader (runReaderT)
 import Control.Monad.Reader.Class (ask, class MonadReader)
 import Control.Monad.State.Class (get)
 import Data.Identity (runIdentity)
-import Data.Lens ((^?), _Just, lens, Lens, (.=))
+import Data.Lens ((+=), (-=), (^?), _Just, lens, Lens, (.=), use, (%=), to)
 import Data.Maybe (fromMaybe, isJust, maybe, Maybe(Nothing, Just))
 import Data.Tuple (Tuple(Tuple))
 import Gonimo.Client.Types (toIO, Settings)
@@ -28,7 +29,7 @@ import Gonimo.Server.Db.Entities (Family(Family), Device(Device))
 import Gonimo.Server.State.Types (MessageNumber(MessageNumber))
 import Gonimo.Server.Types.Lenses (_Baby)
 import Gonimo.Types (Secret(Secret), Key(Key))
-import Gonimo.UI.Socket.Channel.Types (Action, Action(..), State, Props)
+import Gonimo.UI.Socket.Channel.Types (maxMessagesInFlight, messagesInFlight, messageQueue, Action(EnqueueMessage), Action(..), State, Props)
 import Gonimo.UI.Socket.Lenses (mediaStream)
 import Gonimo.UI.Socket.Message (runMaybeIceCandidate, MaybeIceCandidate(JustIceCandidate, NoIceCandidate), encodeToString, decodeFromString, Message)
 import Gonimo.Util (coerceEffects)
@@ -40,7 +41,7 @@ import Servant.Subscriber (Subscriptions)
 import Unsafe.Coerce (unsafeCoerce)
 import WebRTC.MediaStream (createObjectURL, mediaStreamToBlob, stopStream, getUserMedia, MediaStreamConstraints(MediaStreamConstraints), MediaStream)
 import WebRTC.RTC (onnegotiationneeded, closeRTCPeerConnection, MediaStreamEvent, setLocalDescription, createAnswer, iceEventCandidate, IceEvent, onicecandidate, onaddstream, addIceCandidate, setRemoteDescription, fromRTCSessionDescription, createOffer, addStream, RTCIceCandidateInit, RTCPeerConnection, Ice, newRTCPeerConnection)
-
+import Data.CatQueue (CatQueue)
 
 
 init :: Maybe MediaStream -> IO State
@@ -60,6 +61,8 @@ init stream = do
           , remoteStream : Nothing
           , rtcConnection : rtcConnection
           , isBabyStation : isJust stream
+          , messageQueue  : Q.empty :: CatQueue (IO Action)
+          , messagesInFlight : 0
           }
 
 
@@ -79,6 +82,8 @@ update action = case action of
   OnAddStream streamEvent            -> handleOnAddStream streamEvent
   SetRemoteStream stream             -> remoteStream .= Just stream *> pure []
   ReportError _                      -> noEffects
+  EnqueueMessage message             -> handleEnqueueMessage message
+  MessageSent nAction                -> handleMessageSent nAction
   Nop                                -> noEffects
 
 handleInit :: forall ps. ComponentType (Props ps) State Action
@@ -93,7 +98,7 @@ handleInit = do
          liftEff $ onnegotiationneeded (coerceEffects <<< props.sendAction $ StartNegotiation) state.rtcConnection
          if state.isBabyStation
            then pure Nop
-           else sendMessage Message.StartStreaming
+           else pure $ sendMessage Message.StartStreaming
     ]
 
 handleStartStreaming :: forall ps.
@@ -105,7 +110,7 @@ handleStartStreaming constraints =
 handleSendStartStreaming :: forall ps. ComponentType (Props ps) State Action
 handleSendStartStreaming = do
   sendMessage <- getSendMessage
-  pure [ sendMessage Message.StartStreaming ]
+  pure [ pure $ sendMessage Message.StartStreaming ]
 
 handleSetMediaStream :: forall ps. MediaStream -> ComponentType (Props ps) State Action
 handleSetMediaStream stream = do
@@ -128,8 +133,7 @@ handleStartNegotiation = do
   pure [ do
             offer <- liftAff $ createOffer state.rtcConnection
             liftAff $ setLocalDescription offer state.rtcConnection
-            sendMessage $ Message.SessionDescriptionOffer offer
-            pure Nop
+            pure <<< sendMessage $ Message.SessionDescriptionOffer offer
        ]
 
 handleOnIceCandidate :: forall ps. IceEvent -> ComponentType (Props ps) State Action
@@ -137,7 +141,7 @@ handleOnIceCandidate event = do
   let candidate = iceEventCandidate event
   let mCandidate = maybe NoIceCandidate JustIceCandidate candidate
   sendMessage <- getSendMessage
-  pure [ sendMessage $ Message.IceCandidate mCandidate ]
+  pure [ pure <<< sendMessage $ Message.IceCandidate mCandidate ]
 
 handleOnAddStream :: forall ps. MediaStreamEvent  -> ComponentType (Props ps) State Action
 handleOnAddStream event = do
@@ -146,7 +150,7 @@ handleOnAddStream event = do
             pure $ SetRemoteStream $ { stream : event.stream, objectURL : url }
        ]
 
-getSendMessage :: forall ps. Component (Props ps) State (Message -> IO Action)
+getSendMessage :: forall ps. Component (Props ps) State (Message -> Action)
 getSendMessage = do
   let sendString = putSocketByFamilyIdByFromDeviceByToDeviceByChannelId
   props <- ask
@@ -154,10 +158,14 @@ getSendMessage = do
   let fromDevice' = props.ourId
   let toDevice' = props.theirId
   let channelId' = props.cSecret
-  pure $ toIO props.settings <<< ( \msg ->  do
-    let strMsg = encodeToString msg
-    sendString strMsg familyId' fromDevice' toDevice' channelId'
-    pure Nop)
+  let sendMessage = map MessageSent
+                    <<< toIO props.settings
+                    <<< ( \msg ->  do
+                             let strMsg = encodeToString msg
+                             sendString strMsg familyId' fromDevice' toDevice' channelId'
+                             pure Nop
+                        )
+  pure $ EnqueueMessage <<< sendMessage
 
 handleAcceptMessage :: forall ps. MessageNumber -> Message -> ComponentType (Props ps) State Action
 handleAcceptMessage msgNumber msg = do
@@ -180,7 +188,7 @@ handleAcceptMessage msgNumber msg = do
                   liftAff $ setRemoteDescription description state.rtcConnection
                   answer <- liftAff $ createAnswer state.rtcConnection
                   liftAff $ setLocalDescription answer state.rtcConnection
-                  sendMessage $ Message.SessionDescriptionAnswer answer
+                  pure <<< sendMessage $ Message.SessionDescriptionAnswer answer
               ]
         Message.SessionDescriptionAnswer description ->
           pure [ do
@@ -214,8 +222,30 @@ handleCloseConnection :: forall ps. ComponentType (Props ps) State Action
 handleCloseConnection = do
   sendMessage <- getSendMessage
   closeActions <- closeConnection
-  pure $ closeActions <> [ sendMessage Message.CloseConnection ]
+  pure $ closeActions <> [ pure $ sendMessage Message.CloseConnection ]
 
+handleEnqueueMessage :: forall ps. IO Action -> ComponentType (Props ps) State Action
+handleEnqueueMessage message = do
+  allClear <- use $ messagesInFlight <<< to (_ < maxMessagesInFlight)
+  if allClear
+    then do
+      messagesInFlight += 1
+      pure [message] -- Ready to take off!
+    else do
+      messageQueue %= flip Q.snoc message
+      pure []
+
+handleMessageSent :: forall ps. Action -> ComponentType (Props ps) State Action
+handleMessageSent nAction = do
+  messagesInFlight -= 1
+  newActions <- update nAction
+  queue <- use messageQueue
+  ourActions <- map (fromMaybe []) <<< runMaybeT $ do
+    (Tuple message newQueue) <- MaybeT <<< pure $ Q.uncons queue
+    messageQueue .= newQueue
+    messagesInFlight += 1
+    pure [ message ]
+  pure $ newActions <> ourActions
 
 view :: forall ps. Props ps -> State -> Html Action
 view props state =
