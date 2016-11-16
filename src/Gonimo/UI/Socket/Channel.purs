@@ -40,7 +40,7 @@ import Servant.Subscriber (Subscriptions)
 import Unsafe.Coerce (unsafeCoerce)
 import WebRTC.MediaStream (createObjectURL, mediaStreamToBlob, stopStream, getUserMedia, MediaStreamConstraints(MediaStreamConstraints), MediaStream)
 import WebRTC.RTC (onnegotiationneeded, closeRTCPeerConnection, MediaStreamEvent, setLocalDescription, createAnswer, iceEventCandidate, IceEvent, onicecandidate, onaddstream, addIceCandidate, setRemoteDescription, fromRTCSessionDescription, createOffer, addStream, RTCIceCandidateInit, RTCPeerConnection, Ice, newRTCPeerConnection)
-
+import Debug.Trace (trace)
 
 
 init :: Maybe MediaStream -> IO State
@@ -156,17 +156,17 @@ getSendMessage = do
   let channelId' = props.cSecret
   pure $ toIO props.settings <<< ( \msg ->  do
     let strMsg = encodeToString msg
-    sendString strMsg familyId' fromDevice' toDevice' channelId'
-    pure Nop)
+    trace "Sending message ..." $ \_ -> sendString strMsg familyId' fromDevice' toDevice' channelId'
+    trace "Sent" $ \_ -> pure Nop)
 
 handleAcceptMessage :: forall ps. MessageNumber -> Message -> ComponentType (Props ps) State Action
 handleAcceptMessage msgNumber msg = do
     props <- ask
-    actions <- handleMessage
+    actions <- trace "Handling message" $ \_ -> handleMessage
     let deleteMessage = deleteSocketByFamilyIdByFromDeviceByToDeviceByChannelIdMessagesByMessageNumber
     deleteActions <- runGonimo $ do
-      deleteMessage props.familyId props.theirId props.ourId props.cSecret msgNumber
-      pure Nop
+      trace "Deleting message..." $ \_ -> deleteMessage props.familyId props.theirId props.ourId props.cSecret msgNumber
+      trace "Deleted" $ \_ -> pure Nop
     pure $ deleteActions <> actions
   where
     handleMessage :: ComponentType (Props ps) State Action

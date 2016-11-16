@@ -50,6 +50,7 @@ import Servant.Subscriber (Subscriptions)
 import Servant.Subscriber.Connection (Notification(WebSocketClosed))
 import WebRTC.MediaStream (mediaStreamToBlob, createObjectURL, stopStream, MediaStreamConstraints(MediaStreamConstraints), getUserMedia, MediaStream, getTracks)
 import WebRTC.RTC (RTCPeerConnection)
+import Debug.Trace (trace)
 
 init :: AuthData-> State
 init authData' = { authData : authData' -- FIXME: Does this really have to be here? And if so shouldn't we move other stuff from loaded here too? Like subscriptions? Family member list?
@@ -167,9 +168,9 @@ handleAcceptConnection channelId'@(ChannelId theirId secret) = do
           familyId' :: Key Family <- MaybeT <<< pure $ state.currentFamily
           let ourId = state ^. authData <<< to runAuthData <<< deviceId
 
-          lift $ runGonimo $  do
-            deleteSocketByFamilyIdByToDeviceByFromDeviceByChannelId familyId' ourId theirId secret
-            AddChannel channelId' <$> liftIO (ChannelC.init state.localStream)
+          trace "Accepting socket connection ..." $ \_ -> lift $ runGonimo $  do
+            trace "Deleting socket request" $ \_ -> deleteSocketByFamilyIdByToDeviceByFromDeviceByChannelId familyId' ourId theirId secret
+            trace "Deleted socket request" $ \_ -> AddChannel channelId' <$> liftIO (ChannelC.init state.localStream)
     else pure []
 
 handleFamilySwitch :: forall ps. Key Family -> ComponentType (Props ps) State Action
@@ -212,9 +213,9 @@ handleConnectToBaby babyId = do
   let actions = fromMaybe [] $ do
         familyId <- state.currentFamily
         pure [ toIO props.settings $ do
-                  secret <- postSocketByFamilyIdByToDevice ourId familyId babyId
+                  secret <- trace "Creating channel on remote end..." $ \_ -> postSocketByFamilyIdByToDevice ourId familyId babyId
                   let channelId' = makeChannelId babyId secret
-                  AddChannel channelId' <$> liftIO (ChannelC.init Nothing)
+                  trace "Got channel!" $ \_ -> AddChannel channelId' <$> liftIO (ChannelC.init Nothing)
              ]
   pure actions
 
