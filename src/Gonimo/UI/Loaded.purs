@@ -306,7 +306,7 @@ viewHeader state =
                 ]
             [ ul [ A.className "nav navbar-nav"] $ (viewCentralItem <$> getCentrals state) <>
               [ viewFamilyChooser state
-              , viewUserSettings
+        --      , viewUserSettings
               ]
             ]
           ]
