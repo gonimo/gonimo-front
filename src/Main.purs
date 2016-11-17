@@ -219,7 +219,7 @@ load sendAction' = Gonimo.toIO initSettings $ authToAction =<< LoadedC.getAuthDa
             { subscriberUrl : "ws://localhost:8081/subscriber"
             , overviewS         : OverviewC.init
             , socketS       : SocketC.init authData
-            , central       : LoadedC.CentralOverview
+            , central       : LoadedC.CentralBaby
             , familyIds     : []
             , families      : Map.empty
             , url           : ""
