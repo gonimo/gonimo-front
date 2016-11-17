@@ -39,6 +39,7 @@ import Partial.Unsafe (unsafeCrashWith)
 import Pux (renderToDOM, fromSimple, start)
 import Pux.Html (a, button, br, i, input, p, h1, h2, h3, text, span, Html, img, div, small, li, ul, nav)
 import Pux.Html.Attributes (letterSpacing, offset)
+import Pux.Html.Elements (br)
 import Servant.PureScript.Affjax (AjaxError)
 import Servant.PureScript.Settings (gDefaultEncodeURLPiece, defaultSettings, SPSettings_(SPSettings_))
 import Signal (constant, Signal)
@@ -142,46 +143,31 @@ view props state =
                     , br [] []
                     , small []
                       [ text $ "Here you can add new devices to your"
-                            <> " families, you only have to visit the"
+                            <> " family, you only have to visit the"
                             <> " following one-time link on another device." ]
                     ]
-            , div [ A.className "input-group"]
-              [ input [ A.type_ "text", A.className "form-control", A.readOnly true
-                      , A.value invitationLink
-                      , A.id_ "invitationLinkUrlInput"
-                      ] []
-              ,  H.span [ A.className "input-group-btn"]
-                [ button [ A.className "btn btn-default"
-                          , A.type_ "button"
-                          , A.title "Generate new link ..."
-                          , E.onClick $ const $ MakeNewInvitation
-                          ]
-                  [ span [ A.className "glyphicon glyphicon-repeat"] []
-                  ]
+            , div []
+              [ div [ A.className "input-group"]
+                [ input [ A.type_ "text", A.className "form-control", A.readOnly true
+                        , A.value invitationLink
+                        , A.id_ "invitationLinkUrlInput"
+                        ] []
+                ,  H.span [ A.className "input-group-btn"]
+                   [ button [ A.className "btn btn-default"
+                            , A.type_ "button"
+                            , A.title "Generate new link ..."
+                            , E.onClick $ const $ MakeNewInvitation
+                            ]
+                     [ span [ A.className "glyphicon glyphicon-repeat"] []
+                     ]
+                   ]
                 ]
-              ]
-            ]
-          ]
-        , div [ A.className "container"
-              , A.style [Tuple "width" "100%"]]
-          [ h3 [] [text "copy & paste or share directly"]
-          , div [A.className "jumbotron"]
-            [ p [] [ text $ "You can either copy & paste it to send it via some means"
-                        <> " or share it directly with WhatsApp or Telegram."
+                , p [] [ br [] []
+                       , text $ "You can either share it directly with WhatsApp or Telegram"
+                         <> " or copy & paste it to send it via some other means:"
                   ]
             , H.div [ A.className "btn-group btn-group-justified" ]
-              [
-                H.div [ A.className "btn-group" ]
-                [ H.a [ A.className "btn btn-default"
-                           , A.role "button"
-                           , A.type_ "button"
-                           , E.onClick $ const $ CopyToClipboard "invitationLinkUrlInput"
-                           ]
-                  [ H.span [ A.className "glyphicon glyphicon-copy"] []
-                  , H.span [ A.className "hidden-xs"] [H.text " Copy to Clipboard"]
-                  ]
-                ]
-              , H.div [ A.className "btn-group" ]
+              [ H.div [ A.className "btn-group" ]
                 [ H.a [ A.className "btn btn-default"
                       , A.href $ "whatsapp://send?text=" <> escapedLink
                       , A.role "button"
@@ -203,6 +189,16 @@ view props state =
                       ]
                   [ H.i [A.className "fa fa-fw fa-telegram"] []
                   , H.span [A.className "hidden-xs"] [H.text " Telegram"]
+                  ]
+                ]
+              , H.div [ A.className "btn-group" ]
+                [ H.a [ A.className "btn btn-default"
+                           , A.role "button"
+                           , A.type_ "button"
+                           , E.onClick $ const $ CopyToClipboard "invitationLinkUrlInput"
+                           ]
+                  [ H.span [ A.className "glyphicon glyphicon-copy"] []
+                  , H.span [ A.className "hidden-xs"] [H.text " Copy to Clipboard"]
                   ]
                 ]
               ]
@@ -229,10 +225,12 @@ view props state =
               , span [A.className "glyphicon glyphicon-send"] []
               ]
             ]
-          , viewSent props state
+          ]
           , div [ A.className "container"
                 , A.style [Tuple "width" "100%"]]
-              [ text "Invitation successfully transmitted? Then go back to overview or make this device a baby station right away .... " ]
+              [ br [] []
+              , text "Invitation successfully transmitted? Then go back to overview or make this device a baby station right away .... "
+              ]
           , nav []
             [ ul [ A.className "pager" ]
               [ li [ A.className "previous"
@@ -252,6 +250,7 @@ view props state =
               ]
 
             ]
+          , viewSent props state
           ]
         ]
   where
