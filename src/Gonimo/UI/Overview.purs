@@ -28,6 +28,7 @@ import Prelude hiding (div)
 
 type Props ps = { settings      :: Settings
                 , family        :: Maybe Family
+                , deviceId      :: Key Device
                 , onlineStatus  :: DeviceType
                 , onlineDevices :: Array (Tuple (Key Device) DeviceType)
                 , deviceInfos   :: Array (Tuple (Key Device) DeviceInfo)
@@ -61,16 +62,15 @@ update Nop               = noEffects
 view :: forall ps. Props ps -> State -> Html Action
 view props state = div []
                    [ viewConnectedBabies props state
+                   , viewAvailableBabies props state
+                   , case props.onlineStatus of
+                       NoBaby -> div [] []
+                       Baby name -> viewOnline name
                    , div [ A.className "btn-group" ]
-                     [ button [ A.className "btn btn-lg btn-block"
+                     [ button [ A.className "btn btn-lg btn-block btn-info"
                               , E.onClick $ const GoToInviteView ]
                        [ text "Add Device" ]
                      ]
-                   , viewAvailableBabies props state
-                   ,
-                     case props.onlineStatus of
-                       NoBaby -> div [] []
-                       Baby name -> viewOnline name
                    ]
 
 type OnlineBaby =
@@ -131,7 +131,10 @@ viewAvailableBabies props state =
         getBabyName NoBaby = Nothing
         getBabyName (Baby n) = Just n
 
-        ids = map fst <<< Arr.filter (isBaby <<< snd) $ props.onlineDevices
+        ids = map fst
+              <<< Arr.filter (isBaby <<< snd)
+              <<< Arr.filter ((_ /= props.deviceId) <<< fst)
+              $ props.onlineDevices
         babyNames = Arr.concatMap (fromFoldable <<< getBabyName <<< snd) props.onlineDevices
         deviceInfos = Arr.concatMap (fromFoldable <<< flip Tuple.lookup props.deviceInfos) ids
         deviceNames = map (\(DeviceInfo info) -> info.deviceInfoName) deviceInfos
