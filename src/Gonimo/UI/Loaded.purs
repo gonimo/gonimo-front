@@ -421,7 +421,7 @@ viewCentral state =
     CentralInvite s -> case invProps of
       Nothing -> viewLoading "Loading, please wait ..."
       Just invProps' -> map (InviteA Nothing) $ InviteC.view invProps' s
-    CentralAccept s -> map AcceptA $ AcceptC.view s
+    CentralAccept s -> map AcceptA $ AcceptC.view props s
     CentralOverview     -> map OverviewA   $ OverviewC.view props state.overviewS
     CentralBaby     -> map SocketA   $ SocketC.view props state.socketS
 

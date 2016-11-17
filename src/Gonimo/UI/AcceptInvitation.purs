@@ -3,6 +3,7 @@ module Gonimo.UI.AcceptInvitation where
 
 
 import Gonimo.UI.Html
+import Data.Tuple as Tuple
 import Gonimo.Client.Effects as Gonimo
 import Gonimo.Client.LocalStorage as Key
 import Gonimo.Client.Types as Gonimo
@@ -20,17 +21,18 @@ import Control.Monad.State.Class (get, put)
 import Data.Bifunctor (lmap)
 import Data.Either (Either(Right, Left))
 import Data.Generic (gShow)
-import Data.Lens (_Just)
+import Data.Lens ((^?), (^.), _Just)
 import Data.Maybe (fromMaybe, isJust, isNothing, Maybe(..))
 import Data.Tuple (Tuple(Tuple))
 import Gonimo.Client.Types (GonimoError(UnexpectedAction), Gonimo, Settings, class ReportErrorAction)
 import Gonimo.Pux (Component, makeChildData, liftChild, noEffects, onlyModify, Update, ToChild, runGonimo, ComponentType, class MonadComponent)
-import Gonimo.Server.Db.Entities (Invitation(Invitation))
-import Gonimo.Server.Types (InvitationDelivery(EmailInvitation), AuthToken, AuthToken(GonimoSecret))
+import Gonimo.Server.Db.Entities (Device(Device), Invitation(Invitation))
+import Gonimo.Server.Types (DeviceType, InvitationDelivery(EmailInvitation), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (Key(Key), Secret(Secret))
 import Gonimo.Util (fromMaybeM)
 import Gonimo.WebAPI (deleteInvitationsByInvitationSecret, putInvitationsInfoByInvitationSecret, postFamilies, SPParams_(SPParams_), postAccounts)
-import Gonimo.WebAPI.Types (InvitationReply(InvitationReject, InvitationAccept), InvitationReply(InvitationReject, InvitationAccept), InvitationInfo(InvitationInfo), AuthData(AuthData))
+import Gonimo.WebAPI.Lenses (_DeviceInfo, deviceInfoName)
+import Gonimo.WebAPI.Types (DeviceInfo(DeviceInfo), InvitationReply(InvitationReject, InvitationAccept), InvitationReply(InvitationReject, InvitationAccept), InvitationInfo(InvitationInfo), AuthData(AuthData))
 import Partial.Unsafe (unsafeCrashWith)
 import Prelude (class BooleanAlgebra)
 import Pux (renderToDOM, fromSimple, start)
@@ -42,7 +44,9 @@ import Signal (constant, Signal)
 import Prelude hiding (div)
 
 
-type Props ps = { settings :: Settings | ps }
+type Props ps = { settings :: Settings
+                , deviceInfos :: Array (Tuple (Key Device) DeviceInfo)
+                , deviceId :: Key Device | ps }
 
 type State = Maybe StateImpl
 
@@ -118,11 +122,11 @@ answerInvitation reply = do
 
     --------------------------------------------------------------------------------
 
-view :: State -> Html Action
-view Nothing = viewLoading "Loading your invitation - stay tight ..."
-view (Just state) = case state.accepted of
+view :: forall ps. Props ps -> State -> Html Action
+view _ Nothing = viewLoading "Loading your invitation - stay tight ..."
+view props (Just state) = case state.accepted of
   Nothing    ->  viewAskUser state.invitationInfo
-  Just true  ->  viewAccepted state.invitationInfo
+  Just true  ->  viewAccepted props state.invitationInfo
   Just false ->  viewDeclined state.invitationInfo
 
 viewAskUser :: InvitationInfo -> Html Action
@@ -177,10 +181,10 @@ viewAskUser (InvitationInfo invitation) =
     handleEnter :: E.KeyboardEvent -> Action
     handleEnter ev = if ev.keyCode == 13 then Accept else Nop
 
-viewAccepted :: InvitationInfo -> Html Action
-viewAccepted (InvitationInfo invitation) = viewLogo
+viewAccepted :: forall ps. Props ps -> InvitationInfo -> Html Action
+viewAccepted props (InvitationInfo invitation) = viewLogo
                           $ span [ A.title "You chose wisely!" ]
-                                 [ text $ "Your device <deviceName> is now a member of family: "
+                                 [ text $ "Your device \"" <> getDeviceName props <> "\" is now a member of family: "
                                    <> invitation.invitationInfoFamily <> "!"
                                  ]
 
@@ -191,3 +195,8 @@ viewDeclined (InvitationInfo invitation) = viewLogo
                                  , em [] [ text invitation.invitationInfoFamily ]
                                  , text "!"
                                  ]
+
+getDeviceName :: forall ps. Props ps -> String
+getDeviceName props = fromMaybe "No Name Cowboy"
+                      <<< (_^?_Just<<<_DeviceInfo<<<deviceInfoName)
+                      $ Tuple.lookup props.deviceId props.deviceInfos
