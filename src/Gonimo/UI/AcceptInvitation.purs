@@ -64,6 +64,7 @@ data Action = LoadInvitation Secret
             | Decline
             | SetAccepted Boolean
             | ReportError GonimoError
+            | GoToBabyStation
             | Nop
 
 instance reportErrorActionAction :: ReportErrorAction Action where
@@ -105,6 +106,7 @@ updateJust action = case action of
   Decline                 -> answerInvitation InvitationReject
   SetAccepted accepted'   -> onlyModify $ _ { accepted = Just accepted' }
   Nop                     -> noEffects
+  GoToBabyStation         -> noEffects
   ReportError err         -> noEffects
 
 
@@ -182,11 +184,25 @@ viewAskUser (InvitationInfo invitation) =
     handleEnter ev = if ev.keyCode == 13 then Accept else Nop
 
 viewAccepted :: forall ps. Props ps -> InvitationInfo -> Html Action
-viewAccepted props (InvitationInfo invitation) = viewLogo
-                          $ span [ A.title "You chose wisely!" ]
-                                 [ text $ "Your device \"" <> getDeviceName props <> "\" is now a member of family: "
-                                   <> invitation.invitationInfoFamily <> "!"
-                                 ]
+viewAccepted props (InvitationInfo invitation) =
+  viewLogo $
+  div []
+  [  span [ A.title "You chose wisely!" ]
+          [ p []
+            [ text $ "Your device \"" <> getDeviceName props <> "\" is now a member of family: "
+              <> invitation.invitationInfoFamily <> "!"
+            ]
+          , p []
+            [ text "Now go on and ...." ]
+          ]
+  , button [ A.title "Go to baby station view"
+           , A.className "btn btn-block btn-info"
+           , A.type_ "button"
+           , E.onClick $ const GoToBabyStation
+           ]
+    [ text "make this device a Baby Station" ]
+
+  ]
 
 viewDeclined :: InvitationInfo -> Html Action
 viewDeclined (InvitationInfo invitation) = viewLogo
