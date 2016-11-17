@@ -39,6 +39,7 @@ type State = { subscriberUrl :: String
              , userError :: UserError
              , url :: String
              , sendAction :: Action -> Eff () Unit
+             , babiesOnlineCount :: Int -- Little helper to detect when a baby comes online
              }
 
 type Props = { settings :: Settings
@@ -54,7 +55,8 @@ type Props = { settings :: Settings
 
 type InviteProps = InviteC.Props ()
 
-data Action = ReportError GonimoError
+data Action = Init
+            | ReportError GonimoError
             | SetState State
             | InviteA (Maybe InviteProps) InviteC.Action
             | AcceptA AcceptC.Action
@@ -157,6 +159,9 @@ currentFamily = socketS <<< SocketC.currentFamily <<< _Just
 
 familyIds :: LensP State (Array (Key Family))
 familyIds = lens _.familyIds (_ { familyIds = _ })
+
+babiesOnlineCount :: LensP State Int
+babiesOnlineCount = lens _.babiesOnlineCount (_ { babiesOnlineCount = _ })
 
 instance eqCentralReq :: Eq CentralReq where
   eq ReqCentralInvite ReqCentralInvite = true

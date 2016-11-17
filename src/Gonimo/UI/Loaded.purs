@@ -40,7 +40,7 @@ import Control.Monad.Except.Trans (runExceptT)
 import Control.Monad.Reader (runReader)
 import Control.Monad.Reader.Class (class MonadReader)
 import Control.Monad.Reader.Trans (runReaderT)
-import Control.Monad.State.Class (get, modify, put)
+import Control.Monad.State.Class (gets, get, modify, put)
 import Data.Argonaut.Generic.Aeson (decodeJson)
 import Data.Array (fromFoldable, concat, catMaybes, head)
 import Data.Bifunctor (bimap)
@@ -48,7 +48,7 @@ import Data.Either (either, Either(Right, Left))
 import Data.Foldable (foldl)
 import Data.Generic (class Generic)
 import Data.Generic (gShow)
-import Data.Lens (_Just, (.=), to, (^.), (^?))
+import Data.Lens (_Just, (.=), to, (^.), (^?), use)
 import Data.Map (Map)
 import Data.Maybe (fromMaybe, isNothing, maybe, Maybe(..))
 import Data.Monoid (mempty)
@@ -56,7 +56,7 @@ import Data.Profunctor (lmap)
 import Data.Semigroup (append)
 import Data.String (takeWhile)
 import Data.Traversable (traverse)
-import Data.Tuple (uncurry, fst, Tuple(Tuple))
+import Data.Tuple (snd, uncurry, fst, Tuple(Tuple))
 import Debug.Trace (trace)
 import Gonimo.Client.Types (toIO, Settings, GonimoError(AjaxError, RegisterSessionFailed), class ReportErrorAction, Gonimo)
 import Gonimo.Pux (noEffects, Component, toParent, runGonimo, liftChild, ComponentType, makeChildData, ToChild, onlyModify, Update, wrapAction)
@@ -65,9 +65,10 @@ import Gonimo.Server.Db.Entities.Helpers (runFamily)
 import Gonimo.Server.Error (ServerError(InvalidAuthToken))
 import Gonimo.Server.Types (DeviceType(Baby, NoBaby), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (dateToString, Key(Key), Secret(Secret))
+import Gonimo.UI.AcceptInvitation (isAccepted)
 import Gonimo.UI.Error (handleError, viewError, class ErrorAction, UserError(NoError, DeviceInvalid))
 import Gonimo.UI.Loaded.Central (getCentrals)
-import Gonimo.UI.Loaded.Types (mkInviteProps', CentralReq(..), mkInviteProps, mkSettings, mkProps, central, familyIds, authData, currentFamily, socketS, overviewS, Props, acceptS, inviteS, State, Action(..), Central(..), InviteProps)
+import Gonimo.UI.Loaded.Types (babiesOnlineCount, mkInviteProps', CentralReq(..), mkInviteProps, mkSettings, mkProps, central, familyIds, authData, currentFamily, socketS, overviewS, Props, acceptS, inviteS, State, Action(..), Central(..), InviteProps)
 import Gonimo.UI.Socket.Lenses (sessionId)
 import Gonimo.Util (userShow, toString, fromString)
 import Gonimo.WebAPI (postSessionByFamilyIdByDeviceId, postInvitationsByFamilyId, postFamilies, getFamiliesByFamilyId, postFunnyName, SPParams_(SPParams_), postAccounts)
@@ -93,6 +94,7 @@ import Prelude hiding (div)
 
 
 update :: Update Unit State Action
+update Init                                    = handleInit
 update (SetState state)                        = put state *> pure []
 update (ReportError err)                       = handleError err
 update (InviteA _ InviteC.GoToOverview)        = handleRequestCentral ReqCentralOverview
@@ -110,8 +112,8 @@ update (SetFamilyIds ids)                      = handleSetFamilyIds ids
 update (UpdateFamily familyId' family')        = onlyModify $ \state ->  state { families = Map.insert familyId' family' state.families }
 update (RequestCentral c)                      = handleRequestCentral c
 update (SetCentral c)                          = handleSetCentral c
-update (SetOnlineDevices devices)              = onlyModify $ _ { onlineDevices = devices }
-update (SetDeviceInfos devices)                = onlyModify $ _ { deviceInfos = devices }
+update (SetOnlineDevices devices)              = handleSetOnlineDevices devices
+update (SetDeviceInfos devices)                = handleSetDeviceInfos devices
 update (SetURL url)                            = handleSetURL url
 update (HandleSubscriber msg)                  = handleSubscriber msg
 update ResetDevice                             = handleResetDevice
@@ -170,11 +172,36 @@ updateSocket action = do
 inviteEffect :: forall m. Monad m => Secret -> m Action
 inviteEffect = pure <<< AcceptA <<< AcceptC.LoadInvitation
 
+
+handleInit :: ComponentType Unit State Action
+handleInit = pure []
+
 handleSubscriber :: Notification -> ComponentType Unit State Action
 handleSubscriber notification = do
   append <$> Error.handleSubscriber notification
          <*> updateSocket (SocketC.HandleSubscriber notification)
 
+handleSetDeviceInfos :: Array (Tuple (Key Device) DeviceInfo) -> ComponentType Unit State Action
+handleSetDeviceInfos devices = do
+  modify $ _ { deviceInfos = devices }
+  if Arr.length devices <=1
+    then doAutoSwitchCentral ReqCentralInvite
+    else pure []
+
+handleSetOnlineDevices :: Array (Tuple (Key Device) DeviceType) -> ComponentType Unit State Action
+handleSetOnlineDevices devices = do
+  modify $ _ { onlineDevices = devices }
+  let isBaby dev = case dev of
+        Baby _ -> true
+        _    -> false
+  let babies = Arr.filter (isBaby <<< snd) devices
+  let babyCount = Arr.length babies
+  prevBabyCount <- use babiesOnlineCount
+  weAreBaby <- use (socketS<<<to SocketC.toDeviceType <<< to isBaby)
+  babiesOnlineCount .= babyCount
+  if babyCount > prevBabyCount && not weAreBaby
+    then doAutoSwitchCentral ReqCentralOverview
+    else pure []
 
 handleResetDevice :: ComponentType Unit State Action
 handleResetDevice = do
@@ -228,9 +255,13 @@ handleSetFamilyIds :: Array (Key Family) -> ComponentType Unit State Action
 handleSetFamilyIds ids = do
   familyIds .= ids
   state <- get :: Component Unit State State
-  if isNothing state.socketS.currentFamily
-    then pure $ fromFoldable $ pure <<< SocketA <<< SocketC.SwitchFamily <$> Arr.head ids
-    else noEffects
+  let switchFamily
+        = if isNothing state.socketS.currentFamily
+          then fromFoldable $ pure <<< SocketA <<< SocketC.SwitchFamily <$> Arr.head ids
+          else []
+  if Arr.null ids
+    then doAutoSwitchCentral ReqCentralInvite
+    else pure switchFamily
 
 
 handleSetURL :: String -> ComponentType Unit State Action
@@ -261,6 +292,16 @@ handleClearError = do
                  , central = newCentral
                  }
 
+-- Switch central if it is safe to do so. Use this function if you want to switch the central
+-- automatically - not by user request.
+doAutoSwitchCentral :: CentralReq -> ComponentType Unit State Action
+doAutoSwitchCentral req = do
+  mycentral <- use central
+  case mycentral of
+    CentralAccept acceptS' -> if isAccepted acceptS'
+                              then handleRequestCentral req
+                              else pure []
+    _               -> handleRequestCentral req
 --------------------------------------------------------------------------------
 
 view :: State -> Html Action

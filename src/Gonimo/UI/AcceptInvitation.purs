@@ -32,6 +32,7 @@ import Gonimo.Util (fromMaybeM)
 import Gonimo.WebAPI (deleteInvitationsByInvitationSecret, putInvitationsInfoByInvitationSecret, postFamilies, SPParams_(SPParams_), postAccounts)
 import Gonimo.WebAPI.Types (InvitationReply(InvitationReject, InvitationAccept), InvitationReply(InvitationReject, InvitationAccept), InvitationInfo(InvitationInfo), AuthData(AuthData))
 import Partial.Unsafe (unsafeCrashWith)
+import Prelude (class BooleanAlgebra)
 import Pux (renderToDOM, fromSimple, start)
 import Pux.Html (br, em, button, input, p, h3, i, text, span, Html, img, div)
 import Pux.Html.Attributes (offset)
@@ -77,6 +78,12 @@ toJust :: forall ps. ToChild (Props ps) State (Props ps) StateImpl
 toJust = do
   props <- ask
   pure $ makeChildData _Just props
+
+-- Whether or not the invitation was accepted already ...
+isAccepted :: State -> Boolean
+isAccepted state = fromMaybe false $ do
+  rState <- state
+  rState.accepted
 
 updateNothing :: forall ps. Update (Props ps) State Action
 updateNothing action = case action of

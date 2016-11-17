@@ -180,7 +180,10 @@ handleInit ls = do
     case state ^? _LoadingS of
       Nothing -> pure Nothing
       Just loadingS -> do
-        let queueEffects = map (pure <<< LoadedA) <<< reverse $ loadingS.actionQueue
+        let queueEffects = map (pure <<< LoadedA)
+                           <<< reverse
+                           <<< Cons LoadedC.Init
+                           $ loadingS.actionQueue
         put $ LoadedS ls
         pure <<< Just $ toUnfoldable queueEffects
 
@@ -224,6 +227,7 @@ load sendAction' = Gonimo.toIO initSettings $ authToAction =<< LoadedC.getAuthDa
             , deviceInfos   : []
             , userError     : NoError
             , sendAction    : lmap LoadedA sendAction'
+            , babiesOnlineCount : 0
             }
 
 makeCallback :: forall eff. Channel Action ->  (LoadedC.Action -> SubscriberEff (channel :: CHANNEL | eff) Unit)
