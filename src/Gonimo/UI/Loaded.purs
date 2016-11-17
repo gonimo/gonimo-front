@@ -67,7 +67,7 @@ import Gonimo.Server.Types (DeviceType(Baby, NoBaby), AuthToken, AuthToken(Gonim
 import Gonimo.Types (dateToString, Key(Key), Secret(Secret))
 import Gonimo.UI.AcceptInvitation (isAccepted)
 import Gonimo.UI.Error (handleError, viewError, class ErrorAction, UserError(NoError, DeviceInvalid))
-import Gonimo.UI.Loaded.Central (getCentrals)
+import Gonimo.UI.Loaded.Central (CentralItem, getCentrals)
 import Gonimo.UI.Loaded.Types (babiesOnlineCount, mkInviteProps', CentralReq(..), mkInviteProps, mkSettings, mkProps, central, familyIds, authData, currentFamily, socketS, overviewS, Props, acceptS, inviteS, State, Action(..), Central(..), InviteProps)
 import Gonimo.UI.Socket.Lenses (sessionId)
 import Gonimo.Util (userShow, toString, fromString)
@@ -366,16 +366,21 @@ viewHeader state =
                    , span [A.className "icon-bar"] []
                    , span [A.className "icon-bar"] []
                    ]
-    viewCentralItem :: Tuple Boolean CentralReq -> Html Action
-    viewCentralItem (Tuple active item) =
-      li (if active then [ A.className "active" ] else []
-          <>    [ A.dataToggle "collapse"
-                , A.dataTarget ".navbar-collapse.in"]
-         )
-         [ a [ E.onClick <<< const $ RequestCentral item
-             , A.type_ "button", A.role "button"]
-           [ text $ userShow item ]
-         ]
+    viewCentralItem :: CentralItem -> Html Action
+    viewCentralItem item =
+      if item.enabled
+      then
+        li (if item.selected then [ A.className "active" ] else []
+            <>    [ A.dataToggle "collapse"
+                  , A.dataTarget ".navbar-collapse.in"
+                  ]
+          )
+          [ a [ E.onClick <<< const $ RequestCentral item.req
+              , A.type_ "button", A.role "button"
+              ]
+            [ text $ userShow item.req ]
+          ]
+      else span [] []
 
 viewUserSettings :: Html Action
 viewUserSettings =
