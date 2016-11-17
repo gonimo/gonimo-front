@@ -136,7 +136,20 @@ view props state =
     let invitationLink = makeInviteLink (props.baseURL) state.invitation
         escapedLink = encodeURIComponent invitationLink
      in div []
-        [ div [A.className "page-header"]
+        [ div [ A.className "panel panel-danger"]
+          [ div [ A.className "panel-heading"]
+            [ h3 [] [ text "Early Development Software" ]
+            ]
+          , div [ A.className "panel-body" ]
+            [ p []
+              [ text $ "This early development version currently only works on recent versions of Chrome on any non-Apple platform."
+              ]
+            , p []
+              [ text $ "We will support more browsers in the near future, Apple once they support the Internet."
+              ]
+            ]
+          ]
+        , div [A.className "page-header"]
           [ div [ A.className "container"
                 , A.style [Tuple "width" "100%"]]
             [ h3 [] [ text "Device Management"
