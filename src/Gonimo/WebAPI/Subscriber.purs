@@ -66,7 +66,7 @@ getSocketByFamilyIdByToDevice spToUser_ familyId toDevice = do
 getSocketByFamilyIdByFromDeviceByToDeviceByChannelId :: forall m a.
                                                         MonadReader (SPSettings_ SPParams_) m
                                                         =>
-                                                        TypedToUser (Maybe (Tuple MessageNumber String)) a
+                                                        TypedToUser (Maybe (Tuple MessageNumber (Array String))) a
                                                         -> Key Family
                                                         -> Key Device
                                                         -> Key Device -> Secret

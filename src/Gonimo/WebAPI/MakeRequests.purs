@@ -325,7 +325,8 @@ deleteSocketByFamilyIdByToDeviceByFromDeviceByChannelId familyId toDevice
 
 putSocketByFamilyIdByFromDeviceByToDeviceByChannelId :: forall m.
                                                         MonadReader (SPSettings_ SPParams_) m
-                                                        => String -> Key Family
+                                                        => Array String
+                                                        -> Key Family
                                                         -> Key Device
                                                         -> Key Device -> Secret
                                                         -> m HttpRequest

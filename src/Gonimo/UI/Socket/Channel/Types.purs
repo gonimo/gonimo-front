@@ -17,6 +17,7 @@ import Signal.Channel (Channel)
 import WebRTC.MediaStream (MediaStream, MediaStreamConstraints(MediaStreamConstraints))
 import WebRTC.RTC (MediaStreamEvent, IceEvent, RTCPeerConnection)
 import Data.CatQueue (CatQueue)
+import Data.List (List)
 
 maxMessagesInFlight :: Int
 maxMessagesInFlight = 2 -- Offers some performance advantage and hopefull is low enough to not cause dead locks on regular use.
@@ -26,7 +27,7 @@ type State =
   , remoteStream :: Maybe RemoteStream
   , rtcConnection :: RTCPeerConnection
   , isBabyStation :: Boolean
-  , messageQueue  :: CatQueue (IO Action)
+  , messageQueue  :: List String
   , messagesInFlight :: Int
   }
 
@@ -41,9 +42,9 @@ type Props ps =
   }
 
 data Action = InitConnection
-            | AcceptMessage MessageNumber Message
+            | AcceptMessages MessageNumber (Array String)
             | StartStreaming MediaStreamConstraints
-            | EnqueueMessage (IO Action)
+            | EnqueueMessage Message
             | MessageSent Action -- Notification that the ajax call for sending a message returned.
             | StartNegotiation
             | StopStreaming

@@ -3,6 +3,7 @@ module Gonimo.UI.Socket.Channel where
 import Prelude
 import Data.Array as Arr
 import Data.CatQueue as Q
+import Data.List as List
 import Data.Tuple as Tuple
 import Gonimo.UI.Socket.Message as Message
 import Pux.Html.Attributes as A
@@ -21,8 +22,10 @@ import Control.Monad.Reader.Class (ask, class MonadReader)
 import Control.Monad.State.Class (get)
 import Data.Identity (runIdentity)
 import Data.Lens ((+=), (-=), (^?), _Just, lens, Lens, (.=), use, (%=), to)
+import Data.List (List(Cons, Nil))
 import Data.Maybe (fromMaybe, isJust, maybe, Maybe(Nothing, Just))
-import Data.Tuple (Tuple(Tuple))
+import Data.Traversable (traverse)
+import Data.Tuple (uncurry, curry, Tuple(Tuple))
 import Gonimo.Client.Types (toIO, Settings)
 import Gonimo.Pux (noEffects, runGonimo, Component, Update, onlyModify, ComponentType)
 import Gonimo.Server.Db.Entities (Family(Family), Device(Device))
@@ -41,7 +44,6 @@ import Servant.Subscriber (Subscriptions)
 import Unsafe.Coerce (unsafeCoerce)
 import WebRTC.MediaStream (createObjectURL, mediaStreamToBlob, stopStream, getUserMedia, MediaStreamConstraints(MediaStreamConstraints), MediaStream)
 import WebRTC.RTC (onnegotiationneeded, closeRTCPeerConnection, MediaStreamEvent, setLocalDescription, createAnswer, iceEventCandidate, IceEvent, onicecandidate, onaddstream, addIceCandidate, setRemoteDescription, fromRTCSessionDescription, createOffer, addStream, RTCIceCandidateInit, RTCPeerConnection, Ice, newRTCPeerConnection)
-import Data.CatQueue (CatQueue)
 
 
 init :: Maybe MediaStream -> IO State
@@ -61,7 +63,7 @@ init stream = do
           , remoteStream : Nothing
           , rtcConnection : rtcConnection
           , isBabyStation : isJust stream
-          , messageQueue  : Q.empty :: CatQueue (IO Action)
+          , messageQueue  : Nil
           , messagesInFlight : 0
           }
 
@@ -77,7 +79,7 @@ update action = case action of
   SetMediaStream stream              -> handleSetMediaStream stream
   StopStreaming                      -> closeConnection
   CloseConnection                    -> handleCloseConnection
-  AcceptMessage num message          -> handleAcceptMessage num message
+  AcceptMessages num messages        -> handleAcceptMessages num messages
   OnIceCandidate iceEvent            -> handleOnIceCandidate iceEvent
   OnAddStream streamEvent            -> handleOnAddStream streamEvent
   SetRemoteStream stream             -> remoteStream .= Just stream *> pure []
@@ -90,7 +92,6 @@ handleInit :: forall ps. ComponentType (Props ps) State Action
 handleInit = do
   props <- ask :: Component (Props ps) State (Props ps)
   state <- get :: Component (Props ps) State State
-  sendMessage <- getSendMessage
   pure
     [ do
          liftEff $ onaddstream (coerceEffects <<< props.sendAction <<< OnAddStream ) state.rtcConnection
@@ -98,7 +99,7 @@ handleInit = do
          liftEff $ onnegotiationneeded (coerceEffects <<< props.sendAction $ StartNegotiation) state.rtcConnection
          if state.isBabyStation
            then pure Nop
-           else pure $ sendMessage Message.StartStreaming
+           else pure $ EnqueueMessage Message.StartStreaming
     ]
 
 handleStartStreaming :: forall ps.
@@ -107,10 +108,6 @@ handleStartStreaming :: forall ps.
 handleStartStreaming constraints =
   pure [ liftAff $ SetMediaStream <$> coerceEffects (getUserMedia constraints) ]
 
-handleSendStartStreaming :: forall ps. ComponentType (Props ps) State Action
-handleSendStartStreaming = do
-  sendMessage <- getSendMessage
-  pure [ pure $ sendMessage Message.StartStreaming ]
 
 handleSetMediaStream :: forall ps. MediaStream -> ComponentType (Props ps) State Action
 handleSetMediaStream stream = do
@@ -120,7 +117,6 @@ handleSetMediaStream stream = do
 startStreaming :: forall ps. MediaStream -> ComponentType (Props ps) State Action
 startStreaming stream = do
   state <- get
-  sendMessage <- getSendMessage
   pure [ do
             liftEff $ addStream stream state.rtcConnection
             pure Nop
@@ -129,19 +125,17 @@ startStreaming stream = do
 handleStartNegotiation :: forall ps. ComponentType (Props ps) State Action
 handleStartNegotiation = do
   state <- get
-  sendMessage <- getSendMessage
   pure [ do
             offer <- liftAff $ createOffer state.rtcConnection
             liftAff $ setLocalDescription offer state.rtcConnection
-            pure <<< sendMessage $ Message.SessionDescriptionOffer offer
+            pure <<< EnqueueMessage $ Message.SessionDescriptionOffer offer
        ]
 
 handleOnIceCandidate :: forall ps. IceEvent -> ComponentType (Props ps) State Action
 handleOnIceCandidate event = do
   let candidate = iceEventCandidate event
   let mCandidate = maybe NoIceCandidate JustIceCandidate candidate
-  sendMessage <- getSendMessage
-  pure [ pure <<< sendMessage $ Message.IceCandidate mCandidate ]
+  pure [ pure <<< EnqueueMessage $ Message.IceCandidate mCandidate ]
 
 handleOnAddStream :: forall ps. MediaStreamEvent  -> ComponentType (Props ps) State Action
 handleOnAddStream event = do
@@ -150,9 +144,9 @@ handleOnAddStream event = do
             pure $ SetRemoteStream $ { stream : event.stream, objectURL : url }
        ]
 
-getSendMessage :: forall ps. Component (Props ps) State (Message -> Action)
-getSendMessage = do
-  let sendString = putSocketByFamilyIdByFromDeviceByToDeviceByChannelId
+getSendMessages :: forall ps. Component (Props ps) State (Array String -> IO Action)
+getSendMessages = do
+  let sendMessages = putSocketByFamilyIdByFromDeviceByToDeviceByChannelId
   props <- ask
   let familyId' = props.familyId
   let fromDevice' = props.ourId
@@ -160,50 +154,51 @@ getSendMessage = do
   let channelId' = props.cSecret
   let sendMessage = map MessageSent
                     <<< toIO props.settings
-                    <<< ( \msg ->  do
-                             let strMsg = encodeToString msg
-                             sendString strMsg familyId' fromDevice' toDevice' channelId'
+                    <<< ( \msgs ->  do
+                             sendMessages msgs familyId' fromDevice' toDevice' channelId'
                              pure Nop
                         )
-  pure $ EnqueueMessage <<< sendMessage
+  pure sendMessage
 
-handleAcceptMessage :: forall ps. MessageNumber -> Message -> ComponentType (Props ps) State Action
-handleAcceptMessage msgNumber msg = do
-    props <- ask
-    actions <- handleMessage
-    let deleteMessage = deleteSocketByFamilyIdByFromDeviceByToDeviceByChannelIdMessagesByMessageNumber
-    deleteActions <- runGonimo $ do
-      deleteMessage props.familyId props.theirId props.ourId props.cSecret msgNumber
-      pure Nop
-    pure $ deleteActions <> actions
-  where
-    handleMessage :: ComponentType (Props ps) State Action
-    handleMessage = do
-      state <- get
-      sendMessage <- getSendMessage
-      case msg of
-        Message.StartStreaming -> fromMaybe (pure []) $ startStreaming <$> state.mediaStream
-        Message.SessionDescriptionOffer description ->
-          pure [ do
-                  liftAff $ setRemoteDescription description state.rtcConnection
-                  answer <- liftAff $ createAnswer state.rtcConnection
-                  liftAff $ setLocalDescription answer state.rtcConnection
-                  pure <<< sendMessage $ Message.SessionDescriptionAnswer answer
-              ]
-        Message.SessionDescriptionAnswer description ->
-          pure [ do
-                  liftAff $ setRemoteDescription description state.rtcConnection
-                  pure Nop
-              ]
-        Message.IceCandidate candidate ->
-          pure [ do
-                  let test = runMaybeIceCandidate candidate
-                  case test of
-                    Nothing -> pure unit -- let's see whether this helps
-                    Just c -> liftAff $ addIceCandidate (runMaybeIceCandidate candidate) state.rtcConnection
-                  pure Nop
-              ]
-        Message.CloseConnection -> closeConnection
+
+handleAcceptMessages :: forall ps. MessageNumber -> Array String -> ComponentType (Props ps) State Action
+handleAcceptMessages msgNumber msgs = do
+  let decoded = Arr.mapMaybe decodeFromString msgs
+  props <- ask
+  let deleteMessage = deleteSocketByFamilyIdByFromDeviceByToDeviceByChannelIdMessagesByMessageNumber
+  deleteActions <- runGonimo $ do
+    deleteMessage props.familyId props.theirId props.ourId props.cSecret msgNumber
+    pure Nop
+  messageActions <- Arr.concat <$> traverse handleMessage decoded
+  pure $ deleteActions <> messageActions
+
+
+handleMessage :: forall ps. Message -> ComponentType (Props ps) State Action
+handleMessage msg = do
+  state <- get
+  case msg of
+    Message.StartStreaming -> fromMaybe (pure []) $ startStreaming <$> state.mediaStream
+    Message.SessionDescriptionOffer description ->
+      pure [ do
+              liftAff $ setRemoteDescription description state.rtcConnection
+              answer <- liftAff $ createAnswer state.rtcConnection
+              liftAff $ setLocalDescription answer state.rtcConnection
+              pure <<< EnqueueMessage $ Message.SessionDescriptionAnswer answer
+          ]
+    Message.SessionDescriptionAnswer description ->
+      pure [ do
+              liftAff $ setRemoteDescription description state.rtcConnection
+              pure Nop
+          ]
+    Message.IceCandidate candidate ->
+      pure [ do
+              let test = runMaybeIceCandidate candidate
+              case test of
+                Nothing -> pure unit -- let's see whether this helps
+                Just c -> liftAff $ addIceCandidate (runMaybeIceCandidate candidate) state.rtcConnection
+              pure Nop
+          ]
+    Message.CloseConnection -> closeConnection
 
 closeConnection :: forall ps. ComponentType (Props ps) State Action
 closeConnection = do
@@ -220,31 +215,36 @@ closeConnection = do
 
 handleCloseConnection :: forall ps. ComponentType (Props ps) State Action
 handleCloseConnection = do
-  sendMessage <- getSendMessage
   closeActions <- closeConnection
-  pure $ closeActions <> [ pure $ sendMessage Message.CloseConnection ]
+  pure $ closeActions <> [ pure $ EnqueueMessage Message.CloseConnection ]
 
-handleEnqueueMessage :: forall ps. IO Action -> ComponentType (Props ps) State Action
+handleEnqueueMessage :: forall ps. Message -> ComponentType (Props ps) State Action
 handleEnqueueMessage message = do
+  let strMsg = encodeToString message
   allClear <- use $ messagesInFlight <<< to (_ < maxMessagesInFlight)
+  sendMessages <- getSendMessages
   if allClear
     then do
       messagesInFlight += 1
-      pure [message] -- Ready to take off!
+      pure [ sendMessages $ Arr.singleton strMsg ] -- Ready to take off!
     else do
-      messageQueue %= flip Q.snoc message
+      messageQueue %= Cons strMsg
       pure []
 
 handleMessageSent :: forall ps. Action -> ComponentType (Props ps) State Action
 handleMessageSent nAction = do
   messagesInFlight -= 1
   newActions <- update nAction
-  queue <- use messageQueue
-  ourActions <- map (fromMaybe []) <<< runMaybeT $ do
-    (Tuple message newQueue) <- MaybeT <<< pure $ Q.uncons queue
-    messageQueue .= newQueue
-    messagesInFlight += 1
-    pure [ message ]
+  queue :: List String <- use messageQueue
+  sendMessages <- getSendMessages
+  let messages = Arr.fromFoldable $ List.reverse queue
+  ourActions <-
+        if Arr.null messages
+        then pure []
+        else do
+          messageQueue .= Nil :: (List String)
+          messagesInFlight += 1
+          pure [ sendMessages messages ]
   pure $ newActions <> ourActions
 
 view :: forall ps. Props ps -> State -> Html Action
@@ -278,10 +278,10 @@ viewVideo state =
 getSubscriptions :: forall m ps. (MonadReader Settings m) => Props ps -> m (Subscriptions Action)
 getSubscriptions props =
   let
-    receiveMessage = getSocketByFamilyIdByFromDeviceByToDeviceByChannelId doDecode
-    doDecode :: Maybe (Maybe (Tuple MessageNumber String)) -> Action
-    doDecode (Just (Just (Tuple num msg))) = fromMaybe Nop
-                                             $ AcceptMessage num <$> decodeFromString msg
-    doDecode _                             = Nop
+    receiveMessage = getSocketByFamilyIdByFromDeviceByToDeviceByChannelId toAction
+    toAction :: Maybe (Maybe (Tuple MessageNumber (Array String))) -> Action
+    toAction (Just (Just (Tuple num messages))) = AcceptMessages num messages
+    toAction (Just Nothing) = Nop
+    toAction Nothing = Nop
   in
     receiveMessage props.familyId props.theirId props.ourId props.cSecret

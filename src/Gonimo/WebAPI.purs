@@ -315,7 +315,8 @@ deleteSocketByFamilyIdByToDeviceByFromDeviceByChannelId familyId toDevice
   
 putSocketByFamilyIdByFromDeviceByToDeviceByChannelId :: forall eff m.
                                                         (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-                                                        => String -> Key Family
+                                                        => Array String
+                                                        -> Key Family
                                                         -> Key Device
                                                         -> Key Device -> Secret
                                                         -> m Unit
@@ -348,7 +349,7 @@ getSocketByFamilyIdByFromDeviceByToDeviceByChannelId :: forall eff m.
                                                         => Key Family
                                                         -> Key Device
                                                         -> Key Device -> Secret
-                                                        -> m (Maybe (Tuple MessageNumber String))
+                                                        -> m (Maybe (Tuple MessageNumber (Array String)))
 getSocketByFamilyIdByFromDeviceByToDeviceByChannelId familyId fromDevice
                                                      toDevice channelId = do
   spOpts_' <- ask
