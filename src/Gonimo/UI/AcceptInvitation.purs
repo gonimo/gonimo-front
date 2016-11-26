@@ -18,15 +18,16 @@ import Control.Monad.IO (IO)
 import Control.Monad.Reader.Class (ask)
 import Control.Monad.Reader.Trans (runReaderT)
 import Control.Monad.State.Class (get, put)
+import Data.Array (fromFoldable)
 import Data.Bifunctor (lmap)
 import Data.Either (Either(Right, Left))
 import Data.Generic (gShow)
-import Data.Lens ((^?), (^.), _Just)
-import Data.Maybe (fromMaybe, isJust, isNothing, Maybe(..))
+import Data.Lens (lens, LensP, (.=), (^?), (^.), _Just)
+import Data.Maybe (maybe, fromMaybe, isJust, isNothing, Maybe(..))
 import Data.Tuple (Tuple(Tuple))
 import Gonimo.Client.Types (GonimoError(UnexpectedAction), Gonimo, Settings, class ReportErrorAction)
-import Gonimo.Pux (Component, makeChildData, liftChild, noEffects, onlyModify, Update, ToChild, runGonimo, ComponentType, class MonadComponent)
-import Gonimo.Server.Db.Entities (Device(Device), Invitation(Invitation))
+import Gonimo.Pux (noEffects, Component, makeChildData, liftChild, onlyModify, Update, ToChild, runGonimo, ComponentType, class MonadComponent)
+import Gonimo.Server.Db.Entities (Family(Family), Device(Device), Invitation(Invitation))
 import Gonimo.Server.Types (DeviceType, InvitationDelivery(EmailInvitation), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (Key(Key), Secret(Secret))
 import Gonimo.Util (fromMaybeM)
@@ -46,7 +47,8 @@ import Prelude hiding (div)
 
 type Props ps = { settings :: Settings
                 , deviceInfos :: Array (Tuple (Key Device) DeviceInfo)
-                , deviceId :: Key Device | ps }
+                , deviceId :: Key Device | ps
+                }
 
 type State = Maybe StateImpl
 
@@ -62,7 +64,8 @@ data Action = LoadInvitation Secret
             | Init (Tuple Secret InvitationInfo)
             | Accept
             | Decline
-            | SetAccepted Boolean
+            | SetAccepted (Maybe (Key Family))
+            | EnteredFamily (Key Family) 
             | ReportError GonimoError
             | GoToBabyStation
             | Nop
@@ -70,7 +73,7 @@ data Action = LoadInvitation Secret
 instance reportErrorActionAction :: ReportErrorAction Action where
   reportError = ReportError
 
-update :: forall ps m. Action -> Component (Props ps) State (Array (IO Action))
+update :: forall ps. Action -> Component (Props ps) State (Array (IO Action))
 update action = do
    r <- liftChild toJust (updateJust action)
    case r of
@@ -104,10 +107,11 @@ updateJust action = case action of
   Init (Tuple secret inv) -> onlyModify $ _ { invitationInfo = inv, invitationSecret = secret, accepted = (Nothing :: Maybe Boolean)}
   Accept                  -> answerInvitation InvitationAccept
   Decline                 -> answerInvitation InvitationReject
-  SetAccepted accepted'   -> onlyModify $ _ { accepted = Just accepted' }
+  SetAccepted mFamilyId'   -> handleSetAccepted mFamilyId' 
   Nop                     -> noEffects
   GoToBabyStation         -> noEffects
   ReportError err         -> noEffects
+  EnteredFamily _         -> noEffects
 
 
 loadInvitation :: Secret -> Gonimo Action
@@ -117,10 +121,14 @@ answerInvitation :: forall ps. InvitationReply -> ComponentType (Props ps) State
 answerInvitation reply = do
   state <- get
   runGonimo $ do
-    deleteInvitationsByInvitationSecret reply state.invitationSecret
-    pure $ SetAccepted $ case reply of
-      InvitationAccept  -> true
-      InvitationReject  -> false
+    SetAccepted <$> deleteInvitationsByInvitationSecret reply state.invitationSecret
+
+handleSetAccepted :: forall ps. Maybe (Key Family) -> ComponentType (Props ps) StateImpl Action
+handleSetAccepted mFamilyId' = do
+  accepted .= Just (maybe false (const true) mFamilyId')
+  pure $ pure <<< EnteredFamily <$> fromFoldable mFamilyId'
+
+
 
     --------------------------------------------------------------------------------
 
@@ -216,3 +224,6 @@ getDeviceName :: forall ps. Props ps -> String
 getDeviceName props = fromMaybe "No Name Cowboy"
                       <<< (_^?_Just<<<_DeviceInfo<<<deviceInfoName)
                       $ Tuple.lookup props.deviceId props.deviceInfos
+
+accepted :: LensP StateImpl (Maybe Boolean)
+accepted = lens _.accepted (_ { accepted = _ })

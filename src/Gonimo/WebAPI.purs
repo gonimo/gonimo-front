@@ -74,7 +74,8 @@ postInvitationsByFamilyId familyId = do
   
 deleteInvitationsByInvitationSecret :: forall eff m.
                                        (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-                                       => InvitationReply -> Secret -> m Unit
+                                       => InvitationReply -> Secret
+                                       -> m (Maybe (Key Family))
 deleteInvitationsByInvitationSecret reqBody invitationSecret = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
