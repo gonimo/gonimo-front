@@ -158,7 +158,11 @@ updateInvite mProps iAction = do
 
 
 updateAccept :: AcceptC.Action -> ComponentType Unit State Action
-updateAccept = toParent [] AcceptA <<< liftChild toAccept <<< AcceptC.update
+updateAccept action = do
+  case action of
+    AcceptC.EnteredFamily familyId' -> currentFamily .= familyId'
+    _                               -> pure unit
+  toParent [] AcceptA <<< liftChild toAccept <<< AcceptC.update $ action
 
 updateOverview :: OverviewC.Action -> ComponentType Unit State Action
 updateOverview = toParent [] OverviewA <<< liftChild toOverview <<< OverviewC.update
