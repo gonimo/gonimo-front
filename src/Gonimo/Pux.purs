@@ -42,7 +42,7 @@ import Data.Maybe (maybe, Maybe(Just, Nothing))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(Tuple))
 import Gonimo.Client.Types (Gonimo, Settings, class ReportErrorAction)
-import Gonimo.Util (fromMaybeM, runIOToSomeAff)
+import Gonimo.Util (differentObject, fromMaybeM, runIOToSomeAff)
 import Partial.Unsafe (unsafeCrashWith)
 import Pux (noEffects, EffModel)
 import Pux.Html (Attribute)
@@ -210,7 +210,6 @@ instance monadStateStateComponent :: MonadState state (Component props state) wh
   state f = Component $ state f
 
 
-foreign import differentObject :: forall a b. a -> b -> Boolean
 
 
 onClickWithDefault :: forall action. (MouseEvent -> action) -> Attribute action

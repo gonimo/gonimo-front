@@ -54,3 +54,5 @@ fromMaybeM fallback m = do
   case r of
     Nothing -> fallback
     Just v -> pure v
+
+foreign import differentObject :: forall a b. a -> b -> Boolean
