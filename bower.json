@@ -14,7 +14,7 @@
     "purescript-argonaut-generic-codecs": "~3.0.0",
     "purescript-generics": "~1.0.1",
     "purescript-io": "~2.0.0",
-    "purescript-localstorage": "~1.0.0",
+    "purescript-localstorage": "~2.0.0",
     "purescript-partial": "~1.1.2",
     "purescript-profunctor-lenses": "~1.0.0",
     "purescript-pux": "https://github.com/eskimor/purescript-pux.git#dropRepeats",

@@ -30,7 +30,6 @@ import Pux.Html.Events as E
 import Servant.PureScript.Affjax as Affjax
 import Servant.Subscriber as Sub
 import Servant.Subscriber.Connection as Sub
-import Browser.LocalStorage (STORAGE, localStorage)
 import Control.Alt ((<|>))
 import Control.Monad.Aff (Aff)
 import Control.Monad.Eff (Eff)
@@ -41,6 +40,8 @@ import Control.Monad.Reader (runReader)
 import Control.Monad.Reader.Class (class MonadReader)
 import Control.Monad.Reader.Trans (runReaderT)
 import Control.Monad.State.Class (gets, get, modify, put)
+import DOM.WebStorage.Generic (setItem, getItem, removeItem)
+import DOM.WebStorage.Storage (getLocalStorage)
 import Data.Argonaut.Generic.Aeson (decodeJson)
 import Data.Array (fromFoldable, concat, catMaybes, head)
 import Data.Bifunctor (bimap)
@@ -212,7 +213,8 @@ handleResetDevice :: ComponentType Unit State Action
 handleResetDevice = do
   props <- mkProps <$> get :: Component Unit State State
   pure $ [ toIO props.settings $ do
-              liftEff $ localStorage.removeItem Key.authData
+              localStorage <- liftEff $ getLocalStorage
+              liftEff $ removeItem localStorage Key.authData
               SocketA <<< SocketC.SetAuthData <$> getAuthData
          ]
 
@@ -307,6 +309,7 @@ doAutoSwitchCentral req = do
                               then handleRequestCentral req
                               else pure []
     _               -> handleRequestCentral req
+
 --------------------------------------------------------------------------------
 
 view :: State -> Html Action
@@ -582,14 +585,15 @@ getCloseRequest state =
 -- | Retrieve AuthData from local storage or if not present get new one from server
 getAuthData :: Gonimo AuthData
 getAuthData = do
-  md <- liftEff $ localStorage.getItem Key.authData
+  localStorage <- liftEff getLocalStorage
+  md <- liftEff $ getItem localStorage Key.authData
   Gonimo.log $ "Got authdata from local storage: " <> gShow md
   case md of
     Nothing -> do
       auth <- postAccounts
       Gonimo.log $ "Got Nothing - called postAccounts and got: " <> gShow auth
       Gonimo.log $ "Calling setItem with : " <> gShow Key.authData
-      liftEff $ localStorage.setItem Key.authData auth
+      liftEff $ setItem localStorage Key.authData auth
       pure auth
     Just d  -> pure d
 

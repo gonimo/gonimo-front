@@ -7,17 +7,17 @@ import Gonimo.Client.Effects as Gonimo
 import Gonimo.Client.LocalStorage as Key
 import Gonimo.Client.Types as Gonimo
 import Gonimo.UI.AcceptInvitation as AcceptC
-import Gonimo.UI.Overview as OverviewC
+import Gonimo.UI.Html as Html
 import Gonimo.UI.Invite as InviteC
 import Gonimo.UI.Loaded as LoadedC
 import Gonimo.UI.Loaded.Types as LoadedC
+import Gonimo.UI.Overview as OverviewC
 import Gonimo.UI.Socket as SocketC
 import Gonimo.WebAPI.MakeRequests as Reqs
 import Pux.Html.Attributes as A
 import Servant.Subscriber as Sub
 import Servant.Subscriber.Connection as Sub
 import Servant.Subscriber.Subscriptions as Sub
-import Browser.LocalStorage (STORAGE, localStorage)
 import Control.Alt ((<|>))
 import Control.Monad.Aff (launchAff, Aff)
 import Control.Monad.Eff (Eff)
@@ -28,6 +28,8 @@ import Control.Monad.IO (runIO, IO)
 import Control.Monad.Reader (runReader)
 import Control.Monad.Reader.Trans (runReaderT)
 import Control.Monad.State.Class (modify, put, get)
+import DOM.WebStorage.Generic (removeItem)
+import DOM.WebStorage.Storage (getLocalStorage)
 import Data.Array (head)
 import Data.Either (Either(Right, Left))
 import Data.Foldable (traverse_)
@@ -46,16 +48,15 @@ import Gonimo.Pux (toPux, noEffects, wrapAction, onlyModify, Update, ComponentTy
 import Gonimo.Server.Types (DeviceType(NoBaby), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (Secret(Secret))
 import Gonimo.UI.Error (viewError, handleError, class ErrorAction, UserError(NoError))
-import Gonimo.UI.Html as Html
 import Gonimo.Util (fromMaybeM, coerceEffects)
+import Gonimo.Util (sampleUrl)
 import Gonimo.WebAPI (postFunnyName, SPParams_(SPParams_), postAccounts)
 import Gonimo.WebAPI.Types (AuthData(AuthData))
 import Gonimo.WebAPI.Types.Helpers (runAuthData)
 import Partial.Unsafe (unsafeCrashWith)
 import Pux (App, renderToDOM, fromSimple, start)
-import Pux.Html (text, span, Html, img, div)
-import Gonimo.Util (sampleUrl)
 import Pux.Devtool (Action, start) as Pux.Devtool
+import Pux.Html (text, span, Html, img, div)
 import Servant.PureScript.Affjax (AjaxError)
 import Servant.PureScript.Settings (defaultSettings, SPSettings_(SPSettings_))
 import Servant.Subscriber (Subscriber, SubscriberEff)
@@ -151,9 +152,11 @@ updateLoading' action = do
 
 handleResetDevice :: ComponentType Unit LoadingS' Action
 handleResetDevice = pure $ [ do
-  liftEff $ localStorage.removeItem Key.authData
+  localStorage <- liftEff getLocalStorage
+  liftEff $ removeItem localStorage Key.authData
   pure Start
  ]
+
 updateLoading :: Action -> Component Unit State (Maybe (Array (IO Action)))
 updateLoading = liftChild toLoading <<< updateLoading'
 

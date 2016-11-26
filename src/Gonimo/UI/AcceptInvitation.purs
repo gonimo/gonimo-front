@@ -10,7 +10,6 @@ import Gonimo.Client.Types as Gonimo
 import Gonimo.WebAPI.Types as WebAPI
 import Pux.Html.Attributes as A
 import Pux.Html.Events as E
-import Browser.LocalStorage (STORAGE, localStorage)
 import Control.Monad.Aff (Aff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Except.Trans (runExceptT)

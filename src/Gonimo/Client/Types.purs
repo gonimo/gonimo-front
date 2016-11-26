@@ -2,7 +2,7 @@ module Gonimo.Client.Types where
 
 import Prelude
 import Servant.PureScript.Affjax as Affjax
-import Browser.LocalStorage (STORAGE)
+import DOM.WebStorage (STORAGE)
 import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.Class (liftAff, class MonadAff)
 import Control.Monad.Eff.Class (liftEff, class MonadEff)

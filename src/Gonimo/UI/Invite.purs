@@ -13,7 +13,6 @@ import Pux.Html.Attributes.Aria as A
 import Pux.Html.Attributes.Bootstrap as A
 import Pux.Html.Elements as H
 import Pux.Html.Events as E
-import Browser.LocalStorage (STORAGE, localStorage)
 import Control.Apply ((*>))
 import Control.Monad.Aff (Aff)
 import Control.Monad.Eff (Eff)
