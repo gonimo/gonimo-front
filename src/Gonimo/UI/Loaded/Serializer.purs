@@ -13,3 +13,6 @@ load :: forall eff. ForeignStorage -> State -> Eff (storage :: STORAGE | eff) St
 load storage state = do
   newS <- SocketS.load storage state.socketS
   pure $ state { socketS = newS }
+
+needsWrite :: State -> State -> Boolean
+needsWrite old new = SocketS.needsWrite old.socketS new.socketS

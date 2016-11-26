@@ -25,9 +25,11 @@ import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Ref (newRef, writeRef, readRef, REF, Ref)
 import Control.Monad.Except.Trans (runExceptT)
 import Control.Monad.IO (runIO, IO)
+import Control.Monad.Maybe.Trans (MaybeT(MaybeT), runMaybeT)
 import Control.Monad.Reader (runReader)
 import Control.Monad.Reader.Trans (runReaderT)
 import Control.Monad.State.Class (modify, put, get)
+import Control.MonadZero (guard)
 import DOM.WebStorage.Generic (removeItem)
 import DOM.WebStorage.Storage (getLocalStorage)
 import Data.Array (head)
@@ -48,6 +50,7 @@ import Gonimo.Pux (toPux, noEffects, wrapAction, onlyModify, Update, ComponentTy
 import Gonimo.Server.Types (DeviceType(NoBaby), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (Secret(Secret))
 import Gonimo.UI.Error (viewError, handleError, class ErrorAction, UserError(NoError))
+import Gonimo.UI.Loaded.Serializer (store, needsWrite)
 import Gonimo.Util (fromMaybeM, coerceEffects)
 import Gonimo.Util (sampleUrl)
 import Gonimo.WebAPI (postFunnyName, SPParams_(SPParams_), postAccounts)
@@ -279,6 +282,17 @@ renewSubscriber controlChan subscriberRef state = do
                   , notify : makeNotify controlChan
                   }
 
+storeState :: Ref (Maybe State) -> State -> IO Unit
+storeState oldS new = do
+  map (fromMaybe unit) <<< runMaybeT $ do
+    fullOld <- MaybeT <<< liftEff $ readRef oldS
+    loadedOld <- MaybeT <<< pure $ fullOld^?_LoadedS
+    loadedNew <- MaybeT <<< pure $ new^?_LoadedS
+    guard $ needsWrite loadedOld loadedNew
+    localStorage <- liftEff getLocalStorage
+    liftEff $ store localStorage loadedNew
+  liftEff $ writeRef oldS (Just new)
+
 main = do
   urlSignal <- sampleUrl
   controlChan <- channel Nop
@@ -295,7 +309,10 @@ main = do
   send controlChan Start
   let subscriberSignal = map (renewSubscriber controlChan subscriberRef) app.state
   let subscribeSignal = deploySubscriptions <$> subscriberSignal <*> app.state
+  prevState <- newRef Nothing
+  let storeSignal     = storeState prevState <$> app.state
   runSignal $ coerceEffects <<< map (const unit) <<< launchAff <<< runIO <$> subscribeSignal
+  runSignal $ coerceEffects <<< map (const unit) <<< launchAff <<< runIO <$> storeSignal
   -- runSignal $ map (\_ -> Console.log "State changed!") app.state
   runSignal $ Console.log <$> urlSignal
   renderToDOM "#app" app.html
@@ -317,7 +334,10 @@ debug = do
   send controlChan Start
   let subscriberSignal = map (renewSubscriber controlChan subscriberRef) app.state
   let subscribeSignal = deploySubscriptions <$> subscriberSignal <*> app.state
+  prevState <- newRef Nothing
+  let storeSignal     = storeState prevState <$> app.state
   runSignal $ coerceEffects <<< map (const unit) <<< launchAff <<< runIO <$> subscribeSignal
+  runSignal $ coerceEffects <<< map (const unit) <<< launchAff <<< runIO <$> storeSignal
   -- runSignal $ map (\_ -> Console.log "State changed!") app.state
   runSignal $ Console.log <$> urlSignal
   renderToDOM "#app" app.html

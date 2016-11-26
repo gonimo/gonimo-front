@@ -7,6 +7,7 @@ import DOM.WebStorage.Generic (getItem, setItem)
 import DOM.WebStorage.Storage (STORAGE, ForeignStorage)
 import Data.Maybe (Maybe(Just, Nothing))
 import Gonimo.UI.Socket.Types (State)
+import Gonimo.Util (differentObject)
 
 
 store :: forall eff. ForeignStorage -> State -> Eff (storage :: STORAGE | eff) Unit
@@ -20,3 +21,6 @@ load storage state = do
   pure $ case mv of
     Nothing -> state
     Just _ ->  state { currentFamily = mv }
+
+needsWrite :: State -> State -> Boolean
+needsWrite old new = differentObject old.currentFamily new.currentFamily
