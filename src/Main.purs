@@ -11,6 +11,7 @@ import Gonimo.UI.Html as Html
 import Gonimo.UI.Invite as InviteC
 import Gonimo.UI.Loaded as LoadedC
 import Gonimo.UI.Loaded.Types as LoadedC
+import Gonimo.UI.Loaded.Serializer as LoadedC
 import Gonimo.UI.Overview as OverviewC
 import Gonimo.UI.Socket as SocketC
 import Gonimo.WebAPI.MakeRequests as Reqs
@@ -219,9 +220,10 @@ load sendAction' = Gonimo.toIO initSettings $ authToAction =<< LoadedC.getAuthDa
         , baseURL       : "http://localhost:8081/"
         }
 
+    -- TODO: Restoring auth token from localstorage should be managed via our store/load functions now!
     authToAction :: AuthData -> Gonimo Action
     authToAction (authData@(AuthData auth)) = do
-      pure $ Init
+      let initState =
             { subscriberUrl : "ws://localhost:8081/subscriber"
             , overviewS         : OverviewC.init
             , socketS       : SocketC.init authData
@@ -235,6 +237,9 @@ load sendAction' = Gonimo.toIO initSettings $ authToAction =<< LoadedC.getAuthDa
             , sendAction    : lmap LoadedA sendAction'
             , babiesOnlineCount : 0
             }
+      localStorage <- liftEff getLocalStorage
+      loadedState <- liftEff $ LoadedC.load localStorage initState
+      pure $ Init loadedState
 
 makeCallback :: forall eff. Channel Action ->  (LoadedC.Action -> SubscriberEff (channel :: CHANNEL | eff) Unit)
 makeCallback c = send c <<< LoadedA
