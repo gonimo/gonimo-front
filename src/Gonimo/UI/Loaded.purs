@@ -43,10 +43,10 @@ import Control.Monad.State.Class (gets, get, modify, put)
 import DOM.WebStorage.Generic (setItem, getItem, removeItem)
 import DOM.WebStorage.Storage (getLocalStorage)
 import Data.Argonaut.Generic.Aeson (decodeJson)
-import Data.Array (fromFoldable, concat, catMaybes, head)
+import Data.Array (zip, fromFoldable, concat, catMaybes, head)
 import Data.Bifunctor (bimap)
 import Data.Either (either, Either(Right, Left))
-import Data.Foldable (foldl)
+import Data.Foldable (maximumBy, foldl)
 import Data.Generic (class Generic)
 import Data.Generic (gShow)
 import Data.Lens (_Just, (.=), to, (^.), (^?), use)
@@ -72,7 +72,7 @@ import Gonimo.UI.Loaded.Central (CentralItem, getCentrals)
 import Gonimo.UI.Loaded.Types (babiesOnlineCount, mkInviteProps', CentralReq(..), mkInviteProps, mkSettings, mkProps, central, familyIds, authData, currentFamily, socketS, overviewS, Props, acceptS, inviteS, State, Action(..), Central(..), InviteProps)
 import Gonimo.UI.Socket.Lenses (sessionId)
 import Gonimo.Util (userShow, toString, fromString)
-import Gonimo.WebAPI (postSessionByFamilyIdByDeviceId, postInvitationsByFamilyId, postFamilies, getFamiliesByFamilyId, postFunnyName, SPParams_(SPParams_), postAccounts)
+import Gonimo.WebAPI (getFamiliesByFamilyIdDeviceInfos, postSessionByFamilyIdByDeviceId, postInvitationsByFamilyId, postFamilies, getFamiliesByFamilyId, postFunnyName, SPParams_(SPParams_), postAccounts)
 import Gonimo.WebAPI.Types (DeviceInfo(DeviceInfo), AuthData(AuthData))
 import Gonimo.WebAPI.Types.Helpers (runAuthData)
 import Partial.Unsafe (unsafeCrashWith)
@@ -260,15 +260,25 @@ handleSetAuthData = modify $ \state -> state
                                   }
 handleSetFamilyIds :: Array (Key Family) -> ComponentType Unit State Action
 handleSetFamilyIds ids = do
-  familyIds .= ids
-  state <- get :: Component Unit State State
-  let switchFamily
-        = if isNothing state.socketS.currentFamily
-          then fromFoldable $ pure <<< SocketA <<< SocketC.SwitchFamily <$> Arr.head ids
-          else []
-  if Arr.null ids
-    then doAutoSwitchCentral ReqCentralInvite
-    else pure switchFamily
+    familyIds .= ids
+    state <- get :: Component Unit State State
+    let switchFamily
+          = if isNothing state.socketS.currentFamily
+            then pure [ toIO (mkSettings $ state^.authData) switchToBestFamily ]
+            else pure []
+    if Arr.null ids
+      then doAutoSwitchCentral ReqCentralInvite
+      else switchFamily
+  where -- Only needed for fixing old clients:
+    switchToBestFamily :: Gonimo Action
+    switchToBestFamily = do
+      devices <- traverse getFamiliesByFamilyIdDeviceInfos ids
+      let deviceCount = Arr.length <$> devices
+      let familyDevices = zip ids deviceCount
+      let family = map fst <<< maximumBy (\(Tuple _ a) (Tuple _ b) -> compare a b) $ familyDevices
+      let mAction = map (SocketA <<< SocketC.SwitchFamily) family
+      pure $ fromMaybe Nop mAction
+
 
 
 handleSetURL :: String -> ComponentType Unit State Action
