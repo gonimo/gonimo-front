@@ -23,6 +23,7 @@ import Control.Monad.Reader.Class (ask)
 import Control.Monad.Reader.Trans (runReaderT)
 import Control.Monad.State.Class (get, modify)
 import Data.Either (Either(Right, Left))
+import Data.Function.Uncurried (Fn3, runFn3)
 import Data.Generic (gShow)
 import Data.Maybe (isJust, isNothing, Maybe(..))
 import Data.Tuple (uncurry, Tuple(Tuple))
@@ -38,7 +39,8 @@ import Partial.Unsafe (unsafeCrashWith)
 import Pux (renderToDOM, fromSimple, start)
 import Pux.Html (a, button, br, i, input, p, h1, h2, h3, text, span, Html, img, div, small, li, ul, nav)
 import Pux.Html.Attributes (letterSpacing, offset)
-import Pux.Html.Elements (br)
+import Pux.Html.Elements (Attribute, br)
+import Pux.Html.Events (MouseEvent)
 import Servant.PureScript.Affjax (AjaxError)
 import Servant.PureScript.Settings (gDefaultEncodeURLPiece, defaultSettings, SPSettings_(SPSettings_))
 import Signal (constant, Signal)
@@ -76,7 +78,6 @@ data Action = SetEmail String
             | SetInvitationData (Key Invitation) Invitation
             | GoToOverview
             | GoToBabyStation
-            | CopyToClipboard String
             | Nop
 
 type SentInvitation = { invitation :: Invitation
@@ -97,7 +98,6 @@ update action = case action of
   SetInvitationData id' inv -> onlyModify $ \state -> state { invitationId = id', invitation = inv }
   GoToOverview              -> noEffects
   GoToBabyStation           -> noEffects
-  CopyToClipboard elemId    -> handleCopyToClipboard elemId
   ReportError err           -> noEffects
   Nop                       -> noEffects
 
@@ -123,11 +123,6 @@ handleSendInvitation = do
     postInvitationsOutbox $ WebAPI.SendInvitation state.invitationId (EmailInvitation state.email)
     pure $ InvitationSent (SentEmail state.email)
 
-handleCopyToClipboard :: forall ps. String -> ComponentType (Props ps) State Action
-handleCopyToClipboard elemId = pure [ do
-                                         liftEff $ copyTextFromId elemId
-                                         pure $ InvitationSent SentCopyPaste
-                                    ]
 --------------------------------------------------------------------------------
 
 view :: forall ps. Props ps -> State -> Html Action
@@ -207,7 +202,7 @@ view props state =
                 [ H.a [ A.className "btn btn-default"
                            , A.role "button"
                            , A.type_ "button"
-                           , E.onClick $ const $ CopyToClipboard "invitationLinkUrlInput"
+                           , onClickWithCopy "invitationLinkUrlInput" $ const $ InvitationSent SentCopyPaste
                            ]
                   [ H.span [ A.className "glyphicon glyphicon-copy"] []
                   , H.span [ A.className "hidden-xs"] [H.text " Copy to Clipboard"]
@@ -306,3 +301,10 @@ viewSentMethod sent = case sent.sentMethod of
                    ]
 
 foreign import copyTextFromId :: String -> Eff () Boolean
+
+-- Triger acttion but also call copyTextFromId, this needs to be done directly
+-- in order to make it work in all browsers.
+onClickWithCopy :: forall action. String -> (MouseEvent -> action) -> Attribute action
+onClickWithCopy id_ = runFn3 handlerWithCopy id_ "onClick"
+
+foreign import handlerWithCopy :: forall ev a. Fn3 String String (ev -> a) (Attribute a)
