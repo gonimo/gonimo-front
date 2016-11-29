@@ -136,10 +136,10 @@ view props state =
             ]
           , div [ A.className "panel-body" ]
             [ p []
-              [ text $ "This early development version currently only works on recent versions of Chrome on any non-Apple platform."
+              [ text $ "This is early development software. It has been tested successfully on Chrome, Firefox and Opera."
               ]
             , p []
-              [ text $ "We will support more browsers in the near future, Apple once they support the Internet."
+              [ text $ "Apple iOS devices are not yet supported! They will be supported, once Apple supports the Internet!"
               ]
             ]
           ]
