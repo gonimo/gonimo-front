@@ -5,6 +5,7 @@ import Data.Array as Arr
 import Data.CatQueue as Q
 import Data.List as List
 import Data.Tuple as Tuple
+import Gonimo.Client.Effects as Gonimo
 import Gonimo.UI.Socket.Message as Message
 import Pux.Html.Attributes as A
 import Pux.Html.Elements as H
@@ -43,7 +44,8 @@ import Pux.Html.Attributes (offset)
 import Servant.Subscriber (Subscriptions)
 import Unsafe.Coerce (unsafeCoerce)
 import WebRTC.MediaStream (createObjectURL, mediaStreamToBlob, stopStream, getUserMedia, MediaStreamConstraints(MediaStreamConstraints), MediaStream)
-import WebRTC.RTC (onnegotiationneeded, closeRTCPeerConnection, MediaStreamEvent, setLocalDescription, createAnswer, iceEventCandidate, IceEvent, onicecandidate, onaddstream, addIceCandidate, setRemoteDescription, fromRTCSessionDescription, createOffer, addStream, RTCIceCandidateInit, RTCPeerConnection, Ice, newRTCPeerConnection)
+import WebRTC.RTC (iceConnectionState, oniceconnectionstatechange, connectionState, onconnectionstatechange, onnegotiationneeded, closeRTCPeerConnection, MediaStreamEvent, setLocalDescription, createAnswer, iceEventCandidate, IceEvent, onicecandidate, onaddstream, addIceCandidate, setRemoteDescription, fromRTCSessionDescription, createOffer, addStream, RTCIceCandidateInit, RTCPeerConnection, Ice, newRTCPeerConnection)
+import WebRTC.Util (onConnectionDrop)
 
 
 init :: Maybe MediaStream -> IO State
@@ -59,12 +61,14 @@ init stream = do
   ourStream <- runMaybeT $ do
     origStream <- MaybeT <<< pure $ stream
     liftEff $ MediaStream.clone origStream
+  connState <- liftEff $ iceConnectionState rtcConnection
   pure $  { mediaStream : ourStream
           , remoteStream : Nothing
           , rtcConnection : rtcConnection
           , isBabyStation : isJust stream
           , messageQueue  : Nil
           , messagesInFlight : 0
+          , prevConnectionState : connState
           }
 
 
@@ -82,6 +86,7 @@ update action = case action of
   AcceptMessages num messages        -> handleAcceptMessages num messages
   OnIceCandidate iceEvent            -> handleOnIceCandidate iceEvent
   OnAddStream streamEvent            -> handleOnAddStream streamEvent
+  OnConnectionDrop                -> handleOnConnectionDrop
   SetRemoteStream stream             -> remoteStream .= Just stream *> pure []
   ReportError _                      -> noEffects
   EnqueueMessage message             -> handleEnqueueMessage message
@@ -99,7 +104,9 @@ handleInit = do
          liftEff $ onnegotiationneeded (coerceEffects <<< props.sendAction $ StartNegotiation) state.rtcConnection
          if state.isBabyStation
            then pure Nop
-           else pure $ EnqueueMessage Message.StartStreaming
+           else do
+             liftEff $ onConnectionDrop (coerceEffects <<< props.sendAction $ OnConnectionDrop) Nothing state.rtcConnection
+             pure $ EnqueueMessage Message.StartStreaming
     ]
 
 handleStartStreaming :: forall ps.
@@ -144,6 +151,16 @@ handleOnAddStream event = do
             pure $ SetRemoteStream $ { stream : event.stream, objectURL : url }
        ]
 
+handleOnConnectionDrop :: forall ps. ComponentType (Props ps) State Action
+handleOnConnectionDrop = do
+  state <- get
+  pure [ do
+            Gonimo.log $ "Old connection state: " <> state.prevConnectionState
+            connState <- liftEff $ iceConnectionState state.rtcConnection
+            Gonimo.log $ "New connection state: " <> connState
+            pure Nop
+            -- if state.prevConnectionState == "connected" && 
+       ]
 getSendMessages :: forall ps. Component (Props ps) State (Array String -> IO Action)
 getSendMessages = do
   let sendMessages = putSocketByFamilyIdByFromDeviceByToDeviceByChannelId
@@ -285,3 +302,4 @@ getSubscriptions props =
     toAction Nothing = Nop
   in
     receiveMessage props.familyId props.theirId props.ourId props.cSecret
+

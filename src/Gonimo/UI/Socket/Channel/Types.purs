@@ -2,7 +2,10 @@ module Gonimo.UI.Socket.Channel.Types where
 
 import Control.Monad.Eff (Eff)
 import Control.Monad.IO (IO)
+import DOM.Event.Types (Event)
+import Data.CatQueue (CatQueue)
 import Data.Lens (lens, lens', LensP, Lens)
+import Data.List (List)
 import Data.Maybe (Maybe(Just, Nothing))
 import Data.Tuple (Tuple(Tuple))
 import Gonimo.Client.Types (class ReportErrorAction, GonimoError, Settings)
@@ -16,8 +19,6 @@ import Prelude (Unit)
 import Signal.Channel (Channel)
 import WebRTC.MediaStream (MediaStream, MediaStreamConstraints(MediaStreamConstraints))
 import WebRTC.RTC (MediaStreamEvent, IceEvent, RTCPeerConnection)
-import Data.CatQueue (CatQueue)
-import Data.List (List)
 
 maxMessagesInFlight :: Int
 maxMessagesInFlight = 2 -- Offers some performance advantage and hopefull is low enough to not cause dead locks on regular use.
@@ -29,6 +30,7 @@ type State =
   , isBabyStation :: Boolean
   , messageQueue  :: List String
   , messagesInFlight :: Int
+  , prevConnectionState :: String
   }
 
 type Props ps =
@@ -53,6 +55,7 @@ data Action = InitConnection
             | ReportError GonimoError
             | OnIceCandidate IceEvent
             | OnAddStream MediaStreamEvent
+            | OnConnectionDrop
             | SetRemoteStream RemoteStream
             | Nop
 
@@ -64,7 +67,7 @@ type RemoteStream = { stream :: MediaStream
                     }
 
 unsafeMakeFamilyId :: Maybe (Key Family) -> Key Family
-unsafeMakeFamilyId Nothing = unsafeCrashWith "We have to have a valid family id when using a channel, anything else is a but - therefore I am crashing now. Bye!"
+unsafeMakeFamilyId Nothing = unsafeCrashWith "We have to have a valid family id when using a channel, anything else is a bug - therefore I am crashing now. Bye!"
 unsafeMakeFamilyId (Just familyId') = familyId'
 
 remoteStream :: LensP State (Maybe RemoteStream)
