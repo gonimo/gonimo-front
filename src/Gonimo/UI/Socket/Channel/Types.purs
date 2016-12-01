@@ -30,7 +30,8 @@ type State =
   , isBabyStation :: Boolean
   , messageQueue  :: List String
   , messagesInFlight :: Int
-  , prevConnectionState :: String
+  , audioStats    :: StreamConnectionStats
+  , videoStats    :: StreamConnectionStats
   }
 
 type Props ps =
@@ -55,7 +56,9 @@ data Action = InitConnection
             | ReportError GonimoError
             | OnIceCandidate IceEvent
             | OnAddStream MediaStreamEvent
-            | OnConnectionDrop
+            | RegisterMediaTracks (Array TrackKind) -- We received a stream containing an audio/video track
+            | OnAudioConnectionDrop (Maybe Int)
+            | OnVideoConnectionDrop (Maybe Int)
             | SetRemoteStream RemoteStream
             | Nop
 
@@ -66,6 +69,16 @@ type RemoteStream = { stream :: MediaStream
                     , objectURL :: String
                     }
 
+data StreamConnectionState = ConnectionNotAvailable -- not available or stopped by user.
+                           | ConnectionUnknown -- It got registered but is not yet known to be really alive.
+                           | ConnectionReliable
+                           | ConnectionDied
+
+type StreamConnectionStats = { packetsReceived :: Int
+                             , connectionState :: StreamConnectionState
+                             }
+
+data TrackKind = AudioTrack | VideoTrack
 unsafeMakeFamilyId :: Maybe (Key Family) -> Key Family
 unsafeMakeFamilyId Nothing = unsafeCrashWith "We have to have a valid family id when using a channel, anything else is a bug - therefore I am crashing now. Bye!"
 unsafeMakeFamilyId (Just familyId') = familyId'
@@ -78,3 +91,15 @@ messagesInFlight = lens _."messagesInFlight" (_ { "messagesInFlight" = _ })
 
 messageQueue :: forall a b r. Lens { "messageQueue" :: a | r } { "messageQueue" :: b | r } a b
 messageQueue = lens _."messageQueue" (_ { "messageQueue" = _ })
+
+audioStats :: forall a b r. Lens { "audioStats" :: a | r } { "audioStats" :: b | r } a b
+audioStats = lens _."audioStats" (_ { "audioStats" = _ })
+
+videoStats :: forall a b r. Lens { "videoStats" :: a | r } { "videoStats" :: b | r } a b
+videoStats = lens _."videoStats" (_ { "videoStats" = _ })
+
+packetsReceived :: forall a b r. Lens { "packetsReceived" :: a | r } { "packetsReceived" :: b | r } a b
+packetsReceived = lens _."packetsReceived" (_ { "packetsReceived" = _ })
+
+connectionState :: forall a b r. Lens { "connectionState" :: a | r } { "connectionState" :: b | r } a b
+connectionState = lens _."connectionState" (_ { "connectionState" = _ })

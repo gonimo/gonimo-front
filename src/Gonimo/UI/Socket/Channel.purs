@@ -11,7 +11,9 @@ import Pux.Html.Attributes as A
 import Pux.Html.Elements as H
 import Pux.Html.Events as E
 import WebRTC.MediaStream as MediaStream
+import WebRTC.MediaStream.Track as Track
 import WebRTC.RTC as RTC
+import WebRTC.RTCRtpSender as Sender
 import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff (Eff)
@@ -21,19 +23,21 @@ import Control.Monad.Maybe.Trans (MaybeT(MaybeT), runMaybeT)
 import Control.Monad.Reader (runReaderT)
 import Control.Monad.Reader.Class (ask, class MonadReader)
 import Control.Monad.State.Class (get)
+import Data.Array (zip)
+import Data.Foldable (traverse_)
 import Data.Identity (runIdentity)
-import Data.Lens ((+=), (-=), (^?), _Just, lens, Lens, (.=), use, (%=), to)
+import Data.Lens ((+=), (-=), (^?), _Just, lens, Lens, (.=), use, (%=), to, LensP)
 import Data.List (List(Cons, Nil))
 import Data.Maybe (fromMaybe, isJust, maybe, Maybe(Nothing, Just))
 import Data.Traversable (traverse)
-import Data.Tuple (uncurry, curry, Tuple(Tuple))
+import Data.Tuple (snd, fst, uncurry, curry, Tuple(Tuple))
 import Gonimo.Client.Types (toIO, Settings)
 import Gonimo.Pux (noEffects, runGonimo, Component, Update, onlyModify, ComponentType)
 import Gonimo.Server.Db.Entities (Family(Family), Device(Device))
 import Gonimo.Server.State.Types (MessageNumber(MessageNumber))
 import Gonimo.Server.Types.Lenses (_Baby)
 import Gonimo.Types (Secret(Secret), Key(Key))
-import Gonimo.UI.Socket.Channel.Types (maxMessagesInFlight, messagesInFlight, messageQueue, Action(EnqueueMessage), Action(..), State, Props)
+import Gonimo.UI.Socket.Channel.Types (maxMessagesInFlight, messagesInFlight, messageQueue, Action(EnqueueMessage), Action(..), State, Props, StreamConnectionState(..), StreamConnectionStats, audioStats, videoStats, connectionState, packetsReceived, TrackKind(..))
 import Gonimo.UI.Socket.Lenses (mediaStream)
 import Gonimo.UI.Socket.Message (runMaybeIceCandidate, MaybeIceCandidate(JustIceCandidate, NoIceCandidate), encodeToString, decodeFromString, Message)
 import Gonimo.Util (coerceEffects)
@@ -44,7 +48,8 @@ import Pux.Html.Attributes (offset)
 import Servant.Subscriber (Subscriptions)
 import Unsafe.Coerce (unsafeCoerce)
 import WebRTC.MediaStream (createObjectURL, mediaStreamToBlob, stopStream, getUserMedia, MediaStreamConstraints(MediaStreamConstraints), MediaStream)
-import WebRTC.RTC (iceConnectionState, oniceconnectionstatechange, connectionState, onconnectionstatechange, onnegotiationneeded, closeRTCPeerConnection, MediaStreamEvent, setLocalDescription, createAnswer, iceEventCandidate, IceEvent, onicecandidate, onaddstream, addIceCandidate, setRemoteDescription, fromRTCSessionDescription, createOffer, addStream, RTCIceCandidateInit, RTCPeerConnection, Ice, newRTCPeerConnection)
+import WebRTC.MediaStream.Track (MediaStreamTrack)
+import WebRTC.RTC (RTCPeerConnection, iceConnectionState, oniceconnectionstatechange, onconnectionstatechange, onnegotiationneeded, closeRTCPeerConnection, MediaStreamEvent, setLocalDescription, createAnswer, iceEventCandidate, IceEvent, onicecandidate, onaddstream, addIceCandidate, setRemoteDescription, fromRTCSessionDescription, createOffer, addStream, RTCIceCandidateInit, Ice, newRTCPeerConnection)
 import WebRTC.Util (onConnectionDrop)
 
 
@@ -52,7 +57,7 @@ init :: Maybe MediaStream -> IO State
 init stream = do
   rtcConnection <- liftEff (newRTCPeerConnection { iceServers : [ { urls : [ "turn:gonimo.com:3478" ]
                                                                   , username : "gonimo"
-                                                                  , credential : "Aeloh5chai2eil1"
+                                                                  , credential : "Aeloh5chai2eil1" -- FIXME: For production this obviously should not be hardcoded.
                                                                   , credentialType : "password"
                                                                   }
                                                                 ]
@@ -68,9 +73,14 @@ init stream = do
           , isBabyStation : isJust stream
           , messageQueue  : Nil
           , messagesInFlight : 0
-          , prevConnectionState : connState
+          , audioStats : initStreamConnectionStats
+          , videoStats : initStreamConnectionStats
           }
 
+initStreamConnectionStats :: StreamConnectionStats
+initStreamConnectionStats = { packetsReceived : 0
+                            , connectionState : ConnectionNotAvailable
+                            }
 
 remoteStream :: forall a b r. Lens { "remoteStream" :: a | r } { "remoteStream" :: b | r } a b
 remoteStream = lens _."remoteStream" (_ { "remoteStream" = _ })
@@ -86,7 +96,9 @@ update action = case action of
   AcceptMessages num messages        -> handleAcceptMessages num messages
   OnIceCandidate iceEvent            -> handleOnIceCandidate iceEvent
   OnAddStream streamEvent            -> handleOnAddStream streamEvent
-  OnConnectionDrop                -> handleOnConnectionDrop
+  OnAudioConnectionDrop mPackets     -> handleOnConnectionDrop audioStats mPackets
+  OnVideoConnectionDrop mPackets     -> handleOnConnectionDrop videoStats mPackets
+  RegisterMediaTracks tracks         -> traverse_ handleRegisterMediaTrack tracks *> pure []
   SetRemoteStream stream             -> remoteStream .= Just stream *> pure []
   ReportError _                      -> noEffects
   EnqueueMessage message             -> handleEnqueueMessage message
@@ -104,9 +116,7 @@ handleInit = do
          liftEff $ onnegotiationneeded (coerceEffects <<< props.sendAction $ StartNegotiation) state.rtcConnection
          if state.isBabyStation
            then pure Nop
-           else do
-             liftEff $ onConnectionDrop (coerceEffects <<< props.sendAction $ OnConnectionDrop) Nothing state.rtcConnection
-             pure $ EnqueueMessage Message.StartStreaming
+           else pure $ EnqueueMessage Message.StartStreaming
     ]
 
 handleStartStreaming :: forall ps.
@@ -146,21 +156,56 @@ handleOnIceCandidate event = do
 
 handleOnAddStream :: forall ps. MediaStreamEvent  -> ComponentType (Props ps) State Action
 handleOnAddStream event = do
-  pure [ do
-            url <- liftEff <<< createObjectURL <<< mediaStreamToBlob $ event.stream
-            pure $ SetRemoteStream $ { stream : event.stream, objectURL : url }
-       ]
+    state <- get
+    props <- ask
+    pure [ registerOnConnectionDrop props state
+         , do
+              url <- liftEff <<< createObjectURL <<< mediaStreamToBlob $ event.stream
+              pure $ SetRemoteStream $ { stream : event.stream, objectURL : url }
+        ]
+  where
+    registerOnConnectionDrop :: Props ps -> State -> IO Action
+    registerOnConnectionDrop props state = do
+      senders <- liftEff $ RTC.getSenders state.rtcConnection
+      tracks <- liftEff $ traverse Sender.track senders
+      kinds <- liftEff $ traverse Track.kind tracks
+      let trackKinds = zip tracks kinds
+      -- Just take the first track of the right kind ...
+      let mVideoTrack = Arr.head <<< map fst <<< Arr.filter ((_ == "video") <<< snd) $ trackKinds
+      let mAudioTrack = Arr.head <<< map fst <<< Arr.filter ((_ == "audio") <<< snd) $ trackKinds
+      let kindArray kind = Arr.fromFoldable <<< map (const kind)
+      maybeRegister props OnAudioConnectionDrop mAudioTrack state.rtcConnection
+      maybeRegister props OnVideoConnectionDrop mVideoTrack state.rtcConnection
+      -- pure $ RegisterMediaTracks (kindArray audioStats mAudioTrack <> kindArray videoStats mVideoTrack)
+      pure $ RegisterMediaTracks (kindArray AudioTrack mAudioTrack <> kindArray VideoTrack mVideoTrack)
 
-handleOnConnectionDrop :: forall ps. ComponentType (Props ps) State Action
-handleOnConnectionDrop = do
-  state <- get
-  pure [ do
-            Gonimo.log $ "Old connection state: " <> state.prevConnectionState
-            connState <- liftEff $ iceConnectionState state.rtcConnection
-            Gonimo.log $ "New connection state: " <> connState
-            pure Nop
-            -- if state.prevConnectionState == "connected" && 
-       ]
+    maybeRegister :: Props ps -> (Maybe Int -> Action) -> Maybe MediaStreamTrack -> RTCPeerConnection -> IO Unit
+    maybeRegister _ _ Nothing _ = pure unit
+    maybeRegister props mkAction mTrack pc =
+      liftEff $ onConnectionDrop (coerceEffects <<< props.sendAction <<< mkAction) mTrack pc
+
+handleOnConnectionDrop :: forall ps. LensP State StreamConnectionStats
+                          -> Maybe Int -> ComponentType (Props ps) State Action
+handleOnConnectionDrop stats mPackets= do
+    case mPackets of
+      Nothing -> stats <<< connectionState %= updateState ConnectionDied
+      Just packets -> do
+        stats <<< packetsReceived .= packets
+        stats <<< connectionState %= updateState ConnectionReliable
+    pure []
+  where
+    -- updateState new old
+    updateState :: StreamConnectionState -> StreamConnectionState -> StreamConnectionState
+    updateState ConnectionNotAvailable ConnectionDied = ConnectionNotAvailable -- User can stop a dead connection.
+    updateState _ ConnectionDied = ConnectionDied -- In all other cases it remains dead.
+    updateState ConnectionUnknown ConnectionNotAvailable = ConnectionUnknown
+    updateState _ ConnectionNotAvailable = ConnectionNotAvailable
+    updateState new _ = new
+
+handleRegisterMediaTrack :: forall ps. TrackKind -> Component (Props ps) State Unit
+handleRegisterMediaTrack AudioTrack = audioStats <<< connectionState .= ConnectionUnknown
+handleRegisterMediaTrack VideoTrack = videoStats <<< connectionState .= ConnectionUnknown
+
 getSendMessages :: forall ps. Component (Props ps) State (Array String -> IO Action)
 getSendMessages = do
   let sendMessages = putSocketByFamilyIdByFromDeviceByToDeviceByChannelId
