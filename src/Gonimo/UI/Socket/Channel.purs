@@ -355,6 +355,8 @@ viewError state =
                   [
                     H.text "Please reconnect or check on your baby!"
                   ]
+                , H.audio [ A.src "sounds/pup_alert.mp3", A.autoPlay "true", A.loop true
+                          ] []
                 ]
   in
    if audioBroken || videoBroken
