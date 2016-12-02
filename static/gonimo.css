@@ -99,9 +99,30 @@ a.boxclose{
     width: 100%;
 }
 
+
 .overviewThumbnail {
     width: 45%;
     margin: 1%;
+}
+
+@keyframes brokenConnectionOverlayFrames {
+    from { opacity: 0.5;}
+    to   { opacity: 1.0;}
+}
+
+.brokenConnectionOverlay {
+    z-index: 1;
+    background-color: rgb(255, 0, 0);
+    position: absolute;
+    top: 0px;
+    bottom: 0px;
+    right: 0px;
+    left: 0px;
+    text-align: center;
+
+    animation-name: brokenConnectionOverlayFrames;
+    animation-duration: 2s;
+    animation-iteration-count: infinite;
 }
 
 .navbar-nav > li > a {

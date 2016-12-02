@@ -45,6 +45,7 @@ import Gonimo.WebAPI (deleteSocketByFamilyIdByFromDeviceByToDeviceByChannelIdMes
 import Gonimo.WebAPI.Subscriber (getSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
 import Pux.Html (text, Html)
 import Pux.Html.Attributes (offset)
+import Servant.PureScript.Affjax (unsafeToString)
 import Servant.Subscriber (Subscriptions)
 import Unsafe.Coerce (unsafeCoerce)
 import WebRTC.MediaStream (createObjectURL, mediaStreamToBlob, stopStream, getUserMedia, MediaStreamConstraints(MediaStreamConstraints), MediaStream)
@@ -166,13 +167,8 @@ handleOnAddStream event = do
   where
     registerOnConnectionDrop :: Props ps -> State -> IO Action
     registerOnConnectionDrop props state = do
-      senders <- liftEff $ RTC.getSenders state.rtcConnection
-      tracks <- liftEff $ traverse Sender.track senders
-      kinds <- liftEff $ traverse Track.kind tracks
-      let trackKinds = zip tracks kinds
-      -- Just take the first track of the right kind ...
-      let mVideoTrack = Arr.head <<< map fst <<< Arr.filter ((_ == "video") <<< snd) $ trackKinds
-      let mAudioTrack = Arr.head <<< map fst <<< Arr.filter ((_ == "audio") <<< snd) $ trackKinds
+      mVideoTrack <- map Arr.head <<< liftEff $ MediaStream.getVideoTracks event.stream
+      mAudioTrack <- map Arr.head <<< liftEff $ MediaStream.getAudioTracks event.stream
       let kindArray kind = Arr.fromFoldable <<< map (const kind)
       maybeRegister props OnAudioConnectionDrop mAudioTrack state.rtcConnection
       maybeRegister props OnVideoConnectionDrop mVideoTrack state.rtcConnection
@@ -320,7 +316,11 @@ view props state =
               [
                 H.text babyName
               ]
-            , viewVideo state
+            , H.div [ A.style [Tuple "position" "relative"]] -- Needed so absolute positioning of error works.
+              [ viewVideo state
+              , viewError state
+              ]
+            , viewStreamStatus state
             ]
 
 viewVideo :: State -> Html Action
@@ -335,6 +335,48 @@ viewVideo state =
                  , A.width "100%"
                  ] []
 
+viewError :: State -> Html Action
+viewError state =
+  let
+    isBroken connState = case connState of
+      ConnectionDied -> true
+      _              -> false
+    audioBroken = isBroken state.audioStats.connectionState
+    videoBroken = isBroken state.videoStats.connectionState
+    brokenText = if audioBroken && not videoBroken
+                 then "Audio connection broken!"
+                 else if not audioBroken && videoBroken
+                      then "Video connection broken!"
+                      else "Connection broken!"
+
+    errorView = H.div [ A.className "brokenConnectionOverlay" ]
+                [ H.h2 [] [ H.text brokenText ]
+                , H.p []
+                  [
+                    H.text "Please reconnect or check on your baby!"
+                  ]
+                ]
+  in
+   if audioBroken || videoBroken
+   then errorView
+   else H.div [] []
+
+viewStreamStatus :: State -> Html Action
+viewStreamStatus state =
+  let
+     getStatus connState = case connState of
+       ConnectionNotAvailable -> H.text "x"
+       ConnectionUnknown  -> H.text "Might break unnoticed"
+       ConnectionReliable -> H.text "Reliable"
+       ConnectionDied     -> H.text "Dead"
+     videoStatus = getStatus state.videoStats.connectionState
+     audioStatus = getStatus state.audioStats.connectionState
+  in
+   H.div []
+   [ H.text "Audio: " , audioStatus
+   , H.text ", "
+   , H.text "Video: ", videoStatus
+   ]
 
 
 getSubscriptions :: forall m ps. (MonadReader Settings m) => Props ps -> m (Subscriptions Action)
