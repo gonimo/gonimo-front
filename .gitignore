@@ -15,3 +15,5 @@
 /dist/app-stage.js
 /support/gonimo.css
 /dist/app-staging.js
+/.stack-work
+/.shake

@@ -1,0 +1,16 @@
+user-message: ! 'This build uses lts-7.x - which is tailored for ghc 8, but has
+                 also been tested with ghc 7.10.3, any other versions of ghc are
+                 not tested. Be careful the stack ghc-version check has been
+                 disabled and per default the current system ghc is used.'
+
+resolver: lts-7.11
+packages:
+- '.'
+extra-deps: []
+
+flags: {}
+
+extra-package-dbs: []
+
+system-ghc: true
+skip-ghc-check: true
