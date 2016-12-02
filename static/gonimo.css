@@ -121,7 +121,7 @@ a.boxclose{
     text-align: center;
 
     animation-name: brokenConnectionOverlayFrames;
-    animation-duration: 2s;
+    animation-duration: 1.804s;
     animation-iteration-count: infinite;
 }
 
