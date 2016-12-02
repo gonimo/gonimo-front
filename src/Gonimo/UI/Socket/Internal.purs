@@ -74,9 +74,9 @@ update action = case action of
   AddChannel channelId' cState                   -> do channel channelId' .= Just cState
                                                        updateChannel channelId' ChannelC.InitConnection
   ChannelA channelId' (ChannelC.ReportError err) -> pure [pure $ ReportError err]
+  ChannelA channelId' (ChannelC.ConnectionClosed)-> channel channelId' .= Nothing *> pure []
   ChannelA channelId' action'                    -> updateChannel channelId' action'
   CloseChannel channelId'                        -> pure [ pure $ ChannelA channelId' ChannelC.CloseConnection
-                                                         , pure $ RemoveChannel channelId'
                                                          ]
   CloseBabyChannel channelId'                    -> do
     isBabyStation' <- gets (_^?channel channelId' <<< _Just <<< to _.isBabyStation)

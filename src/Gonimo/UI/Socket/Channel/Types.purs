@@ -9,6 +9,7 @@ import Data.List (List)
 import Data.Maybe (Maybe(Just, Nothing))
 import Data.Tuple (Tuple(Tuple))
 import Gonimo.Client.Types (class ReportErrorAction, GonimoError, Settings)
+import Gonimo.Client.Vibrations (Vibrator)
 import Gonimo.Server.Db.Entities (Family(Family), Device(Device))
 import Gonimo.Server.State.Types (MessageNumber(MessageNumber))
 import Gonimo.Server.Types (DeviceType)
@@ -32,6 +33,7 @@ type State =
   , messagesInFlight :: Int
   , audioStats    :: StreamConnectionStats
   , videoStats    :: StreamConnectionStats
+  , vibrator      :: Maybe Vibrator
   }
 
 type Props ps =
@@ -60,6 +62,8 @@ data Action = InitConnection
             | OnAudioConnectionDrop (Maybe Int)
             | OnVideoConnectionDrop (Maybe Int)
             | SetRemoteStream RemoteStream
+            | SetVibrator (Maybe Vibrator)
+            | ConnectionClosed -- Message to parent, when channel gets closed
             | Nop
 
 instance reportErrorAction :: ReportErrorAction Action where
@@ -103,3 +107,6 @@ packetsReceived = lens _."packetsReceived" (_ { "packetsReceived" = _ })
 
 connectionState :: forall a b r. Lens { "connectionState" :: a | r } { "connectionState" :: b | r } a b
 connectionState = lens _."connectionState" (_ { "connectionState" = _ })
+
+vibrator :: forall a b r. Lens { "vibrator" :: a | r } { "vibrator" :: b | r } a b
+vibrator = lens _."vibrator" (_ { "vibrator" = _ })

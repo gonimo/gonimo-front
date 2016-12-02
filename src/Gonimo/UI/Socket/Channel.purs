@@ -2,6 +2,7 @@ module Gonimo.UI.Socket.Channel where
 
 import Prelude
 import Data.Array as Arr
+import Control.Monad.Eff.Console as Console
 import Data.CatQueue as Q
 import Data.List as List
 import Data.Tuple as Tuple
@@ -18,6 +19,7 @@ import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
+import Control.Monad.Eff.Exception (catchException)
 import Control.Monad.IO (IO)
 import Control.Monad.Maybe.Trans (MaybeT(MaybeT), runMaybeT)
 import Control.Monad.Reader (runReaderT)
@@ -32,12 +34,13 @@ import Data.Maybe (fromMaybe, isJust, maybe, Maybe(Nothing, Just))
 import Data.Traversable (traverse)
 import Data.Tuple (snd, fst, uncurry, curry, Tuple(Tuple))
 import Gonimo.Client.Types (toIO, Settings)
+import Gonimo.Client.Vibrations (stopVibration, startVibration, Vibrator)
 import Gonimo.Pux (noEffects, runGonimo, Component, Update, onlyModify, ComponentType)
 import Gonimo.Server.Db.Entities (Family(Family), Device(Device))
 import Gonimo.Server.State.Types (MessageNumber(MessageNumber))
 import Gonimo.Server.Types.Lenses (_Baby)
 import Gonimo.Types (Secret(Secret), Key(Key))
-import Gonimo.UI.Socket.Channel.Types (maxMessagesInFlight, messagesInFlight, messageQueue, Action(EnqueueMessage), Action(..), State, Props, StreamConnectionState(..), StreamConnectionStats, audioStats, videoStats, connectionState, packetsReceived, TrackKind(..))
+import Gonimo.UI.Socket.Channel.Types (audioStats, maxMessagesInFlight, messagesInFlight, messageQueue, Action(EnqueueMessage), Action(..), State, Props, StreamConnectionState(..), StreamConnectionStats, videoStats, connectionState, packetsReceived, TrackKind(..), vibrator)
 import Gonimo.UI.Socket.Lenses (mediaStream)
 import Gonimo.UI.Socket.Message (runMaybeIceCandidate, MaybeIceCandidate(JustIceCandidate, NoIceCandidate), encodeToString, decodeFromString, Message)
 import Gonimo.Util (coerceEffects)
@@ -76,6 +79,7 @@ init stream = do
           , messagesInFlight : 0
           , audioStats : initStreamConnectionStats
           , videoStats : initStreamConnectionStats
+          , vibrator   : Nothing
           }
 
 initStreamConnectionStats :: StreamConnectionStats
@@ -104,6 +108,8 @@ update action = case action of
   ReportError _                      -> noEffects
   EnqueueMessage message             -> handleEnqueueMessage message
   MessageSent nAction                -> handleMessageSent nAction
+  SetVibrator mVibrator              -> vibrator .= mVibrator *> pure []
+  ConnectionClosed                      -> noEffects
   Nop                                -> noEffects
 
 handleInit :: forall ps. ComponentType (Props ps) State Action
@@ -159,11 +165,14 @@ handleOnAddStream :: forall ps. MediaStreamEvent  -> ComponentType (Props ps) St
 handleOnAddStream event = do
     state <- get
     props <- ask
-    pure [ registerOnConnectionDrop props state
-         , do
+    let registerConnDrop = if state.isBabyStation
+                           then []
+                           else [ registerOnConnectionDrop props state ]
+    pure $ registerConnDrop
+         <> [ do
               url <- liftEff <<< createObjectURL <<< mediaStreamToBlob $ event.stream
               pure $ SetRemoteStream $ { stream : event.stream, objectURL : url }
-        ]
+            ]
   where
     registerOnConnectionDrop :: Props ps -> State -> IO Action
     registerOnConnectionDrop props state = do
@@ -184,11 +193,19 @@ handleOnConnectionDrop :: forall ps. LensP State StreamConnectionStats
                           -> Maybe Int -> ComponentType (Props ps) State Action
 handleOnConnectionDrop stats mPackets= do
     case mPackets of
-      Nothing -> stats <<< connectionState %= updateState ConnectionDied
+      Nothing -> do
+        stats <<< connectionState %= updateState ConnectionDied
+        status <- use (stats <<< connectionState)
+        case status of
+          ConnectionDied -> pure [ do
+                                      vibrator' <- liftEff $ startVibration [200, 100, 250, 100, 300]
+                                      pure $ (SetVibrator <<< Just) vibrator'
+                                 ]
+          _ -> pure []
       Just packets -> do
         stats <<< packetsReceived .= packets
         stats <<< connectionState %= updateState ConnectionReliable
-    pure []
+        pure []
   where
     -- updateState new old
     updateState :: StreamConnectionState -> StreamConnectionState -> StreamConnectionState
@@ -260,21 +277,26 @@ handleMessage msg = do
 
 closeConnection :: forall ps. ComponentType (Props ps) State Action
 closeConnection = do
-  state <- get
+  state <- get :: Component (Props ps) State State
   let conn = state.rtcConnection
-  pure $ fromMaybe [] $ do
-    stream <- state.mediaStream
-    pure [ liftEff $ do
-              stopStream stream
-              closeRTCPeerConnection conn
-              pure Nop
-         ]
+  audioStats <<< connectionState .= ConnectionNotAvailable
+  videoStats <<< connectionState .= ConnectionNotAvailable
+  pure [ liftEff $ do
+            catchException (\_ -> Console.log "Stopping vibrations failed!")
+              $ traverse_ stopVibration state.vibrator
+            pure $ SetVibrator Nothing
+        , liftEff $ do
+            catchException (\_ -> Console.log "Closing RTC connection failed!")
+              $ closeRTCPeerConnection conn
+            pure ConnectionClosed
+        ]
 
 
 handleCloseConnection :: forall ps. ComponentType (Props ps) State Action
 handleCloseConnection = do
+  state <- get :: Component (Props ps) State State
   closeActions <- closeConnection
-  pure $ closeActions <> [ pure $ EnqueueMessage Message.CloseConnection ]
+  pure $ [ pure $ EnqueueMessage Message.CloseConnection ] <> closeActions
 
 handleEnqueueMessage :: forall ps. Message -> ComponentType (Props ps) State Action
 handleEnqueueMessage message = do
