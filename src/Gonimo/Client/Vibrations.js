@@ -6,7 +6,7 @@ exports._startVibration = function (vals) {
             var vibrate = navigator.vibrate || navigator.mozVibrate || navigator.webkitVibrate;
             var vibrator = setInterval(function() {
                 try {
-                    vibrate(vals);
+                    vibrate.call(navigator, vals);
                 }
                 catch (e) {
                     console.log("Enabling vibrations failed!");
@@ -21,6 +21,6 @@ exports.stopVibration = function (vibrator) {
     return function () {
         clearInterval(vibrator);
         var vibrate = navigator.vibrate || navigator.mozVibrate || navigator.webkitVibrate;
-        vibrate(0);
+        vibrate.call(navigator, 0);
     };
 };
