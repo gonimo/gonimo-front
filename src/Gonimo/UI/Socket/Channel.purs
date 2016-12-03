@@ -108,7 +108,7 @@ update action = case action of
   ReportError _                      -> noEffects
   EnqueueMessage message             -> handleEnqueueMessage message
   MessageSent nAction                -> handleMessageSent nAction
-  SetVibrator mVibrator              -> vibrator .= mVibrator *> pure []
+  SetVibrator mVibrator              -> handleSetVibrator mVibrator
   ConnectionClosed                      -> noEffects
   Nop                                -> noEffects
 
@@ -197,10 +197,11 @@ handleOnConnectionDrop stats mPackets= do
         stats <<< connectionState %= updateState ConnectionDied
         status <- use (stats <<< connectionState)
         case status of
-          ConnectionDied -> pure [ do
-                                      vibrator' <- liftEff $ startVibration [200, 100, 250, 100, 300]
-                                      pure $ (SetVibrator <<< Just) vibrator'
-                                 ]
+          ConnectionDied ->
+            pure [ do
+                      vibrator' <- liftEff $ startVibration [200, 100, 250, 100, 300]
+                      pure $ (SetVibrator <<< Just) vibrator'
+                 ]
           _ -> pure []
       Just packets -> do
         stats <<< packetsReceived .= packets
@@ -214,6 +215,16 @@ handleOnConnectionDrop stats mPackets= do
     updateState ConnectionUnknown ConnectionNotAvailable = ConnectionUnknown
     updateState _ ConnectionNotAvailable = ConnectionNotAvailable
     updateState new _ = new
+
+handleSetVibrator :: forall ps. Maybe Vibrator -> ComponentType (Props ps) State Action
+handleSetVibrator mVibrator = do
+  state <- get :: Component (Props ps) State State
+  let oldVibrator = state.vibrator
+  vibrator .= mVibrator
+  pure [ liftEff $ do
+            traverse_ stopVibration oldVibrator
+            pure Nop
+       ]
 
 handleRegisterMediaTrack :: forall ps. TrackKind -> Component (Props ps) State Unit
 handleRegisterMediaTrack AudioTrack = audioStats <<< connectionState .= ConnectionUnknown
