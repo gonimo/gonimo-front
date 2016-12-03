@@ -99,10 +99,17 @@ a.boxclose{
     width: 100%;
 }
 
-
-.overviewThumbnail {
-    width: 45%;
-    margin: 1%;
+@media all and (max-width: 768px) {
+    .overviewThumbnail {
+        width: 90%;
+        margin: 1%;
+    }
+}
+@media all and (min-width: 769px) {
+    .overviewThumbnail {
+        width: 45%;
+        margin: 1%;
+    }
 }
 
 @keyframes brokenConnectionOverlayFrames {
