@@ -1,8 +1,8 @@
 module Gonimo.UI.Socket.Channel where
 
 import Prelude
-import Data.Array as Arr
 import Control.Monad.Eff.Console as Console
+import Data.Array as Arr
 import Data.CatQueue as Q
 import Data.List as List
 import Data.Tuple as Tuple
@@ -43,7 +43,7 @@ import Gonimo.Types (Secret(Secret), Key(Key))
 import Gonimo.UI.Socket.Channel.Types (audioStats, maxMessagesInFlight, messagesInFlight, messageQueue, Action(EnqueueMessage), Action(..), State, Props, StreamConnectionState(..), StreamConnectionStats, videoStats, connectionState, packetsReceived, TrackKind(..), vibrator)
 import Gonimo.UI.Socket.Lenses (mediaStream)
 import Gonimo.UI.Socket.Message (runMaybeIceCandidate, MaybeIceCandidate(JustIceCandidate, NoIceCandidate), encodeToString, decodeFromString, Message)
-import Gonimo.Util (coerceEffects)
+import Gonimo.Util (boostVolumeMediaStream, coerceEffects)
 import Gonimo.WebAPI (deleteSocketByFamilyIdByFromDeviceByToDeviceByChannelIdMessagesByMessageNumber, putSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
 import Gonimo.WebAPI.Subscriber (getSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
 import Pux.Html (text, Html)
@@ -69,7 +69,7 @@ init stream = do
                            )
   ourStream <- runMaybeT $ do
     origStream <- MaybeT <<< pure $ stream
-    liftEff $ MediaStream.clone origStream
+    liftEff $ boostVolumeMediaStream origStream
   connState <- liftEff $ iceConnectionState rtcConnection
   pure $  { mediaStream : ourStream
           , remoteStream : Nothing

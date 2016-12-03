@@ -5,13 +5,14 @@ import Data.Argonaut.Generic.Aeson as Aeson
 import Control.Monad.Aff (Aff)
 import Control.Monad.Eff (Eff)
 import Control.Monad.IO (IO)
+import DOM (DOM)
 import Data.Argonaut.Parser (jsonParser)
 import Data.Either (Either(Right, Left))
 import Data.Generic (class Generic)
 import Data.Maybe (Maybe(Just, Nothing))
-import Unsafe.Coerce (unsafeCoerce)
 import Signal (constant, Signal)
-import DOM (DOM)
+import Unsafe.Coerce (unsafeCoerce)
+import WebRTC.MediaStream (MediaStream)
 
 -- | Things that can be shown to the user
 class UserShow a where
@@ -56,3 +57,6 @@ fromMaybeM fallback m = do
     Just v -> pure v
 
 foreign import differentObject :: forall a b. a -> b -> Boolean
+
+
+foreign import boostVolumeMediaStream :: forall eff. MediaStream -> Eff eff MediaStream
