@@ -69,7 +69,7 @@ import Gonimo.Types (dateToString, Key(Key), Secret(Secret))
 import Gonimo.UI.AcceptInvitation (isAccepted)
 import Gonimo.UI.Error (handleError, viewError, class ErrorAction, UserError(NoError, DeviceInvalid))
 import Gonimo.UI.Loaded.Central (CentralItem, getCentrals)
-import Gonimo.UI.Loaded.Types (babiesOnlineCount, mkInviteProps', CentralReq(..), mkInviteProps, mkSettings, mkProps, central, familyIds, authData, currentFamily, socketS, overviewS, Props, acceptS, inviteS, State, Action(..), Central(..), InviteProps)
+import Gonimo.UI.Loaded.Types (babiesOnlineCount, CentralReq(..), mkInviteProps, mkSettings, mkProps, central, familyIds, authData, currentFamily, socketS, overviewS, Props, acceptS, inviteS, State, Action(..), Central(..), InviteProps)
 import Gonimo.UI.Socket.Lenses (sessionId)
 import Gonimo.Util (userShow, toString, fromString)
 import Gonimo.WebAPI (getFamiliesByFamilyIdDeviceInfos, postSessionByFamilyIdByDeviceId, postInvitationsByFamilyId, postFamilies, getFamiliesByFamilyId, postFunnyName, SPParams_(SPParams_), postAccounts)
@@ -98,10 +98,10 @@ update :: Update Unit State Action
 update Init                                    = handleInit
 update (SetState state)                        = put state *> pure []
 update (ReportError err)                       = handleError err
-update (InviteA _ InviteC.GoToOverview)        = handleRequestCentral ReqCentralOverview
-update (InviteA _ InviteC.GoToBabyStation)     = handleRequestCentral ReqCentralBaby
-update (InviteA _ (InviteC.ReportError err))   = handleError err
-update (InviteA mProps action)                 = updateInvite mProps action
+update (InviteA InviteC.GoToOverview)          = handleRequestCentral ReqCentralOverview
+update (InviteA InviteC.GoToBabyStation)       = handleRequestCentral ReqCentralBaby
+update (InviteA (InviteC.ReportError err))     = handleError err
+update (InviteA action)                        = updateInvite action
 update (AcceptA AcceptC.GoToBabyStation)       = handleRequestCentral ReqCentralBaby
 update (AcceptA (AcceptC.ReportError err))     = handleError err
 update (AcceptA action)                        = updateAccept action
@@ -123,8 +123,10 @@ update ClearError                              = handleClearError
 update Nop                                     = noEffects
 
 
-toInvite :: InviteProps -> ToChild Unit State InviteProps InviteC.State
-toInvite props = pure $ makeChildData inviteS props
+toInvite :: ToChild Unit State InviteProps InviteC.State
+toInvite = do
+  props <- mkInviteProps <$> get
+  pure $ makeChildData inviteS props
 
 toAccept :: ToChild Unit State Props AcceptC.State
 toAccept = do
@@ -141,21 +143,11 @@ toSocket = do
   props <- mkProps <$> get
   pure $ makeChildData socketS props
 
-updateInvite :: Maybe InviteProps -> InviteC.Action -> ComponentType Unit State Action
-updateInvite mProps iAction = do
+updateInvite :: InviteC.Action -> ComponentType Unit State Action
+updateInvite iAction = do
   state <- get :: Component Unit State State
-  let props = mkInviteProps state <|> mProps -- State props have higher priority!
-  case props of
-    Nothing -> pure $
-              [ toIO (mkSettings $ state^.authData) $ do
-                    name <- postFunnyName
-                    fid' <- postFamilies name
-                    family' <- getFamiliesByFamilyId fid'
-                    let newProps = mkInviteProps' fid' family' state
-                    pure $ InviteA (Just newProps) iAction
-              ]
-    Just rProps ->
-      toParent [] (InviteA Nothing) <<< liftChild (toInvite rProps) <<< InviteC.update $ iAction
+  let props = mkInviteProps state
+  toParent [] InviteA <<< liftChild toInvite <<< InviteC.update $ iAction
 
 
 updateAccept :: AcceptC.Action -> ComponentType Unit State Action
@@ -190,7 +182,7 @@ handleSubscriber notification = do
 handleSetDeviceInfos :: Array (Tuple (Key Device) DeviceInfo) -> ComponentType Unit State Action
 handleSetDeviceInfos devices = do
   modify $ _ { deviceInfos = devices }
-  if Arr.length devices <=1
+  if Arr.length devices == 1
     then doAutoSwitchCentral ReqCentralInvite
     else pure []
 
@@ -223,22 +215,19 @@ handleRequestCentral c = do
   state <- get
   r <- case c of
     ReqCentralInvite   -> do
-      let invProps = mkInviteProps state
-      case invProps of
+      case state^?currentFamily of
         Nothing    -> pure
                    [ toIO (mkSettings $ state^.authData) $ do
                         name <- postFunnyName
                         fid' <- postFamilies name
-                        family' <- getFamiliesByFamilyId fid'
-                        let newProps = mkInviteProps' fid' family' state
                         invData <- postInvitationsByFamilyId fid'
-                        pure <<< SetCentral <<< CentralInvite $ (InviteC.init invData newProps)
+                        pure <<< SetCentral <<< CentralInvite $ InviteC.init invData
                    ]
-        Just props -> pure
-                      [ toIO (mkSettings $ state^.authData) $ do
-                           invData <- postInvitationsByFamilyId props.rFamilyId
-                           pure <<< SetCentral $ CentralInvite (InviteC.init invData props)
-                      ]
+        Just fid' -> pure
+                   [ toIO (mkSettings $ state^.authData) $ do
+                         invData <- postInvitationsByFamilyId fid'
+                         pure <<< SetCentral <<< CentralInvite $ InviteC.init invData
+                   ]
     ReqCentralOverview -> handleSetCentral CentralOverview
     ReqCentralBaby     -> do
                           handleSetCentral CentralBaby
@@ -436,9 +425,7 @@ viewCentral state =
     invProps = mkInviteProps state
   in
    case state.central of
-    CentralInvite s -> case invProps of
-      Nothing -> viewLoading "Loading, please wait ..."
-      Just invProps' -> map (InviteA Nothing) $ InviteC.view invProps' s
+    CentralInvite s -> map InviteA $ InviteC.view invProps s
     CentralAccept s -> map AcceptA $ AcceptC.view props s
     CentralOverview     -> map OverviewA   $ OverviewC.view props state.overviewS
     CentralBaby     -> map SocketA   $ SocketC.view props state.socketS

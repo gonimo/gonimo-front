@@ -19,13 +19,14 @@ import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Except.Trans (runExceptT)
 import Control.Monad.IO (IO)
+import Control.Monad.Maybe.Trans (MaybeT(MaybeT), runMaybeT)
 import Control.Monad.Reader.Class (ask)
 import Control.Monad.Reader.Trans (runReaderT)
 import Control.Monad.State.Class (get, modify)
 import Data.Either (Either(Right, Left))
 import Data.Function.Uncurried (Fn3, runFn3)
 import Data.Generic (gShow)
-import Data.Maybe (isJust, isNothing, Maybe(..))
+import Data.Maybe (fromMaybe, isJust, isNothing, Maybe(..))
 import Data.Tuple (uncurry, Tuple(Tuple))
 import Global (encodeURIComponent, encodeURI)
 import Gonimo.Client.Types (Settings, GonimoError, Gonimo, class ReportErrorAction)
@@ -47,8 +48,7 @@ import Signal (constant, Signal)
 import Prelude hiding (div)
 
 type Props ps = { settings  :: Settings
-                , rFamilyId :: Key Family
-                , rFamily   :: Family
+                , familyId  :: Maybe (Key Family)
                 , baseURL :: String
                 | ps
                 }
@@ -62,12 +62,12 @@ type State =
 
 -- | We take our props in init to ensure the caller takes care of providing proper props.
 --   Ensuring this on the first call to update is a tad to late.
-init :: forall ps. Tuple (Key Invitation) Invitation -> Props ps -> State
-init (Tuple invKey inv) _ = { email : ""
-                            , sentInvitation : Nothing
-                            , invitationId : invKey
-                            , invitation : inv
-                            }
+init :: Tuple (Key Invitation) Invitation -> State
+init (Tuple invKey inv) = { email : ""
+                          , sentInvitation : Nothing
+                          , invitationId : invKey
+                          , invitation : inv
+                          }
 
 
 data Action = SetEmail String
@@ -114,7 +114,9 @@ handleInvitationSent method = do
 handleMakeNewInvitation :: forall m ps. (MonadComponent (Props ps) State m) => m (Array (IO Action))
 handleMakeNewInvitation = do
   props <- ask
-  runGonimo $ uncurry SetInvitationData <$> postInvitationsByFamilyId props.rFamilyId
+  runGonimo <<< map (fromMaybe Nop) <<< runMaybeT $ do
+    familyId' <- MaybeT <<< pure $ props.familyId
+    uncurry SetInvitationData <$> postInvitationsByFamilyId familyId'
 
 handleSendInvitation :: forall m ps. (MonadComponent (Props ps) State m) => m (Array (IO Action))
 handleSendInvitation = do

@@ -58,7 +58,7 @@ type InviteProps = InviteC.Props ()
 data Action = Init
             | ReportError GonimoError
             | SetState State
-            | InviteA (Maybe InviteProps) InviteC.Action
+            | InviteA InviteC.Action
             | AcceptA AcceptC.Action
             | OverviewA OverviewC.Action
             | SocketA SocketC.Action
@@ -96,19 +96,11 @@ mkProps state = { settings : mkSettings $ state^.authData
                 , socketS : state.socketS
                 }
 
-mkInviteProps :: State -> Maybe InviteProps
-mkInviteProps state = do
-  familyId' <- state^?currentFamily
-  family' <- Map.lookup familyId' state.families
-  pure $ mkInviteProps' familyId' family' state
-
-mkInviteProps' :: Key Family -> Family -> State -> InviteProps
-mkInviteProps' familyId' family' state =
-  { settings : mkSettings $ state^.authData
-  , rFamilyId : familyId'
-  , rFamily : family'
-  , baseURL : state.url
-  }
+mkInviteProps :: State -> InviteProps
+mkInviteProps state = { settings : mkSettings $ state^.authData
+                      , familyId : state^?currentFamily
+                      , baseURL : state.url
+                      }
 
 mkSettings :: AuthData -> Settings
 mkSettings (AuthData auth) = defaultSettings $ SPParams_ {
