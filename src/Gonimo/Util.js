@@ -40,3 +40,46 @@ exports.boostVolumeMediaStream = function (stream) {
         return outStream;
     };
 };
+
+exports._loadSound = function (success) {
+    return function (error) {
+        return function (url) {
+            return function () {
+                var request = new XMLHttpRequest();
+                request.open('GET', url, true);
+                request.responseType = 'arraybuffer';
+
+                // Decode asynchronously
+                console.log("ok - setting on load");
+                request.onload = function() {
+                    console.log("Ok received request");
+                    var ctx = new window.AudioContext();
+                    ctx.decodeAudioData(request.response, function(buffer) {
+                        console.log("ok audio decoded!");
+                        var source = ctx.createBufferSource();
+                        source.buffer = buffer;
+                        source.connect(ctx.destination);
+                        source.loop = true;
+                        console.log("Ok calling success");
+                        success(source)();
+                        console.log("Ok called success");
+                    }, function(e) { console.log ("Error:" +  e.message); error(e);});
+                };
+                console.log("ok - sending request");
+                request.send();
+            };
+        };
+    };
+};
+
+exports.playSound = function (myAudio) {
+    return function () {
+        myAudio.start();
+    };
+};
+
+exports.stopSound = function (myAudio) {
+    return function () {
+        myAudio.stop();
+    };
+};

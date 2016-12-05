@@ -2,8 +2,9 @@ module Gonimo.Util where
 
 import Prelude
 import Data.Argonaut.Generic.Aeson as Aeson
-import Control.Monad.Aff (Aff)
+import Control.Monad.Aff (makeAff, Aff)
 import Control.Monad.Eff (Eff)
+import Control.Monad.Eff.Exception (Error)
 import Control.Monad.IO (IO)
 import DOM (DOM)
 import Data.Argonaut.Parser (jsonParser)
@@ -60,3 +61,15 @@ foreign import differentObject :: forall a b. a -> b -> Boolean
 
 
 foreign import boostVolumeMediaStream :: forall eff. MediaStream -> Eff eff MediaStream
+
+foreign import data Audio :: *
+
+foreign import _loadSound :: forall eff. (Audio -> Eff eff Unit)
+                             -> (Error -> Eff eff Unit)
+                             -> String -> Eff eff Unit
+
+loadSound :: forall eff. String -> Aff eff Audio
+loadSound url = makeAff (\e s -> _loadSound s e url)
+
+foreign import playSound :: forall eff. Audio -> Eff eff Unit
+foreign import stopSound :: forall eff. Audio -> Eff eff Unit

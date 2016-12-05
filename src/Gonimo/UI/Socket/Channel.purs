@@ -24,7 +24,7 @@ import Control.Monad.IO (IO)
 import Control.Monad.Maybe.Trans (MaybeT(MaybeT), runMaybeT)
 import Control.Monad.Reader (runReaderT)
 import Control.Monad.Reader.Class (ask, class MonadReader)
-import Control.Monad.State.Class (get)
+import Control.Monad.State.Class (modify, get)
 import Data.Array (zip)
 import Data.Foldable (traverse_)
 import Data.Identity (runIdentity)
@@ -43,7 +43,7 @@ import Gonimo.Types (Secret(Secret), Key(Key))
 import Gonimo.UI.Socket.Channel.Types (audioStats, maxMessagesInFlight, messagesInFlight, messageQueue, Action(EnqueueMessage), Action(..), State, Props, StreamConnectionState(..), StreamConnectionStats, videoStats, connectionState, packetsReceived, TrackKind(..), vibrator)
 import Gonimo.UI.Socket.Lenses (mediaStream)
 import Gonimo.UI.Socket.Message (runMaybeIceCandidate, MaybeIceCandidate(JustIceCandidate, NoIceCandidate), encodeToString, decodeFromString, Message)
-import Gonimo.Util (boostVolumeMediaStream, coerceEffects)
+import Gonimo.Util (stopSound, playSound, loadSound, boostVolumeMediaStream, coerceEffects)
 import Gonimo.WebAPI (deleteSocketByFamilyIdByFromDeviceByToDeviceByChannelIdMessagesByMessageNumber, putSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
 import Gonimo.WebAPI.Subscriber (getSocketByFamilyIdByFromDeviceByToDeviceByChannelId)
 import Pux.Html (text, Html)
@@ -71,6 +71,8 @@ init stream = do
     origStream <- MaybeT <<< pure $ stream
     liftEff $ boostVolumeMediaStream origStream
   connState <- liftEff $ iceConnectionState rtcConnection
+  alarm' <- liftAff $ loadSound "/sounds/pup_alert.mp3"
+  Gonimo.log "Got alarm!"
   pure $  { mediaStream : ourStream
           , remoteStream : Nothing
           , rtcConnection : rtcConnection
@@ -80,6 +82,8 @@ init stream = do
           , audioStats : initStreamConnectionStats
           , videoStats : initStreamConnectionStats
           , vibrator   : Nothing
+          , alarm : alarm'
+          , alarmIsOn : false
           }
 
 initStreamConnectionStats :: StreamConnectionStats
@@ -109,6 +113,7 @@ update action = case action of
   EnqueueMessage message             -> handleEnqueueMessage message
   MessageSent nAction                -> handleMessageSent nAction
   SetVibrator mVibrator              -> handleSetVibrator mVibrator
+  TurnOnAlarm onOff                  -> handleTurnOnAlarm onOff
   ConnectionClosed                      -> noEffects
   Nop                                -> noEffects
 
@@ -197,11 +202,13 @@ handleOnConnectionDrop stats mPackets= do
         stats <<< connectionState %= updateState ConnectionDied
         status <- use (stats <<< connectionState)
         case status of
-          ConnectionDied ->
-            pure [ do
-                      vibrator' <- liftEff $ startVibration [200, 100, 250, 100, 300]
-                      pure $ (SetVibrator <<< Just) vibrator'
-                 ]
+          ConnectionDied -> do
+            let vibratorActions = [ do
+                                       vibrator' <- liftEff $ startVibration [200, 100, 250, 100, 300]
+                                       pure $ (SetVibrator <<< Just) vibrator'
+                                  ]
+            alarmActions <- handleTurnOnAlarm true
+            pure $ alarmActions <> vibratorActions
           _ -> pure []
       Just packets -> do
         stats <<< packetsReceived .= packets
@@ -225,6 +232,26 @@ handleSetVibrator mVibrator = do
             traverse_ stopVibration oldVibrator
             pure Nop
        ]
+
+handleTurnOnAlarm :: forall ps. Boolean -> ComponentType (Props ps) State Action
+handleTurnOnAlarm onOff = do
+  state <- get :: Component (Props ps) State State
+  let old = state.alarmIsOn
+  modify $ _ { alarmIsOn = onOff }
+  let actions =
+        if onOff
+        then [ do
+                  liftEff $ playSound state.alarm
+                  pure Nop
+            ]
+        else [ do
+                  liftEff $ stopSound state.alarm
+                  pure Nop
+            ]
+  if old /= onOff
+    then pure actions
+    else pure []
+
 
 handleRegisterMediaTrack :: forall ps. TrackKind -> Component (Props ps) State Unit
 handleRegisterMediaTrack AudioTrack = audioStats <<< connectionState .= ConnectionUnknown
@@ -292,7 +319,8 @@ closeConnection = do
   let conn = state.rtcConnection
   audioStats <<< connectionState .= ConnectionNotAvailable
   videoStats <<< connectionState .= ConnectionNotAvailable
-  pure [ liftEff $ do
+  alarmA <- handleTurnOnAlarm false
+  pure $ [ liftEff $ do
             catchException (\_ -> Console.log "Stopping vibrations failed!")
               $ traverse_ stopVibration state.vibrator
             pure $ SetVibrator Nothing
@@ -301,6 +329,7 @@ closeConnection = do
               $ closeRTCPeerConnection conn
             pure ConnectionClosed
         ]
+    <> alarmA
 
 
 handleCloseConnection :: forall ps. ComponentType (Props ps) State Action
@@ -388,8 +417,6 @@ viewError state =
                   [
                     H.text "Please reconnect or check on your baby!"
                   ]
-                , H.audio [ A.src "sounds/pup_alert.mp3", A.autoPlay "true", A.loop true
-                          ] []
                 ]
   in
    if audioBroken || videoBroken

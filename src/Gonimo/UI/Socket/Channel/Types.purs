@@ -15,6 +15,7 @@ import Gonimo.Server.State.Types (MessageNumber(MessageNumber))
 import Gonimo.Server.Types (DeviceType)
 import Gonimo.Types (Secret(Secret), Key(Key))
 import Gonimo.UI.Socket.Message (Message)
+import Gonimo.Util (Audio)
 import Partial.Unsafe (unsafeCrashWith)
 import Prelude (Unit)
 import Signal.Channel (Channel)
@@ -34,6 +35,8 @@ type State =
   , audioStats    :: StreamConnectionStats
   , videoStats    :: StreamConnectionStats
   , vibrator      :: Maybe Vibrator
+  , alarm         :: Audio
+  , alarmIsOn     :: Boolean
   }
 
 type Props ps =
@@ -63,6 +66,7 @@ data Action = InitConnection
             | OnVideoConnectionDrop (Maybe Int)
             | SetRemoteStream RemoteStream
             | SetVibrator (Maybe Vibrator)
+            | TurnOnAlarm Boolean
             | ConnectionClosed -- Message to parent, when channel gets closed
             | Nop
 
