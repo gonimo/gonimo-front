@@ -71,12 +71,15 @@ init stream = do
     origStream <- MaybeT <<< pure $ stream
     liftEff $ boostVolumeMediaStream origStream
   connState <- liftEff $ iceConnectionState rtcConnection
-  alarm' <- liftAff $ loadSound "/sounds/pup_alert.mp3"
+  let isBabyStation = isJust stream
+  alarm' <- if isBabyStation -- We only need alarm at the parent side
+            then pure Nothing
+            else map Just <<< liftAff $ loadSound "/sounds/pup_alert.mp3"
   Gonimo.log "Got alarm!"
   pure $  { mediaStream : ourStream
           , remoteStream : Nothing
           , rtcConnection : rtcConnection
-          , isBabyStation : isJust stream
+          , isBabyStation : isBabyStation
           , messageQueue  : Nil
           , messagesInFlight : 0
           , audioStats : initStreamConnectionStats
@@ -241,11 +244,11 @@ handleTurnOnAlarm onOff = do
   let actions =
         if onOff
         then [ do
-                  liftEff $ playSound state.alarm
+                  liftEff $ traverse_ playSound state.alarm
                   pure Nop
             ]
         else [ do
-                  liftEff $ stopSound state.alarm
+                  liftEff $ traverse_ stopSound state.alarm
                   pure Nop
             ]
   if old /= onOff

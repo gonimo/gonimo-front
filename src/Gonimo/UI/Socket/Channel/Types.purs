@@ -35,7 +35,7 @@ type State =
   , audioStats    :: StreamConnectionStats
   , videoStats    :: StreamConnectionStats
   , vibrator      :: Maybe Vibrator
-  , alarm         :: Audio
+  , alarm         :: Maybe Audio
   , alarmIsOn     :: Boolean
   }
 
