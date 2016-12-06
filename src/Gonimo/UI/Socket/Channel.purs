@@ -194,8 +194,11 @@ handleOnAddStream event = do
 
     maybeRegister :: Props ps -> (Maybe Int -> Action) -> Maybe MediaStreamTrack -> RTCPeerConnection -> IO Unit
     maybeRegister _ _ Nothing _ = pure unit
-    maybeRegister props mkAction mTrack pc =
-      liftEff $ onConnectionDrop (coerceEffects <<< props.sendAction <<< mkAction) mTrack pc
+    maybeRegister props mkAction mTrack@(Just track) pc = do
+      let eventHandler = coerceEffects <<< props.sendAction <<< mkAction
+      liftEff $ onConnectionDrop eventHandler mTrack pc
+      liftEff $ addEventListener "ended" (const (eventHandler Nothing)) track
+      liftEff $ addEventListener "ended" (const (Console.log "Track ended")) track
 
 handleOnConnectionDrop :: forall ps. LensP State StreamConnectionStats
                           -> Maybe Int -> ComponentType (Props ps) State Action
