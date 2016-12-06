@@ -73,7 +73,7 @@ init stream = do
     tracks <- liftEff $ MediaStream.getTracks origStream
     let addListener event = liftEff <<< addEventListener event (const (closeRTCPeerConnection rtcConnection))
     traverse_ (addListener "ended") tracks
-    traverse_ (addListener "muted") tracks
+    traverse_ (addListener "mute") tracks
     liftEff $ boostVolumeMediaStream origStream
 
   connState <- liftEff $ iceConnectionState rtcConnection
