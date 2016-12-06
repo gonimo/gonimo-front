@@ -71,8 +71,9 @@ init stream = do
     origStream <- MaybeT <<< pure $ stream
     -- Close rtc connection once a track ends - so parent will notice local problems:
     tracks <- liftEff $ MediaStream.getTracks origStream
-    let addListener = liftEff <<< addEventListener "ended" (const (closeRTCPeerConnection rtcConnection))
-    traverse_ addListener tracks
+    let addListener event = liftEff <<< addEventListener event (const (closeRTCPeerConnection rtcConnection))
+    traverse_ (addListener "ended") tracks
+    traverse_ (addListener "muted") tracks
     liftEff $ boostVolumeMediaStream origStream
 
   connState <- liftEff $ iceConnectionState rtcConnection
