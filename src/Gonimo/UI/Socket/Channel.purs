@@ -52,8 +52,8 @@ import Servant.PureScript.Affjax (unsafeToString)
 import Servant.Subscriber (Subscriptions)
 import Unsafe.Coerce (unsafeCoerce)
 import WebRTC.MediaStream (createObjectURL, mediaStreamToBlob, stopStream, getUserMedia, MediaStreamConstraints(MediaStreamConstraints), MediaStream)
-import WebRTC.MediaStream.Track (MediaStreamTrack)
-import WebRTC.RTC (RTCPeerConnection, iceConnectionState, oniceconnectionstatechange, onconnectionstatechange, onnegotiationneeded, closeRTCPeerConnection, MediaStreamEvent, setLocalDescription, createAnswer, iceEventCandidate, IceEvent, onicecandidate, onaddstream, addIceCandidate, setRemoteDescription, fromRTCSessionDescription, createOffer, addStream, RTCIceCandidateInit, Ice, newRTCPeerConnection)
+import WebRTC.MediaStream.Track (addEventListener, MediaStreamTrack)
+import WebRTC.RTC (closeRTCPeerConnection, RTCPeerConnection, iceConnectionState, oniceconnectionstatechange, onconnectionstatechange, onnegotiationneeded, MediaStreamEvent, setLocalDescription, createAnswer, iceEventCandidate, IceEvent, onicecandidate, onaddstream, addIceCandidate, setRemoteDescription, fromRTCSessionDescription, createOffer, addStream, RTCIceCandidateInit, Ice, newRTCPeerConnection)
 import WebRTC.Util (onConnectionDrop)
 
 
@@ -69,13 +69,17 @@ init stream = do
                            )
   ourStream <- runMaybeT $ do
     origStream <- MaybeT <<< pure $ stream
+    -- Close rtc connection once a track ends - so parent will notice local problems:
+    tracks <- liftEff $ MediaStream.getTracks origStream
+    let addListener = liftEff <<< addEventListener "ended" (const (closeRTCPeerConnection rtcConnection))
+    traverse_ addListener tracks
     liftEff $ boostVolumeMediaStream origStream
+
   connState <- liftEff $ iceConnectionState rtcConnection
   let isBabyStation = isJust stream
   alarm' <- if isBabyStation -- We only need alarm at the parent side
             then pure Nothing
             else map Just <<< liftAff $ loadSound "/sounds/pup_alert.mp3"
-  Gonimo.log "Got alarm!"
   pure $  { mediaStream : ourStream
           , remoteStream : Nothing
           , rtcConnection : rtcConnection

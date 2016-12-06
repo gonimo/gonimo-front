@@ -3,7 +3,6 @@ module Gonimo.UI.Socket.Internal where
 import Prelude
 import Data.Array as Arr
 import Data.Map as Map
-import Gonimo.Client.Effects as Console
 import Gonimo.UI.Socket.Channel as ChannelC
 import Gonimo.UI.Socket.Channel.Types as ChannelC
 import Pux.Html.Attributes as A
