@@ -74,7 +74,7 @@ viewOffline props state =
         [ H.label []
           [ H.input [ A.type_ "checkbox", A.value ""
                     , A.defaultChecked haveVideo
-                    , E.onInput (\e -> EnableCamera e.target.checked)
+                    , E.onChange (\e -> EnableCamera e.target.checked)
                     ]
             []
           , H.text "Enable Video"
