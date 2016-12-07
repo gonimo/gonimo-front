@@ -56,20 +56,24 @@ view props state =
                           <> " allow your browser to access the hardware."
                   ]
                 ]
+      , if haveVideo
+          then viewPreviewVideo props state
+          else H.div [] []
       , if state.isAvailable
-         then viewOnline props state
-         else viewOffline props state
+          then viewOnline props state
+          else viewOffline props state
       ]
+  where
+    haveVideo = fromMaybe true $ state^?constraints<<<_MediaStreamConstraints<<<video
 
 viewOffline :: forall ps. Props ps -> State -> Html Action
 viewOffline props state =
     H.div []
-    [ viewPreviewVideo props state
-    , H.div [ A.className "videoContainer" ]
+    [ H.div [ A.className "videoContainer" ]
       [ H.div [ A.className "checkbox" ]
         [ H.label []
           [ H.input [ A.type_ "checkbox", A.value ""
-                    , A.defaultChecked (fromMaybe true $ state^?constraints<<<_MediaStreamConstraints<<<video)
+                    , A.defaultChecked haveVideo
                     , E.onInput (\e -> EnableCamera e.target.checked)
                     ]
             []
@@ -80,12 +84,13 @@ viewOffline props state =
       ]
     , viewBabyNameSelect props state
     ]
+  where
+    haveVideo = fromMaybe true $ state^?constraints<<<_MediaStreamConstraints<<<video
 
 viewOnline :: forall ps. Props ps -> State -> Html Action
 viewOnline props state =
   H.div []
-    [ viewPreviewVideo props state
-    , viewStopButton state
+    [ viewStopButton state
     ]
 
 viewPreviewVideo :: forall ps. Props ps -> State -> Html Action
