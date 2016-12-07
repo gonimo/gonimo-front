@@ -41,6 +41,9 @@ exports.boostVolumeMediaStream = function (stream) {
     };
 };
 
+// Reuse the same audio context, because the number of audio contexts to allocate is limited.
+var alertAudioContext = new window.AudioContext();
+
 exports._loadSound = function (success) {
     return function (error) {
         return function (url) {
@@ -48,10 +51,9 @@ exports._loadSound = function (success) {
                 var request = new XMLHttpRequest();
                 request.open('GET', url, true);
                 request.responseType = 'arraybuffer';
-
                 // Decode asynchronously
                 request.onload = function() {
-                    var ctx = new window.AudioContext();
+                    var ctx = alertAudioContext;
                     ctx.decodeAudioData(request.response, function(buffer) {
                         var source = ctx.createBufferSource();
                         source.buffer = buffer;
