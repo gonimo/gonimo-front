@@ -99,6 +99,7 @@ data Action = AcceptConnection ChannelId
             | SetStreamURL (Maybe String)
             | StopBabyStation
             | HandleSubscriber Notification
+            | EnableCamera Boolean
 
             | SetBabyName String
             | SetNewBabyName String

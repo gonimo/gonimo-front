@@ -1,9 +1,11 @@
 module Gonimo.UI.Socket.Lenses where
 
-import Prelude as Prelude
-import Data.Lens as Lens
-import Data.Either as Either
 import Gonimo.UI.Socket.Types
+import Data.Either as Either
+import Data.Lens as Lens
+import Prelude as Prelude
+import Data.Either (Either(Left, Right))
+import WebRTC.MediaStream (MediaStreamConstraints(MediaStreamConstraints))
 
 
 settings :: forall a b r. Lens.Lens { "settings" :: a | r } { "settings" :: b | r } a b
@@ -42,6 +44,12 @@ localStream = Lens.lens _."localStream" (_ { "localStream" = _ })
 streamURL :: forall a b r. Lens.Lens { "streamURL" :: a | r } { "streamURL" :: b | r } a b
 streamURL = Lens.lens _."streamURL" (_ { "streamURL" = _ })
 
+constraints :: forall a b r. Lens.Lens { "constraints" :: a | r } { "constraints" :: b | r } a b
+constraints = Lens.lens _."constraints" (_ { "constraints" = _ })
+
+video :: forall a b r. Lens.Lens { "video" :: a | r } { "video" :: b | r } a b
+video = Lens.lens _."video" (_ { "video" = _ })
+
 _AcceptConnection :: Lens.PrismP Action ChannelId
 _AcceptConnection = Lens.prism AcceptConnection unwrap
   where
@@ -59,3 +67,11 @@ _Nop = Lens.prism (Prelude.const Nop) unwrap
   where
     unwrap Nop = Either.Right Prelude.unit
     unwrap y = Either.Left y
+
+_MediaStreamConstraints :: Lens.PrismP MediaStreamConstraints { video :: Boolean
+                         , audio :: Boolean
+                         }
+_MediaStreamConstraints = Lens.prism MediaStreamConstraints unwrap
+  where
+    unwrap (MediaStreamConstraints x) = Right x
+    unwrap y = Left y

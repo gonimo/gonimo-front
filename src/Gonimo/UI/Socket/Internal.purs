@@ -35,7 +35,7 @@ import Gonimo.Server.Db.Entities (Family(Family), Device(Device))
 import Gonimo.Server.Db.Entities.Helpers (runFamily)
 import Gonimo.Server.State.Types (SessionId(SessionId))
 import Gonimo.Types (Secret(Secret), Key(Key))
-import Gonimo.UI.Socket.Lenses (sessionId, streamURL, isAvailable, mediaStream, babyName, currentFamily, localStream, authData, newBabyName, previewEnabled)
+import Gonimo.UI.Socket.Lenses (_MediaStreamConstraints, video, constraints, sessionId, streamURL, isAvailable, mediaStream, babyName, currentFamily, localStream, authData, newBabyName, previewEnabled)
 import Gonimo.UI.Socket.Message (decodeFromString)
 import Gonimo.UI.Socket.Types (toDeviceType, makeChannelId, toCSecret, toTheirId, ChannelId(ChannelId), channel, Props, State, Action(..))
 import Gonimo.WebAPI (deleteSocketByFamilyIdByToDeviceByFromDeviceByChannelId, postSocketByFamilyIdByToDevice, deleteSessionByFamilyIdByDeviceIdBySessionId)
@@ -94,6 +94,7 @@ update action = case action of
                                                   *> pure []
 
   HandleSubscriber msg                         -> pure []
+  EnableCamera onOff                           -> handleEnableCamera onOff
   SetBabyName name                             -> babyName .= name *> pure []
   SetNewBabyName name                          -> do
     newBabyName .= name
@@ -216,6 +217,16 @@ handleConnectToBaby babyId = do
                   AddChannel channelId' <$> liftIO (ChannelC.init Nothing)
              ]
   pure actions
+
+
+handleEnableCamera :: forall ps. Boolean -> ComponentType (Props ps) State Action
+handleEnableCamera onOff = do
+  constraints <<< _MediaStreamConstraints <<< video .= onOff
+  state <- get :: Component (Props ps) State State
+  let wasActive = state^.localStream <<< to isJust
+  if wasActive
+    then append <$> handleStopUserMedia <*> handleGetUserMedia
+    else pure []
 
 updateChannel :: forall ps. ChannelId -> ChannelC.Action -> ComponentType (Props ps) State Action
 updateChannel channelId' = toParent [] (ChannelA channelId')

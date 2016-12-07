@@ -32,7 +32,7 @@ import Gonimo.Server.Db.Entities (Family(Family), Device(Device))
 import Gonimo.Server.Db.Entities.Helpers (runFamily)
 import Gonimo.Types (Secret(Secret), Key(Key))
 import Gonimo.UI.Socket.Internal (mkChannelProps, getParentChannels)
-import Gonimo.UI.Socket.Lenses (streamURL, isAvailable, mediaStream, babyName, currentFamily, localStream, authData, newBabyName)
+import Gonimo.UI.Socket.Lenses (video, _MediaStreamConstraints, constraints, streamURL, isAvailable, mediaStream, babyName, currentFamily, localStream, authData, newBabyName)
 import Gonimo.UI.Socket.Message (decodeFromString)
 import Gonimo.UI.Socket.Types (makeChannelId, toCSecret, toTheirId, ChannelId(ChannelId), channel, Props, State, Action(..))
 import Gonimo.WebAPI.Lenses (deviceId, _AuthData)
@@ -65,7 +65,19 @@ viewOffline :: forall ps. Props ps -> State -> Html Action
 viewOffline props state =
     H.div []
     [ viewPreviewVideo props state
-    , H.div [ A.className "videoContainer" ] [ viewStartButton state ]
+    , H.div [ A.className "videoContainer" ]
+      [ H.div [ A.className "checkbox" ]
+        [ H.label []
+          [ H.input [ A.type_ "checkbox", A.value ""
+                    , A.defaultChecked (fromMaybe true $ state^?constraints<<<_MediaStreamConstraints<<<video)
+                    , E.onInput (\e -> EnableCamera e.target.checked)
+                    ]
+            []
+          , H.text "Enable Video"
+          ]
+        ]
+      , viewStartButton state
+      ]
     , viewBabyNameSelect props state
     ]
 
