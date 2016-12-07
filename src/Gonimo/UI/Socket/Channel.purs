@@ -74,6 +74,7 @@ init stream = do
     let addListener event = liftEff <<< addEventListener event (const (closeRTCPeerConnection rtcConnection))
     traverse_ (addListener "ended") tracks
     traverse_ (addListener "mute") tracks
+    traverse_ (addListener "inactive") tracks -- Let's see if this helps
     liftEff $ boostVolumeMediaStream origStream
 
   connState <- liftEff $ iceConnectionState rtcConnection
