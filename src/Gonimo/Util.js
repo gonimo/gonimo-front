@@ -43,26 +43,39 @@ exports.boostVolumeMediaStream = function (stream) {
 
 // Reuse the same audio context, because the number of audio contexts to allocate is limited.
 var alertAudioContext = new window.AudioContext();
+var decodedSound = null;
 
 exports._loadSound = function (success) {
     return function (error) {
         return function (url) {
             return function () {
-                var request = new XMLHttpRequest();
-                request.open('GET', url, true);
-                request.responseType = 'arraybuffer';
-                // Decode asynchronously
-                request.onload = function() {
+
+                function makeMyAudio() {
                     var ctx = alertAudioContext;
-                    ctx.decodeAudioData(request.response, function(buffer) {
-                        var source = ctx.createBufferSource();
-                        source.buffer = buffer;
-                        source.connect(ctx.destination);
-                        source.loop = true;
-                        success(source)();
-                    }, function(e) { console.log ("Error:" +  e.message); error(e);});
-                };
-                request.send();
+                    var source = ctx.createBufferSource();
+                    source.buffer = decodedSound;
+                    source.connect(ctx.destination);
+                    source.loop = true;
+                    return source;
+                }
+
+                if (decodedSound == null) {
+                    var request = new XMLHttpRequest();
+                    request.open('GET', url, true);
+                    request.responseType = 'arraybuffer';
+                    // Decode asynchronously
+                  request.onload = function() {
+                      var ctx = alertAudioContext;
+                      ctx.decodeAudioData(request.response, function(buffer) {
+                          decodedSound = buffer;
+                          success(makeMyAudio())();
+                      }, function(e) { console.log ("Error:" +  e.message); error(e);});
+                  };
+                  request.send();
+                }
+                else {
+                    success(makeMyAudio())();
+                }
             };
         };
     };
@@ -79,3 +92,4 @@ exports.stopSound = function (myAudio) {
         myAudio.stop();
     };
 };
+
