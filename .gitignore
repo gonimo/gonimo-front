@@ -17,3 +17,4 @@
 /dist/app-staging.js
 /.stack-work
 /.shake
+/static/dist/
