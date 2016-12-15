@@ -171,9 +171,8 @@ getAccountsByAccountIdFamilies accountId = do
                 }
   pure spReq
 
-postFamilies :: forall m. MonadReader (SPSettings_ SPParams_) m => String
-                -> m HttpRequest
-postFamilies reqBody = do
+postFamilies :: forall m. MonadReader (SPSettings_ SPParams_) m => m HttpRequest
+postFamilies = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
@@ -190,7 +189,7 @@ postFamilies reqBody = do
                 , httpPath: reqPath
                 , httpHeaders: reqHeaders
                 , httpQuery: reqQuery
-                , httpBody: printJson <<< encodeJson $ reqBody
+                , httpBody: ""
                 }
   pure spReq
 
@@ -513,28 +512,6 @@ getSessionByFamilyId familyId = do
   let reqPath = Path ["session" , gDefaultToURLPiece familyId]
   let reqHeaders =
         [Tuple "Authorization" (gDefaultToURLPiece authorization)]
-  let reqQuery =
-        []
-  let spReq = HttpRequest
-                { httpMethod: httpMethod
-                , httpPath: reqPath
-                , httpHeaders: reqHeaders
-                , httpQuery: reqQuery
-                , httpBody: ""
-                }
-  pure spReq
-
-postFunnyName :: forall m. MonadReader (SPSettings_ SPParams_) m =>
-                 m HttpRequest
-postFunnyName = do
-  spOpts_' <- ask
-  let spOpts_ = case spOpts_' of SPSettings_ o -> o
-  let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
-  let baseURL = spParams_.baseURL
-  let httpMethod = "POST"
-  let reqPath = Path ["funnyName"]
-  let reqHeaders =
-        []
   let reqQuery =
         []
   let spReq = HttpRequest

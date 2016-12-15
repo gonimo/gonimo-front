@@ -34,7 +34,7 @@ import Gonimo.Pux (Component, ComponentType, noEffects, onlyModify, Update, runG
 import Gonimo.Server.Db.Entities (Invitation(Invitation), Family(Family))
 import Gonimo.Server.Types (InvitationDelivery(EmailInvitation), AuthToken, AuthToken(GonimoSecret))
 import Gonimo.Types (Key(Key), Secret(Secret))
-import Gonimo.WebAPI (postInvitationsOutbox, postInvitationsByFamilyId, postFamilies, SPParams_(SPParams_), postAccounts, postFunnyName)
+import Gonimo.WebAPI (postInvitationsOutbox, postInvitationsByFamilyId, postFamilies, SPParams_(SPParams_), postAccounts)
 import Gonimo.WebAPI.Types (AuthData(AuthData))
 import Partial.Unsafe (unsafeCrashWith)
 import Pux (renderToDOM, fromSimple, start)

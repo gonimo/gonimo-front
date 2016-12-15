@@ -42,3 +42,15 @@ _Baby = Lens.prism Baby unwrap
   where
     unwrap (Baby x) = Either.Right x
     unwrap y = Either.Left y
+
+_FamilyName :: Lens.PrismP FamilyName { familyMemberName :: String, familyName :: String }
+_FamilyName = Lens.prism FamilyName unwrap
+  where
+    unwrap (FamilyName r) = Either.Right r
+    unwrap y = Either.Left y
+
+familyName :: forall a b r. Lens.LensP FamilyName String
+familyName = Lens.lens unwrap wrap
+  where
+    unwrap (FamilyName n) = n.familyName
+    wrap (FamilyName f) n = FamilyName (f { familyName = n })

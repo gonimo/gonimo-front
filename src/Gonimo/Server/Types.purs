@@ -29,3 +29,11 @@ data DeviceType =
 
 derive instance genericDeviceType :: Generic DeviceType
 
+data FamilyName =
+    FamilyName {
+      familyMemberName :: String
+    , familyName :: String
+    }
+
+derive instance genericFamilyName :: Generic FamilyName
+

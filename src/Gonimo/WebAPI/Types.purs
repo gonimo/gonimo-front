@@ -3,7 +3,7 @@ module Gonimo.WebAPI.Types where
 
 import Data.Maybe (Maybe)
 import Gonimo.Server.Db.Entities (Account, Device, Invitation)
-import Gonimo.Server.Types (AuthToken, InvitationDelivery)
+import Gonimo.Server.Types (AuthToken, FamilyName, InvitationDelivery)
 import Gonimo.Types (Date, Key)
 import Prim (String)
 
@@ -21,7 +21,7 @@ derive instance genericAuthData :: Generic AuthData
 
 data InvitationInfo =
     InvitationInfo {
-      invitationInfoFamily :: String
+      invitationInfoFamily :: FamilyName
     , invitationInfoSendingDevice :: String
     , invitationInfoSendingUser :: Maybe String
     }

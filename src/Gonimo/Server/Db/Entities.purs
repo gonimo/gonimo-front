@@ -2,7 +2,7 @@
 module Gonimo.Server.Db.Entities where
 
 import Data.Maybe (Maybe)
-import Gonimo.Server.Types (AuthToken, InvitationDelivery)
+import Gonimo.Server.Types (AuthToken, FamilyName, InvitationDelivery)
 import Gonimo.Types (Date, Key, Secret)
 import Prim (Array, String)
 
@@ -18,7 +18,7 @@ derive instance genericAccount :: Generic Account
 
 data Device =
     Device {
-      deviceName :: String
+      deviceName :: Maybe String
     , deviceAuthToken :: AuthToken
     , deviceAccountId :: Key Account
     , deviceLastAccessed :: Date
@@ -41,7 +41,7 @@ derive instance genericInvitation :: Generic Invitation
 
 data Family =
     Family {
-      familyName :: String
+      familyName :: FamilyName
     , familyCreated :: Date
     , familyLastAccessed :: Date
     , familyLastUsedBabyNames :: Array String
