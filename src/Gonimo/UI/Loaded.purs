@@ -229,9 +229,7 @@ handleRequestCentral c = do
                          pure <<< SetCentral <<< CentralInvite $ InviteC.init invData
                    ]
     ReqCentralOverview -> handleSetCentral CentralOverview
-    ReqCentralBaby     -> do
-                          handleSetCentral CentralBaby
-                          pure [ pure $ SocketA SocketC.GetUserMedia ]
+    ReqCentralBaby     -> handleSetCentral CentralBaby
   case Tuple state.central c of
     Tuple CentralBaby ReqCentralBaby -> pure r
     Tuple CentralBaby _              -> pure $ [ pure $ SocketA SocketC.StopUserMedia ] <> r
