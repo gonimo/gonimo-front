@@ -183,26 +183,12 @@ viewStartButton state =
   [
     H.button [ A.className "btn btn-block btn-success"
              , A.style [ Tuple "margin-left" "0px" ]
-             , A.disabled $ isNothing state.localStream
              , A.type_ "button"
              , E.onClick $ const $ StartBabyStation
              ]
     [ H.text $ "Start Baby Station for cute " <> state.babyName <> " "
     , H.span [A.className "glyphicon glyphicon-transfer"] []
     ]
-  , H.div []
-    $ if isNothing state.localStream
-      then [ H.div [ A.className "alert alert-danger" ]
-             [ H.p [] [ H.text "We need to enable your camera/microphone first." ]
-             , H.button [ A.className "btn btn-block btn-default"
-                        , A.style [ Tuple "margin-left" "0px" ]
-                        , A.type_ "button"
-                        , E.onClick $ const $ GetUserMedia
-                        ]
-               [ H.text "Enable camera/microphone!" ]
-             ]
-           ]
-      else []
   ]
 
 viewParentChannelThumb :: forall ps. Props ps -> State

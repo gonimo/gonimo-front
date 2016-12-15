@@ -35,7 +35,7 @@ import Gonimo.Server.Db.Entities (Family(Family), Device(Device))
 import Gonimo.Server.Db.Entities.Helpers (runFamily)
 import Gonimo.Server.State.Types (SessionId(SessionId))
 import Gonimo.Types (Secret(Secret), Key(Key))
-import Gonimo.UI.Socket.Lenses (_MediaStreamConstraints, video, constraints, sessionId, streamURL, isAvailable, mediaStream, babyName, currentFamily, localStream, authData, newBabyName, previewEnabled)
+import Gonimo.UI.Socket.Lenses (gotStreamAction, _MediaStreamConstraints, video, constraints, sessionId, streamURL, isAvailable, mediaStream, babyName, currentFamily, localStream, authData, newBabyName, previewEnabled)
 import Gonimo.UI.Socket.Message (decodeFromString)
 import Gonimo.UI.Socket.Types (toDeviceType, makeChannelId, toCSecret, toTheirId, ChannelId(ChannelId), channel, Props, State, Action(..))
 import Gonimo.WebAPI (deleteSocketByFamilyIdByToDeviceByFromDeviceByChannelId, postSocketByFamilyIdByToDevice, deleteSessionByFamilyIdByDeviceIdBySessionId)
@@ -62,6 +62,7 @@ init authData' = { authData : authData' -- FIXME: Does this really have to be he
                  , newBabyName : "baby"
                  , constraints : MediaStreamConstraints { audio : true, video : true }
                  , previewEnabled : false
+                 , gotStreamAction : Nothing
                  }
 
 update :: forall ps. Update (Props ps) State Action
@@ -69,7 +70,7 @@ update action = case action of
   AcceptConnection channelId'                    -> handleAcceptConnection channelId'
   GetUserMedia                                   -> handleGetUserMedia
   StopUserMedia                                  -> handleStopUserMedia
-  EnablePreview onoff                            -> onlyModify $ _ { previewEnabled = onoff }
+  EnablePreview onoff                            -> handleEnablePreview onoff
   AddChannel channelId' cState                   -> do channel channelId' .= Just cState
                                                        updateChannel channelId' ChannelC.InitConnection
   ChannelA channelId' (ChannelC.ReportError err) -> pure [pure $ ReportError err]
@@ -134,6 +135,8 @@ handleStopUserMedia = do
     Nothing -> pure []
     Just stream -> do
       localStream .= Nothing :: (Maybe MediaStream)
+      streamURL .= Nothing :: (Maybe String)
+      previewEnabled .= false
       pure [ do
                 liftEff $ stopStream stream
                 pure Nop
@@ -144,20 +147,26 @@ handleStartBabyStation = do
   state <- get :: Component (Props ps) State State
   if isJust state.localStream
     then do
-    isAvailable .= true
-    previewEnabled .= true
-    else isAvailable .= false
-  noEffects
+      isAvailable .= true
+      previewEnabled .= true
+      pure []
+    else do
+      isAvailable .= false
+      gotStreamAction .= Just StartBabyStation
+      handleGetUserMedia
 
 handleInitBabyStation :: forall ps.
                           MediaStream
                        -> ComponentType (Props ps) State Action
 handleInitBabyStation stream = do
   localStream .= Just stream
-  pure [ do
+  state <- get :: Component (Props ps) State State
+  let gotItAction = state.gotStreamAction
+  gotStreamAction .= Nothing :: Maybe Action
+  pure $ [ do
             url <- liftEff <<< createObjectURL <<< mediaStreamToBlob $ stream
             pure $ SetStreamURL (Just url)
-       ]
+       ] <> Arr.fromFoldable (pure <$> gotItAction)
 
 handleAcceptConnection :: forall ps. ChannelId -> ComponentType (Props ps) State Action
 handleAcceptConnection channelId'@(ChannelId theirId secret) = do
@@ -194,7 +203,15 @@ handleStopBabyStation = do
   props <- ask :: Component (Props ps) State (Props ps)
   isAvailable .= false
   previewEnabled .= false
-  pure $ doCleanup state CloseBabyChannel []
+  pure $ doCleanup state CloseBabyChannel [pure StopUserMedia]
+
+handleEnablePreview :: forall ps. Boolean -> ComponentType (Props ps) State Action
+handleEnablePreview onoff = do
+  state <- get :: Component (Props ps) State State
+  modify $ _ { previewEnabled = onoff }
+  if onoff
+    then handleGetUserMedia
+    else handleStopUserMedia
 
 handleServerFamilyGoOffline :: forall ps. Key Family -> SessionId -> ComponentType (Props ps) State Action
 handleServerFamilyGoOffline familyId sessionId = do

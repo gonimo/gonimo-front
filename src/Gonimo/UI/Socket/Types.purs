@@ -45,6 +45,7 @@ type State =
   , isAvailable :: Boolean
   , localStream :: Maybe MediaStream
   , streamURL :: Maybe String
+  , gotStreamAction :: Maybe Action
   , previewEnabled :: Boolean
   , constraints :: MediaStreamConstraints
   }

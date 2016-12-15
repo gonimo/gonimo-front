@@ -50,6 +50,9 @@ constraints = Lens.lens _."constraints" (_ { "constraints" = _ })
 video :: forall a b r. Lens.Lens { "video" :: a | r } { "video" :: b | r } a b
 video = Lens.lens _."video" (_ { "video" = _ })
 
+gotStreamAction :: forall a b r. Lens.Lens { "gotStreamAction" :: a | r } { "gotStreamAction" :: b | r } a b
+gotStreamAction = Lens.lens _."gotStreamAction" (_ { "gotStreamAction" = _ })
+
 _AcceptConnection :: Lens.PrismP Action ChannelId
 _AcceptConnection = Lens.prism AcceptConnection unwrap
   where
