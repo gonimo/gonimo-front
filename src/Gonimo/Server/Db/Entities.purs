@@ -18,7 +18,7 @@ derive instance genericAccount :: Generic Account
 
 data Device =
     Device {
-      deviceName :: String
+      deviceName :: Maybe String
     , deviceAuthToken :: AuthToken
     , deviceAccountId :: Key Account
     , deviceLastAccessed :: Date
