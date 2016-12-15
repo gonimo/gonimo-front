@@ -168,8 +168,8 @@ getAccountsByAccountIdFamilies accountId = do
   
 postFamilies :: forall eff m.
                 (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-                => String -> m (Key Family)
-postFamilies reqBody = do
+                => m (Key Family)
+postFamilies = do
   spOpts_' <- ask
   let spOpts_ = case spOpts_' of SPSettings_ o -> o
   let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
@@ -184,7 +184,6 @@ postFamilies reqBody = do
                  { method = httpMethod
                  , url = reqUrl
                  , headers = defaultRequest.headers <> reqHeaders
-                 , content = toNullable <<< Just <<< printJson <<< encodeJson $ reqBody
                  }
   affResp <- affjax affReq
   getResult affReq decodeJson affResp
@@ -503,26 +502,6 @@ getSessionByFamilyId familyId = do
   let reqHeaders =
         [{ field : "Authorization" , value : encodeHeader spOpts_' authorization
          }]
-  let affReq = defaultRequest
-                 { method = httpMethod
-                 , url = reqUrl
-                 , headers = defaultRequest.headers <> reqHeaders
-                 }
-  affResp <- affjax affReq
-  getResult affReq decodeJson affResp
-  
-postFunnyName :: forall eff m.
-                 (MonadReader (SPSettings_ SPParams_) m, MonadError AjaxError m, MonadAff ( ajax :: AJAX | eff) m)
-                 => m String
-postFunnyName = do
-  spOpts_' <- ask
-  let spOpts_ = case spOpts_' of SPSettings_ o -> o
-  let spParams_ = case spOpts_.params of SPParams_ ps_ -> ps_
-  let baseURL = spParams_.baseURL
-  let httpMethod = "POST"
-  let reqUrl = baseURL <> "funnyName"
-  let reqHeaders =
-        []
   let affReq = defaultRequest
                  { method = httpMethod
                  , url = reqUrl

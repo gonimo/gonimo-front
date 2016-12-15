@@ -6,7 +6,7 @@ import Data.Lens as Lens
 import Prelude as Prelude
 import Data.Maybe (Maybe)
 import Gonimo.Server.Db.Entities (Device(Device), Account(Account))
-import Gonimo.Server.Types (AuthToken)
+import Gonimo.Server.Types (AuthToken, FamilyName)
 import Gonimo.Types (Date, Key(Key))
 
 
@@ -39,7 +39,7 @@ invitationInfoSendingUser :: forall a b r. Lens.Lens { "invitationInfoSendingUse
 invitationInfoSendingUser = Lens.lens _."invitationInfoSendingUser" (_ { "invitationInfoSendingUser" = _ })
 
 _InvitationInfo :: Lens.PrismP InvitationInfo
-                     { invitationInfoFamily :: String
+                     { invitationInfoFamily :: FamilyName
                      , invitationInfoSendingDevice :: String
                      , invitationInfoSendingUser :: Maybe String
                      }
