@@ -27,7 +27,8 @@ import Data.Tuple (Tuple(Tuple))
 import Gonimo.Client.Types (GonimoError(UnexpectedAction), Gonimo, Settings, class ReportErrorAction)
 import Gonimo.Pux (noEffects, Component, makeChildData, liftChild, onlyModify, Update, ToChild, runGonimo, ComponentType, class MonadComponent)
 import Gonimo.Server.Db.Entities (Family(Family), Device(Device), Invitation(Invitation))
-import Gonimo.Server.Types (DeviceType, InvitationDelivery(EmailInvitation), AuthToken, AuthToken(GonimoSecret))
+import Gonimo.Server.Types (DeviceType, InvitationDelivery(EmailInvitation), AuthToken, AuthToken(GonimoSecret), FamilyName(..))
+import Gonimo.Server.Types.Lenses (familyName)
 import Gonimo.Types (Key(Key), Secret(Secret))
 import Gonimo.Util (fromMaybeM)
 import Gonimo.WebAPI (deleteInvitationsByInvitationSecret, putInvitationsInfoByInvitationSecret, postFamilies, SPParams_(SPParams_), postAccounts)
@@ -145,7 +146,7 @@ viewAskUser (InvitationInfo invitation) =
         , div [A.className "jumbotron"]
           [ div [A.className "container"]
             [ text $ "You received an invitation to join family: "
-            , em [] [ text invitation.invitationInfoFamily ]
+            , em [] [ text (invitation.invitationInfoFamily^.familyName) ]
             , text "!"
             , br [] []
             , text $ "You got invited by a device answering to the name: "
@@ -156,7 +157,7 @@ viewAskUser (InvitationInfo invitation) =
 
         , div [ E.onKeyUp handleEnter ]
           [ p [] [ text $ "Do you really want to join the family \""
-                <> invitation.invitationInfoFamily <> "\"?"
+                <> invitation.invitationInfoFamily^.familyName <> "\"?"
                  ]
           , p []
               [ text $ "Pick wisely! Gonimo is the most awesome baby monitor on the planet, but only with the right family!"
@@ -197,7 +198,7 @@ viewAccepted props (InvitationInfo invitation) =
   [  span [ A.title "You chose wisely!" ]
           [ p []
             [ text $ "Your device \"" <> getDeviceName props <> "\" is now a member of family: "
-              <> invitation.invitationInfoFamily <> "!"
+              <> invitation.invitationInfoFamily^.familyName <> "!"
             ]
           , p []
             [ text "Now go on and ...." ]
@@ -215,7 +216,7 @@ viewDeclined :: InvitationInfo -> Html Action
 viewDeclined (InvitationInfo invitation) = viewLogo
                           $ span [ A.title "You chose wisely!" ]
                                  [ text $ "You did not join the stalker family: "
-                                 , em [] [ text invitation.invitationInfoFamily ]
+                                 , em [] [ text (invitation.invitationInfoFamily^.familyName) ]
                                  , text "!"
                                  ]
 

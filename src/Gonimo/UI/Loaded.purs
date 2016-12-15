@@ -65,6 +65,7 @@ import Gonimo.Server.Db.Entities (Device(Device), Family(Family))
 import Gonimo.Server.Db.Entities.Helpers (runFamily)
 import Gonimo.Server.Error (ServerError(InvalidAuthToken))
 import Gonimo.Server.Types (DeviceType(Baby, NoBaby), AuthToken, AuthToken(GonimoSecret))
+import Gonimo.Server.Types.Lenses (familyName)
 import Gonimo.Types (dateToString, Key(Key), Secret(Secret))
 import Gonimo.UI.AcceptInvitation (isAccepted)
 import Gonimo.UI.Error (handleError, viewError, class ErrorAction, UserError(NoError, DeviceInvalid))
@@ -72,7 +73,7 @@ import Gonimo.UI.Loaded.Central (CentralItem, getCentrals)
 import Gonimo.UI.Loaded.Types (babiesOnlineCount, CentralReq(..), mkInviteProps, mkSettings, mkProps, central, familyIds, authData, currentFamily, socketS, overviewS, Props, acceptS, inviteS, State, Action(..), Central(..), InviteProps)
 import Gonimo.UI.Socket.Lenses (sessionId)
 import Gonimo.Util (userShow, toString, fromString)
-import Gonimo.WebAPI (getFamiliesByFamilyIdDeviceInfos, postSessionByFamilyIdByDeviceId, postInvitationsByFamilyId, postFamilies, getFamiliesByFamilyId, postFunnyName, SPParams_(SPParams_), postAccounts)
+import Gonimo.WebAPI (getFamiliesByFamilyIdDeviceInfos, postSessionByFamilyIdByDeviceId, postInvitationsByFamilyId, postFamilies, getFamiliesByFamilyId, SPParams_(SPParams_), postAccounts)
 import Gonimo.WebAPI.Types (DeviceInfo(DeviceInfo), AuthData(AuthData))
 import Gonimo.WebAPI.Types.Helpers (runAuthData)
 import Partial.Unsafe (unsafeCrashWith)
@@ -218,8 +219,7 @@ handleRequestCentral c = do
       case state^?currentFamily of
         Nothing    -> pure
                    [ toIO (mkSettings $ state^.authData) $ do
-                        name <- postFunnyName
-                        fid' <- postFamilies name
+                        fid' <- postFamilies
                         invData <- postInvitationsByFamilyId fid'
                         pure <<< SetCentral <<< CentralInvite $ InviteC.init invData
                    ]
@@ -494,7 +494,7 @@ viewFamilyChooser state =
       ]
     [ i [A.className "fa fa-fw fa-users"] []
     , text " "
-    , text $ fromMaybe "" $ _.familyName <<< runFamily <$> (state.socketS.currentFamily >>= flip Map.lookup state.families)
+    , text $ fromMaybe "" $ getFamilyName <$> (state.socketS.currentFamily >>= flip Map.lookup state.families)
     {--, span [] [text $ fromMaybe "" $ _.familyName <<< runFamily <$> (state.socketS.currentFamily >>= flip Map.lookup state.families)]--}
     , text " "
     , span [A.className "caret"] [] ]
@@ -504,13 +504,15 @@ viewFamilyChooser state =
                          <<< Map.toList $ state.families)
   ]
   where
+    getFamilyName (Family f) = f.familyName^.familyName
+
     doSwitchFamily :: Key Family -> Action
     doSwitchFamily = SocketA <<< SocketC.SwitchFamily
 
     viewFamily :: Maybe (Key Family) -> Key Family -> Family -> Html Action
     viewFamily currentFamilyId familyId (Family family) =
         li [] [a [E.onClick $ const $ doSwitchFamily familyId ] $
-                 [text family.familyName] <> if Just familyId == currentFamilyId
+                 [text (family.familyName^.familyName)] <> if Just familyId == currentFamilyId
                                                 then [text " ✔"]
                                                 else []
               ]

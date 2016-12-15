@@ -54,7 +54,7 @@ import Gonimo.UI.Error (viewError, handleError, class ErrorAction, UserError(NoE
 import Gonimo.UI.Loaded.Serializer (store, needsWrite)
 import Gonimo.Util (fromMaybeM, coerceEffects)
 import Gonimo.Util (sampleUrl)
-import Gonimo.WebAPI (postFunnyName, SPParams_(SPParams_), postAccounts)
+import Gonimo.WebAPI (SPParams_(SPParams_), postAccounts)
 import Gonimo.WebAPI.Types (AuthData(AuthData))
 import Gonimo.WebAPI.Types.Helpers (runAuthData)
 import Partial.Unsafe (unsafeCrashWith)
