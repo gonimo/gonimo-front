@@ -22,9 +22,13 @@ exports.differentObject = function(obj1) {
 };
 
 
+// Reuse the same audio context, because the number of audio contexts to allocate is limited.
+var alertAudioContext = new window.AudioContext();
+var decodedSound = null;
+
 exports.boostVolumeMediaStream = function (stream) {
     return function () {
-        var ctx = new window.AudioContext();
+        var ctx = alertAudioContext;
         var source = ctx.createMediaStreamSource(stream);
         var gainNode = ctx.createGain();
         gainNode.gain.value = 10;
@@ -40,10 +44,6 @@ exports.boostVolumeMediaStream = function (stream) {
         return outStream;
     };
 };
-
-// Reuse the same audio context, because the number of audio contexts to allocate is limited.
-var alertAudioContext = new window.AudioContext();
-var decodedSound = null;
 
 exports._loadSound = function (success) {
     return function (error) {
