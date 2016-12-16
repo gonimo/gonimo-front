@@ -335,10 +335,12 @@ viewHeader state =
             [ burgerButton
             , a [ A.className "navbar-brand"]
               [ img [ A.alt "gonimo"
-                    , A.src "./pix/gonimo-brand-01.svg"
-                    , A.width "45px"
-                    , A.height "45px"
-                    , A.style [Tuple "padding" "5px 7.5px 0px 7.5px"]
+                    -- , A.src "./pix/gonimo-brand-01.svg"
+                    , A.src "./pix/gonimo-Weihnachts-Logo_2_app-12.svg"
+                    -- , A.width "45px"
+                    , A.height "50px"
+                    , A.style [Tuple "padding" "2px 3.5px 0px 3.5px"]
+                    -- , A.style [Tuple "padding" "5px 7.5px 0px 7.5px"]
                     ] []
               ]
             ]
