@@ -71,7 +71,7 @@ init stream = do
     origStream <- MaybeT <<< pure $ stream
     -- Close rtc connection once a track ends - so parent will notice local problems:
     tracks <- liftEff $ MediaStream.getTracks origStream
-    let addListener event = liftEff <<< addEventListener event (const (closeRTCPeerConnection rtcConnection))
+    let addListener event = liftEff <<< addEventListener event (const (closeRTCConnectionCatch rtcConnection))
     traverse_ (addListener "ended") tracks
     traverse_ (addListener "mute") tracks
     traverse_ (addListener "inactive") tracks -- Let's see if this helps
@@ -337,8 +337,7 @@ closeConnection = do
               $ traverse_ stopVibration state.vibrator
             pure $ SetVibrator Nothing
         , liftEff $ do
-            catchException (\_ -> Console.log "Closing RTC connection failed!")
-              $ closeRTCPeerConnection conn
+            closeRTCConnectionCatch conn
             pure ConnectionClosed
         ]
     <> alarmA
@@ -464,3 +463,7 @@ getSubscriptions props =
   in
     receiveMessage props.familyId props.theirId props.ourId props.cSecret
 
+closeRTCConnectionCatch :: forall eff. RTCPeerConnection -> Eff eff Unit
+closeRTCConnectionCatch conn =
+  catchException (\_ -> coerceEffects $ Console.log "Closing RTC connection failed!")
+  $ closeRTCPeerConnection conn
