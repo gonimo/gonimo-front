@@ -1,25 +1,18 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -fno-warn-unused-imports #-}
 module Main where
 
-import           Control.Category                    ((>>>))
 import           Control.Monad
 import qualified Data.ByteString.Char8               as B'
 import qualified Data.ByteString.Lazy.Char8          as B
 import           System.Console.GetOpt
 {-import           Data.ByteString.Lazy.Char8  (ByteString)-}
-import qualified Data.ByteString.Lazy.Search        as B
-import qualified Data.ByteString.Search             as B'
-import           Data.ByteString.Search.Substitution
 import qualified Data.ByteString.Lazy.Search         as B
 import           Data.Conduit                        ((=$=))
 import qualified Data.Conduit                        as C
 import qualified Data.Conduit.Binary                 as C
 import qualified Data.Conduit.List                   as C
 import           Data.Digest.Pure.MD5                as MD5
-import           Data.Foldable
-import           Data.List                           (delete)
 import qualified Data.Map                            as M
 import           Data.Monoid                         ((<>))
 import           Development.Shake
