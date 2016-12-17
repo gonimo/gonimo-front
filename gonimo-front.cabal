@@ -23,12 +23,14 @@ executable build
   -- other-extensions:
   build-depends:       base >=4.8 && <4.10
                ,       bytestring
+               ,       conduit
+               ,       conduit-extra
                ,       containers
                ,       directory
                ,       filepath
                ,       pureMD5
                ,       shake
                ,       stringsearch
-               ,       tagsoup
+
   hs-source-dirs:      build
   default-language:    Haskell2010
