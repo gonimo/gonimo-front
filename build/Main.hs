@@ -3,21 +3,22 @@
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 module Main where
 
+import           Control.Category                    ((>>>))
 import           Control.Monad
+import qualified Data.ByteString.Char8               as B'
+import qualified Data.ByteString.Lazy.Char8          as B
 import           System.Console.GetOpt
-import           Control.Category ((>>>))
-import qualified Data.ByteString.Lazy.Char8  as B
-import           Data.ByteString.Lazy.Char8  (ByteString)
-import qualified Data.ByteString.Char8  as B'
 {-import           Data.ByteString.Lazy.Char8  (ByteString)-}
-import           Data.ByteString.Lazy.Search
+import qualified Data.ByteString.Lazy.Search        as B
+import qualified Data.ByteString.Search             as B'
 import           Data.ByteString.Search.Substitution
-import           Data.Digest.Pure.MD5        as MD5
+import           Data.Digest.Pure.MD5                as MD5
 import           Data.Foldable
-import qualified Data.Map                    as M
-import           Data.Monoid                 ((<>))
+import           Data.List                           (delete)
+import qualified Data.Map                            as M
+import           Data.Monoid                         ((<>))
 import           Development.Shake
-import           System.Directory            (createDirectory)
+import           System.Directory                    (createDirectoryIfMissing)
 import           System.FilePath
 
 data Located a = Located FilePath a
@@ -32,9 +33,10 @@ flags = [Option "" ["prod"] (NoArg $ Right Prod) "build for production"]
 main :: IO ()
 main = shakeArgsWith shakeOptions flags $ \flagVals _ -> build (Prod `elem` flagVals)
 
-srcDir, outputDir :: FilePath
+srcDir, outputDir, outputDir':: FilePath
 srcDir = "support"
 outputDir = "dist"
+outputDir' = "static" </> outputDir
 
 templateName, templateName' :: FilePath
 templateName = "prod.index.html"
@@ -46,12 +48,20 @@ outputName' = outputDir </> outputName
 
 appName, appName' :: FilePath
 appName = "app.js"
-appName' = srcDir </> appName
+appName' = outputDir' </> appName
+
+blacklist :: [String]
+-- | list of extensions
+blacklist = [ ".jpg", ".jpeg", ".png", ".gif"
+            , ".mp3", ".wav", ".ogg"
+            , ".otf", ".woff", ".woff2", ".ttf", ".eot"
+            ]
 
 build :: Bool -> IO (Maybe (Rules ()))
 build isProd = return $ Just $ do
-  want [appName']
+  want [appName', outputName']                                                                -- step 1 - generate app.js to static/dist/
   action $ do
+    liftIO $ createDirectoryIfMissing True outputDir'
     psFiles <- getDirectoryFiles "" ["src//*"]
     need (psFiles ++ ["bower.json", "package.json"])
     unit (bowerInstall >> bowerPrune)
@@ -59,34 +69,36 @@ build isProd = return $ Just $ do
     fmap sed browserify >>= (if isProd then uglify else return)
                         >>= (liftIO . B.writeFile appName')
 
-  want $ map ("static" </>) [outputName']
-  action $ do
-    support <- getDirectoryFiles "support" ["//*"]
-    supportMD5 <-
+    support <- getDirectoryFiles "" ["support//*"]
+    mapM_ (\f -> safeCopyFile' f (outputDir' </> removeTLD f)) support
+    distFiles <- getDirectoryFiles "" ["static/dist//*"]
+    liftIO $ print distFiles
+    need distFiles
+                                                                                 -- step 3 - generate md5sums for all files
+
+    md5Sums :: M.Map B'.ByteString B'.ByteString <-
       fmap M.fromList $
-      forM support $ \p -> do
-           p' <- liftIO $ B.readFile $ "support" </> p
-           return ( B.toStrict $ B.pack p
-                  , B.pack $ "/" </> outputDir </> p <> "?" <> show (md5 p'))
-    b <- doesDirectoryExist ("static" </> outputDir)
-    unless b $ liftIO $ createDirectory ("static" </> outputDir)
-    need [templateName']
-    template <- liftIO $ B.readFile templateName'
-    let (indexHTML,filesToCopy) = M.foldrWithKey replaceCollect (template,[]) supportMD5
+        forM distFiles $ \filePath -> do
+           fileContent <- liftIO $ B.readFile filePath
+           return ( B'.pack $ takeFileName filePath
+                  , B'.pack $ removeTLD $ filePath <> "?" <> show (md5 fileContent))
+    liftIO $ print md5Sums
+    let md5Files = filter ((`notElem` blacklist) . takeExtensions) distFiles     -- step 4 - replace links with link?md5um
+    forM_ md5Files $ \fileName -> do
+      fileContent :: B'.ByteString <- liftIO $ B'.readFile fileName
+      let replacedContents = M.foldrWithKey B.replace (B.fromStrict fileContent) md5Sums
+      liftIO $ B.writeFile fileName replacedContents
+      liftIO $ Prelude.putStrLn fileName
 
-    for_ filesToCopy $ \f -> copyFile' (srcDir </> f) ("static" </> outputDir </> f)
-    liftIO $ B.writeFile ("static" </> outputName') indexHTML
+ where safeCopyFile' :: FilePath -> FilePath -> Action ()
+       safeCopyFile' from to = do liftIO $ createDirectoryIfMissing True (takeDirectory to)
+                                  copyFile' from to
 
- where replaceCollect str rep tl@(tmplt,l) =
-         if null $ indices str tmplt
-            then tl
-            else (replace (B'.pack "/"<>str) rep tmplt, B'.unpack str:l)
-
-       browserify :: Action ByteString
+       browserify :: Action B.ByteString
        browserify = fromStdout <$> cmd "pulp" ("browserify" : ["-O" | isProd])
-       sed :: ByteString -> ByteString
-       sed = replace (B'.pack "://localhost:8081/") (B.pack "s://b00.gonimo.com/")
-       uglify :: ByteString -> Action ByteString
+       sed :: B.ByteString -> B.ByteString
+       sed = B.replace (B'.pack "://localhost:8081/") (B.pack "s://b00.gonimo.com/")
+       uglify :: B.ByteString -> Action B.ByteString
        uglify s = fromStdout <$> cmd (AddPath ["./node_modules/uglify-js/bin/"] []) "uglifyjs" ["-c","--screw-ie8","-m"] (StdinBS s)
        npmInstall, bowerInstall, bowerPrune :: Action ()
        npmInstall = cmd "npm" ["install"]
