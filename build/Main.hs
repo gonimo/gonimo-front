@@ -44,7 +44,7 @@ templateName' = srcDir </> templateName
 
 outputName, outputName' :: FilePath
 outputName = "index.html"
-outputName' = outputDir </> outputName
+outputName' = outputDir' </> outputName
 
 appName, appName' :: FilePath
 appName = "app.js"
@@ -72,7 +72,6 @@ build isProd = return $ Just $ do
     support <- getDirectoryFiles "" ["support//*"]
     mapM_ (\f -> safeCopyFile' f (outputDir' </> removeTLD f)) support
     distFiles <- getDirectoryFiles "" ["static/dist//*"]
-    liftIO $ print distFiles
     need distFiles
                                                                                  -- step 3 - generate md5sums for all files
 
@@ -82,13 +81,11 @@ build isProd = return $ Just $ do
            fileContent <- liftIO $ B.readFile filePath
            return ( B'.pack $ takeFileName filePath
                   , B'.pack $ removeTLD $ filePath <> "?" <> show (md5 fileContent))
-    liftIO $ print md5Sums
     let md5Files = filter ((`notElem` blacklist) . takeExtensions) distFiles     -- step 4 - replace links with link?md5um
     forM_ md5Files $ \fileName -> do
       fileContent :: B'.ByteString <- liftIO $ B'.readFile fileName
       let replacedContents = M.foldrWithKey B.replace (B.fromStrict fileContent) md5Sums
       liftIO $ B.writeFile fileName replacedContents
-      liftIO $ Prelude.putStrLn fileName
 
  where safeCopyFile' :: FilePath -> FilePath -> Action ()
        safeCopyFile' from to = do liftIO $ createDirectoryIfMissing True (takeDirectory to)
