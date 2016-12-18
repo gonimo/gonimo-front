@@ -1,20 +1,18 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -fno-warn-unused-imports #-}
 module Main where
 
-import           Control.Category                    ((>>>))
 import           Control.Monad
 import qualified Data.ByteString.Char8               as B'
 import qualified Data.ByteString.Lazy.Char8          as B
 import           System.Console.GetOpt
 {-import           Data.ByteString.Lazy.Char8  (ByteString)-}
-import qualified Data.ByteString.Lazy.Search        as B
-import qualified Data.ByteString.Search             as B'
-import           Data.ByteString.Search.Substitution
+import qualified Data.ByteString.Lazy.Search         as B
+import           Data.Conduit                        ((=$=))
+import qualified Data.Conduit                        as C
+import qualified Data.Conduit.Binary                 as C
+import qualified Data.Conduit.List                   as C
 import           Data.Digest.Pure.MD5                as MD5
-import           Data.Foldable
-import           Data.List                           (delete)
 import qualified Data.Map                            as M
 import           Data.Monoid                         ((<>))
 import           Development.Shake
@@ -82,10 +80,12 @@ build isProd = return $ Just $ do
            return ( B'.pack $ takeFileName filePath
                   , B'.pack $ removeTLD $ filePath <> "?" <> show (md5 fileContent))
     let md5Files = filter ((`notElem` blacklist) . takeExtensions) distFiles     -- step 4 - replace links with link?md5um
-    forM_ md5Files $ \fileName -> do
-      fileContent :: B'.ByteString <- liftIO $ B'.readFile fileName
-      let replacedContents = M.foldrWithKey B.replace (B.fromStrict fileContent) md5Sums
-      liftIO $ B.writeFile fileName replacedContents
+    forM_ md5Files $ \fileName ->
+      let replaceContents content = M.foldrWithKey B.replace (B.fromStrict content) md5Sums
+       in liftIO $  C.runConduitRes
+                 $  C.sourceFile fileName
+                =$= C.map (B.toStrict . replaceContents)
+                =$= C.sinkFileCautious fileName
 
  where safeCopyFile' :: FilePath -> FilePath -> Action ()
        safeCopyFile' from to = do liftIO $ createDirectoryIfMissing True (takeDirectory to)
