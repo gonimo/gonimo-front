@@ -18,6 +18,7 @@ import           Data.Monoid                         ((<>))
 import           Development.Shake
 import           System.Directory                    (createDirectoryIfMissing)
 import           System.FilePath
+import           Data.List                           ((\\))
 
 data Located a = Located FilePath a
   deriving (Eq, Ord, Show)
@@ -67,7 +68,7 @@ build isProd = return $ Just $ do
     fmap sed browserify >>= uglify >>= (liftIO . B.writeFile appName')
 
     support <- getDirectoryFiles "" ["support//*"]
-    mapM_ (\f -> safeCopyFile' f (outputDir' </> removeTLD f)) support
+    mapM_ (\f -> safeCopyFile' f (outputDir' </> removeRoot srcDir f)) support
     distFiles <- getDirectoryFiles "" ["static/dist//*"]
     need distFiles
                                                                                  -- step 3 - generate md5sums for all files
@@ -76,8 +77,8 @@ build isProd = return $ Just $ do
       fmap M.fromList $
         forM distFiles $ \filePath -> do
            fileContent <- liftIO $ B.readFile filePath
-           return ( B'.pack $ takeFileName filePath
-                  , B'.pack $ removeTLD $ filePath <> "?" <> show (md5 fileContent))
+           return ( B'.pack $ removeRoot outputDir' filePath
+                  , B'.pack $ removeRoot outputDir' $ filePath <> "?" <> show (md5 fileContent))
     let md5Files = filter ((`notElem` blacklist) . takeExtensions) distFiles     -- step 4 - replace links with link?md5um
     forM_ md5Files $ \fileName ->
       let replaceContents content = M.foldrWithKey B.replace (B.fromStrict content) md5Sums
@@ -105,5 +106,5 @@ build isProd = return $ Just $ do
        bowerInstall = cmd "bower" ["install"]
        bowerPrune = cmd "bower" ["prune"]
 
-removeTLD :: FilePath -> FilePath
-removeTLD = joinPath . drop 1 . splitPath
+removeRoot :: FilePath -> FilePath -> FilePath
+removeRoot root path = path \\ addTrailingPathSeparator root -- Trailing path separtor needed because of weird </> behaviour!
