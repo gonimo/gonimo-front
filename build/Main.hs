@@ -64,8 +64,7 @@ build isProd = return $ Just $ do
     need (psFiles ++ ["bower.json", "package.json"])
     unit (bowerInstall >> bowerPrune)
     unit npmInstall
-    fmap sed browserify >>= (if isProd then uglify else return)
-                        >>= (liftIO . B.writeFile appName')
+    fmap sed browserify >>= uglify >>= (liftIO . B.writeFile appName')
 
     support <- getDirectoryFiles "" ["support//*"]
     mapM_ (\f -> safeCopyFile' f (outputDir' </> removeTLD f)) support
@@ -94,9 +93,13 @@ build isProd = return $ Just $ do
        browserify :: Action B.ByteString
        browserify = fromStdout <$> cmd "pulp" ("browserify" : ["-O" | isProd])
        sed :: B.ByteString -> B.ByteString
-       sed = B.replace (B'.pack "://localhost:8081/") (B.pack "s://b00.gonimo.com/")
+       sed = if isProd
+                then B.replace (B'.pack "://localhost:8081/") (B.pack "s://b00.gonimo.com/")
+                else id
        uglify :: B.ByteString -> Action B.ByteString
-       uglify s = fromStdout <$> cmd (AddPath ["./node_modules/uglify-js/bin/"] []) "uglifyjs" ["-c","--screw-ie8","-m"] (StdinBS s)
+       uglify s = if isProd
+                     then fromStdout <$> cmd (AddPath ["./node_modules/uglify-js/bin/"] []) "uglifyjs" ["-c","--screw-ie8","-m"] (StdinBS s)
+                     else return s
        npmInstall, bowerInstall, bowerPrune :: Action ()
        npmInstall = cmd "npm" ["install"]
        bowerInstall = cmd "bower" ["install"]
