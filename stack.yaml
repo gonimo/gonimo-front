@@ -14,3 +14,6 @@ extra-package-dbs: []
 
 system-ghc: true
 skip-ghc-check: true
+
+nix:
+  packages: [ zlib ]
